@@ -97,13 +97,15 @@ int main(int argc, char *argv[]) {
     bool proc_verbose = false;
     bool debug = false;
     bool userandomrhs = true;
+    bool damppoly = false;
+    bool addRoots = true;
     int frequency = -1;        // frequency of status test output.
     int blocksize = 1;         // blocksize
     int numrhs = 1;            // number of right-hand sides to solve for
-    int maxiters = -1;         // maximum number of iterations allowed per linear system
+    int maxiters = 3000;         // maximum number of iterations allowed per linear system
     int maxdegree = 25;        // maximum degree of polynomial
     int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
-    int maxrestarts = 15;      // number of restarts allowed
+    int maxrestarts = 50;      // number of restarts allowed
     std::string outersolver("Block Gmres");
     std::string polytype("Arnoldi");
     std::string filename("orsirr1.hb");
@@ -115,6 +117,8 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
     cmdp.setOption("debug","nondebug",&debug,"Print debugging information from solver.");
     cmdp.setOption("use-random-rhs","use-rhs",&userandomrhs,"Use linear system RHS or random RHS to generate polynomial.");
+    cmdp.setOption("damp-poly","no-damp",&damppoly,"Damp the polynomial.");
+    cmdp.setOption("add-roots","no-add-roots",&addRoots,"Add extra roots as needed to stabilize the polynomial.");
     cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
     cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
@@ -156,6 +160,12 @@ int main(int argc, char *argv[]) {
       X = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecX);
       B = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecB);
     }
+    std::vector<double> tempnorm(numrhs), temprhs(numrhs);
+    MVT::MvNorm(*B, temprhs);
+    MVT::MvNorm(*X, tempnorm);
+    std::cout << "Norm of B: " << temprhs[0] << " Norm of X: " << tempnorm[0] << std::endl;
+    //X->PutScalar( 0.0 );
+    //B->PutScalar( 1.0 );
     //
     // ************Construct preconditioner*************
     //
@@ -230,6 +240,8 @@ int main(int argc, char *argv[]) {
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Verbosity", verbosity );               // Verbosity for polynomial construction
     polyList.set( "Random RHS", userandomrhs );           // Use RHS from linear system or random vector
+    polyList.set( "Damped Poly", damppoly );              // Option to damp polynomial
+    polyList.set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
     if ( outersolver != "" ) {
       polyList.set( "Outer Solver", outersolver );
       polyList.set( "Outer Solver Params", belosList );
@@ -256,6 +268,7 @@ int main(int argc, char *argv[]) {
     // *************Start the block Gmres iteration*************************
     // *******************************************************************
     //
+    
     // Create an iterative solver manager.
     RCP< Belos::SolverManager<double,MV,OP> > newSolver
       = rcp( new Belos::GmresPolySolMgr<double,MV,OP>(rcp(&problem,false), rcp(&polyList,false)));
@@ -292,6 +305,7 @@ int main(int argc, char *argv[]) {
       std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
       for ( int i=0; i<numrhs; i++) {
         double actRes = actual_resids[i]/rhs_norm[i];
+        std::cout << "Act resid: " << actual_resids[i] << "  rhs norm " << rhs_norm[i] << std::endl;
         std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
         if (actRes > tol) badRes = true;
       }

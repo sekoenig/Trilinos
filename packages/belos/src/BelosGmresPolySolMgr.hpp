@@ -38,6 +38,9 @@
 //
 // ************************************************************************
 //@HEADER
+//
+//TODO: 
+//- Update all parameter lists in documentation. 
 
 #ifndef BELOS_GMRES_POLY_SOLMGR_HPP
 #define BELOS_GMRES_POLY_SOLMGR_HPP
@@ -300,6 +303,8 @@ private:
   int verbosity_;
   bool hasOuterSolver_;
   bool randomRHS_;
+  bool damp_;
+  bool addRoots_;
   std::string polyType_;
   std::string outerSolverType_;
   std::string orthoType_;
@@ -330,6 +335,8 @@ GmresPolySolMgr<ScalarType,MV,OP>::GmresPolySolMgr () :
   verbosity_ (verbosity_default_),
   hasOuterSolver_ (false),
   randomRHS_ (true),
+  damp_ (false),
+  addRoots_ (true),
   polyType_ (polyType_default_),
   outerSolverType_ (outerSolverType_default_),
   orthoType_ (orthoType_default_),
@@ -352,6 +359,8 @@ GmresPolySolMgr (const Teuchos::RCP<LinearProblem<ScalarType,MV,OP> > &problem,
   verbosity_ (verbosity_default_),
   hasOuterSolver_ (false),
   randomRHS_ (true),
+  damp_ (false),
+  addRoots_ (true),
   polyType_ (polyType_default_),
   outerSolverType_ (outerSolverType_default_),
   orthoType_ (orthoType_default_),
@@ -384,7 +393,7 @@ GmresPolySolMgr<ScalarType,MV,OP>::getValidParameters() const
     // The static_cast is to resolve an issue with older clang versions which
     // would cause the constexpr to link fail. With c++17 the problem is resolved.
     pl->set("Polynomial Type", static_cast<const char *>(polyType_default_),
-      "The type of GMRES polynomial that is used as a preconditioner.");
+      "The type of GMRES polynomial that is used as a preconditioner: Arnoldi, Gmres, or Roots.");
     pl->set("Polynomial Tolerance", static_cast<MagnitudeType>(DefaultSolverParameters::polyTol),
       "The relative residual tolerance that used to construct the GMRES polynomial.");
     pl->set("Maximum Degree", static_cast<int>(maxDegree_default_),
@@ -520,6 +529,22 @@ setParameters (const Teuchos::RCP<Teuchos::ParameterList>& params)
 
   // Update parameter in our list.
   params_->set("Random RHS", randomRHS_);
+  
+  
+  // Check for polynomial damping
+  if (params->isParameter("Damped Poly")) {
+    damp_ = params->get("Damped Poly",false);
+  }
+  // Update parameter in our list.
+  params_->set("Damped Poly", damp_);
+
+  // Check for added roots
+  if (params->isParameter("Add Roots")) {
+    addRoots_ = params->get("Add Roots",true);
+  }
+
+  // Update parameter in our list.
+  params_->set("Add Roots", addRoots_);
 
   // Create the timers if we need to.
 #ifdef BELOS_TEUCHOS_TIME_MONITOR

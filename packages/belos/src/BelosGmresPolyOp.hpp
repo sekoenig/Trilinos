@@ -76,7 +76,9 @@
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_SerialDenseMatrix.hpp"
 #include "Teuchos_SerialDenseVector.hpp"
+#include "Teuchos_SerialDenseSolver.hpp"
 #include "Teuchos_ParameterList.hpp"
+
 
 namespace Belos {
  
@@ -212,17 +214,19 @@ namespace Belos {
         label_ (label_default_),
         polyType_ (polyType_default_),
         orthoType_ (orthoType_default_),
-        dim_(0)
+        dim_(0),
+        damp_ (damp_default_),
+        addRoots_ (addRoots_default_)
     {
       setParameters( params_ );
 
-      if (polyType_ == "Arnoldi")
+      if (polyType_ == "Arnoldi" || polyType_=="Roots")
         generateArnoldiPoly();
       else if (polyType_ == "Gmres")
         generateGmresPoly();
       else
-        TEUCHOS_TEST_FOR_EXCEPTION(polyType_!="Arnoldi"&&polyType_!="Gmres",std::logic_error,
-          "Belos::GmresPolyOp(): Invalid polynomial type.");
+        TEUCHOS_TEST_FOR_EXCEPTION(polyType_!="Arnoldi"&&polyType_!="Gmres"&&polyType_!="Roots",std::logic_error,
+          "Belos::GmresPolyOp: \"Polynomial Type\" must be either \"Arnoldi\", \"Gmres\", or \"Roots\".");
     }
 
     //! Create a simple polynomial of dimension 1.
@@ -270,6 +274,7 @@ namespace Belos {
     void ApplyPoly ( const MV& x, MV& y ) const;
     void ApplyArnoldiPoly ( const MV& x, MV& y ) const;
     void ApplyGmresPoly ( const MV& x, MV& y ) const;
+    void ApplyRootsPoly ( const MV& x, MV& y ) const;
 
     /*! \brief This routine casts the MultiVec to GmresPolyMv to retrieve the MV.  Then the above
         apply method is called.
@@ -292,6 +297,7 @@ namespace Belos {
     typedef MultiVecTraits<ScalarType,MV> MVT;
     typedef Teuchos::ScalarTraits<ScalarType> SCT ;
     typedef typename Teuchos::ScalarTraits<ScalarType>::magnitudeType MagnitudeType;
+    typedef Teuchos::ScalarTraits<MagnitudeType> MCT ;
 
     // Default polynomial parameters
     static constexpr int maxDegree_default_ = 25;
@@ -301,6 +307,8 @@ namespace Belos {
     static constexpr const char * polyType_default_ = "Arnoldi";
     static constexpr const char * orthoType_default_ = "DGKS";
     static constexpr std::ostream * outputStream_default_ = &std::cout;
+    static constexpr bool damp_default_ = false;
+    static constexpr bool addRoots_default_ = true;
 
     // Variables for generating the polynomial
     Teuchos::RCP<LinearProblem<ScalarType,MV,OP> > problem_;
@@ -323,6 +331,8 @@ namespace Belos {
     std::string polyType_;
     std::string orthoType_;
     int dim_;
+    bool damp_;
+    bool addRoots_;
 
     // Variables for Arnoldi polynomial
     mutable Teuchos::RCP<MV> V_, wL_, wR_;
@@ -333,11 +343,23 @@ namespace Belos {
     bool autoDeg = false;
     Teuchos::SerialDenseMatrix< OT, ScalarType > pCoeff_;
 
+    // Variables for Roots polynomial:
+    //
+    // These are to hold the harmonic Ritz values.  If poly doesn't have max deg, 
+    // arrays will be long, but I think this will be okay. 
+    //int length_ = maxDegree_;
+    //MagnitudeType thetaReal_[length_];
+    //MagnitudeType thetaImag_[length_];
+    Teuchos::SerialDenseMatrix< OT, MagnitudeType > theta_; 
+    
+    //Sorting function:
+    void SortModLeja(Teuchos::SerialDenseMatrix< OT, MagnitudeType > &thetaN, std::vector<int> &index) const ;
   };
   
   template <class ScalarType, class MV, class OP>
   void GmresPolyOp<ScalarType, MV, OP>::setParameters( const Teuchos::RCP<Teuchos::ParameterList>& params_in )
   {
+    std::cout << "In the new poly op!" << std::endl;
     // Check which Gmres polynomial to use
     if (params_in->isParameter("Polynomial Type")) {
       polyType_ = params_in->get("Polynomial Type", polyType_default_);
@@ -390,6 +412,18 @@ namespace Belos {
     if (params_in->isParameter("Output Stream")) {
       outputStream_ = Teuchos::getParameter<Teuchos::RCP<std::ostream> >(*params_in,"Output Stream");
     }
+
+    // Check for damped polynomial
+    if (params_in->isParameter("Damped Poly")) {
+      damp_ = params_in->get("Damped Poly", damp_default_);
+      std::cout << "Damp option is: " << damp_ << std::endl;
+    }
+
+    // Check for root-adding
+    if (params_in->isParameter("Add Roots")) {
+      addRoots_ = params_in->get("Add Roots", addRoots_default_);
+      std::cout << "Add Roots option is: " << addRoots_ << std::endl;
+    }
   }
 
   template <class ScalarType, class MV, class OP>
@@ -409,6 +443,11 @@ namespace Belos {
     {
       Teuchos::RCP< MV > Vtemp = MVT::CloneCopy(*V0);
       problem_->applyLeftPrec( *Vtemp, *V0);
+    }
+    if ( damp_ )
+    {
+      Teuchos::RCP< MV > Vtemp = MVT::CloneCopy(*V0);
+      problem_->apply( *Vtemp, *V0);
     }
 
     for(int i=0; i< maxDegree_+1; i++)
@@ -501,6 +540,7 @@ namespace Belos {
     MVT::MvInit( *newX, SCT::zero() );
     if (randomRHS_) {
       MVT::MvRandom( *newB );
+      //MVT::MvPrint(*newB, std::cout );
     }
     else {
       MVT::Assign( *(MVT::CloneView(*(problem_->getRHS()), idx)), *newB );
@@ -563,7 +603,12 @@ namespace Belos {
     // Create the first block in the current Krylov basis (residual).
     Teuchos::RCP<MV> V_0 = MVT::CloneCopy( *newB );
     if ( !LP_.is_null() )
-      problem_->applyLeftPrec( *newB, *V_0 );
+      newProblem->applyLeftPrec( *newB, *V_0 );
+    if ( damp_ )
+    {
+      Teuchos::RCP< MV > Vtemp = MVT::CloneCopy(*V_0);
+      newProblem->apply( *Vtemp, *V_0 );
+    }
   
     // Get a matrix to hold the orthonormalization coefficients.
     r0_.resize(1);
@@ -606,23 +651,299 @@ namespace Belos {
     if (dim_ == 0) {
       return;
     }
- 
-    //  Make a view and then copy the RHS of the least squares problem.
-    //
-    y_ = Teuchos::SerialDenseMatrix<OT,ScalarType>( Teuchos::Copy, *gmresState.z, dim_, 1 );
-    H_ = *gmresState.H;
+    if(polyType_ == "Arnoldi"){
+      //  Make a view and then copy the RHS of the least squares problem.
+      //
+      y_ = Teuchos::SerialDenseMatrix<OT,ScalarType>( Teuchos::Copy, *gmresState.z, dim_, 1 );
+      H_ = *gmresState.H;
 
-    //
-    // Solve the least squares problem.
-    //
-    Teuchos::BLAS<OT,ScalarType> blas;
-    blas.TRSM( Teuchos::LEFT_SIDE, Teuchos::UPPER_TRI, Teuchos::NO_TRANS,
-               Teuchos::NON_UNIT_DIAG, dim_, 1, SCT::one(),
-               gmresState.R->values(), gmresState.R->stride(),
-               y_.values(), y_.stride() );
+      //
+      // Solve the least squares problem.
+      //
+      Teuchos::BLAS<OT,ScalarType> blas;
+      blas.TRSM( Teuchos::LEFT_SIDE, Teuchos::UPPER_TRI, Teuchos::NO_TRANS,
+          Teuchos::NON_UNIT_DIAG, dim_, 1, SCT::one(),
+          gmresState.R->values(), gmresState.R->stride(),
+          y_.values(), y_.stride() );
+    }
+    else{ //Roots Poly
+    H_ = Teuchos::SerialDenseMatrix<OT,ScalarType>(Teuchos::Copy, *gmresState.H, dim_, dim_);
+    //Zero out below subdiagonal of H:
+    for(int i=0; i <= dim_-3; i++)
+    {
+      for(int k=i+2; k <= dim_-1; k++)
+      {
+        H_(k,i) = SCT::zero();
+      }
+    }
+    //Extra copy of H because equilibrate changes the matrix: 
+    Teuchos::SerialDenseMatrix<OT,ScalarType> Htemp (Teuchos::Copy, H_, dim_, dim_);
 
+    //std::cout<<"H matrix is:" << std::endl;
+    //H_.print(std::cout);
+
+    ScalarType Hlast = (*gmresState.H)(dim_,dim_-1);
+    //std::cout<< "Hlast is: " << Hlast << std::endl;   
+
+    Teuchos::SerialDenseMatrix<OT,ScalarType> HlastCol (Teuchos::View, H_, dim_, 1, 0, dim_-1);
+    //std::cout<< "H last column is: " << HlastCol << std::endl;
+
+    Teuchos::SerialDenseMatrix< OT, ScalarType > F(dim_,1), E(dim_,1);
+    E.putScalar(SCT::zero());
+    E(dim_-1,0) = SCT::one();
+      
+    Teuchos::SerialDenseSolver< OT, ScalarType > HSolver;
+    HSolver.setMatrix( Teuchos::rcp( &Htemp, false ) );
+    HSolver.solveWithTransposeFlag( Teuchos::CONJ_TRANS );
+    HSolver.setVectors( Teuchos::rcp( &F, false ), Teuchos::rcp( &E, false ) );
+    HSolver.factorWithEquilibration( true );
+    int info = 0;
+    info = HSolver.factor();
+    if(info != 0)
+      std::cout << "Hsolver factor: info = " << info << std::endl;
+    
+    info = HSolver.solve();
+    if(info != 0)
+      std::cout << "Hsolver solve : info = " << info << std::endl;
+
+    F.scale(Hlast*Hlast); 
+    //std::cout<< "F scaled is: " << F << std::endl;
+    HlastCol += F; 
+    //std::cout<< "New H is: " << H_ << std::endl;
+
+    Teuchos::LAPACK< OT, ScalarType > lapack;
+    theta_.shape(dim_,2);//1st col for real part, 2nd col for complex
+    //theta_.putScalar(8764.0);
+    //std::cout << "Orig theta is: " << theta_ << std::endl;
+
+    const int ldv = 1;
+    ScalarType* vlr = 0;
+
+    // Size of workspace and workspace for DGEEV
+    int lwork = -1;
+    std::vector<ScalarType> work(1);
+    std::vector<MagnitudeType> rwork(2*dim_);
+
+    //std::vector<MagnitudeType> wr(dim_), wi(dim_);
+    
+   // std::cout<< "wr is : " << std::endl;
+   // for(int i=0; i<wr.size(); ++i)
+  //std::cout << wr[i] << ' ';
+  //  std::cout<< "wi is : " << std::endl;
+  //  for(int i=0; i<wi.size(); ++i)
+  //std::cout << wi[i] << ' ';
+
+    //Unneeded, but to test like GCRODR:
+     // Real and imaginary (right) eigenvectors; Don't zero out matrix when constructing
+    //Teuchos::SerialDenseMatrix<int,ScalarType> vr(dim_,dim_,false);
+
+    info = 2476;
+    lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
+    //lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),&wr[0], &wi[0],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
+    //lapack.GEEV('N', 'V', dim_, H_.values(), H_.stride(), &wr[0], &wi[0],
+    //          vlr, ldv, vr.values(), vr.stride(), &work[0], lwork, &rwork[0], &info);
+    lwork = std::abs (static_cast<int> (Teuchos::ScalarTraits<ScalarType>::real (work[0])));
+    std::cout << "lwork is " << lwork << std::endl;
+    work.resize( lwork );
+    //lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),&wr[0], &wi[0],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
+    //lapack.GEEV('N', 'V', dim_, H_.values(), H_.stride(), &wr[0], &wi[0],
+    //          vlr, ldv, vr.values(), vr.stride(), &work[0], lwork, &rwork[0], &info);
+    lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
+    //
+    //std::cout<< "wr is : " << std::endl;
+    //for(int i=0; i<wr.size(); ++i)
+ // std::cout << wr[i] << ' ';
+//    for (std::vector<MagnitudeType>::const_iterator i = wr.begin(); i != wr.end(); ++i)
+//    std::cout << *i << ' ';
+      
+  //  std::cout<< "wi is : " << std::endl;
+   //     for(int i=0; i<wi.size(); ++i)
+    //      std::cout << wi[i] << ' ';
+//    for (std::vector<MagnitudeType>::const_iterator i = wi.begin(); i != wi.end(); ++i)
+//    std::cout << *i << ' ';
+
+    if(info != 0)
+      std::cout << "GEEV solve : info = " << info << std::endl;
+    std::cout << std::scientific << "Harmonic Ritz Values are: " << theta_ << std::endl;
+
+    std::vector<int> index(dim_);
+    for(int i=0; i<dim_; ++i)
+    { index[i] = i; }
+
+    SortModLeja(theta_,index);
+    //std::cout << "Actual theta is: " << theta_ << std::endl;
+
+    //Section to check for root adding:
+    std::vector<std::complex<MagnitudeType>> cmplxHRitz (dim_);
+    for(int i=0; i<cmplxHRitz.size(); ++i)
+      {cmplxHRitz[i] = std::complex<MagnitudeType>( theta_(i,0), theta_(i,1) );}
+    std::cout << std::endl;
+    //std::cout << "My complex harm ritz values are: " << std::endl;
+    //for(int i=0; i<cmplxHRitz.size(); ++i)
+    //{  std::cout << cmplxHRitz[i] << std::endl; }
+    //std::cout << std::endl;
+    
+    std::vector<MagnitudeType> pof (dim_,1.0);
+    //std::cout << "pof is : " << std::endl;
+    for(int j=0; j<dim_; ++j)
+    {
+      for(int i=0; i<dim_; ++i)
+      {
+        if(i!=j)
+        {
+          pof[j] = std::abs(pof[j]*(1.0-(cmplxHRitz[j]/cmplxHRitz[i])));
+        }
+      }
+      //std::cout << pof[j] << std::endl;
+    }
+    //std::cout << std::endl;
+
+    std::vector<int> extra (dim_);
+    int totalExtra = 0;
+    //std::cout << "Extra is: " << std::endl;
+    for(int i=0; i<dim_; ++i)
+    {
+      extra[i] = ceil((log10(pof[i])-4.0)/14.0);
+      if(extra[i] > 0)
+      {
+        totalExtra += extra[i];
+      }
+      //std::cout << extra[i] << std::endl;
+    }
+    std::cout <<std::endl;
+
+    std::cout << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;
+
+    if(addRoots_ && totalExtra>0)
+    {
+      theta_.reshape(dim_+totalExtra,2);
+      Teuchos::SerialDenseMatrix<OT,MagnitudeType> thetaPert (Teuchos::Copy, theta_, dim_+totalExtra, 2);
+
+      //Add extra eigenvalues to matrix and perturb for sort:
+      int count = dim_;
+      for(int i=0; i<dim_; ++i)
+      {
+        for(int j=0; j< extra[i]; ++j)
+        {
+          theta_(count,0) = theta_(i,0);
+          theta_(count,1) = theta_(i,1);
+          thetaPert(count,0) = theta_(i,0)+(j+MCT::one())*5e-8;
+          //std::cout << "Theta is: " << theta_(i,0) << " (j+1.0)*0.5= " << (j+1.0)*0.5 << " sum is: " << theta_(i,0)+(j+1.0)*0.5 << std::endl;
+          std::cout << std::scientific << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "Orig val is: " << theta_(count,0) << " Perturbed value is: " << thetaPert(count,0) << std::endl;
+          thetaPert(count,1) = theta_(i,1);
+          ++count;
+        }
+      }
+
+    //  std::cout << "Theta with extra roots on end is : " << theta_ << std::endl;
+      std::cout << "Theta pertrubed is: " << thetaPert << std::endl;
+
+      dim_ += totalExtra;
+      std::cout<< "New poly degree is: " << dim_ << std::endl;
+
+      std::vector<int> index2(dim_);
+      for(int i=0; i<dim_; ++i)
+      { index2[i] = i; }
+
+      SortModLeja(thetaPert,index2);
+      for(int i=0; i<dim_; ++i)
+      { 
+        thetaPert(i,0) = theta_(index2[i],0);
+        thetaPert(i,1) = theta_(index2[i],1);
+      }
+
+      theta_ = thetaPert;
+
+      std::cout << "Sorted with extra roots theta is: " << theta_ << std::endl;
+
+    }
+
+    //End root adding section
+
+   }//End "else is roots poly"
   }
 
+  template <class ScalarType, class MV, class OP>
+  void GmresPolyOp<ScalarType, MV, OP>::SortModLeja(Teuchos::SerialDenseMatrix< OT, MagnitudeType > &thetaN, std::vector<int> &index) const 
+  {
+      int dimN = index.size();
+      std::vector<int> newIndex(dimN);
+    
+    //Section for Modified Leja Ordering:
+    
+      Teuchos::SerialDenseMatrix< OT, MagnitudeType > sorted (thetaN.numRows(), thetaN.numCols());
+      Teuchos::SerialDenseMatrix< OT, MagnitudeType > absVal (thetaN.numRows(), 1);
+      Teuchos::SerialDenseMatrix< OT, MagnitudeType > prod (thetaN.numRows(), 1);
+      for(int i = 0; i < dimN; i++)
+      {
+        absVal(i,0) = sqrt(thetaN(i,0)*thetaN(i,0) + thetaN(i,1)*thetaN(i,1));
+      }
+     // std::cout << "Abs vals of thetas: " << absVal << std::endl;
+     //std::cout << "first absVal: " << *absVal.values() << " last absVal: " << *(absVal.values() + dimN-1) << std::endl;
+      MagnitudeType * maxPointer = std::max_element(absVal.values(), (absVal.values()+dimN));
+      //std::cout << "value at maxPointer is : " << *maxPointer << std::endl;
+      int maxIndex = (maxPointer- absVal.values());
+      //std::cout << "Max abs val is: " << absVal(maxIndex, 0) << std::endl;
+
+      //Put larges abs value first in the list:
+      sorted(0,0) = thetaN(maxIndex,0);
+      sorted(0,1) = thetaN(maxIndex,1);
+      newIndex[0] = index[maxIndex];
+      //std::cout << "Sorted 718 is: " << sorted << std::endl;
+      int j;  
+      if(sorted(0,1)!= SCT::zero() && !SCT::isComplex) //Complex harmonic Ritz Value //Cmplx test
+      {
+        sorted(1,0) = thetaN(maxIndex,0);
+        sorted(1,1) = -thetaN(maxIndex,1);
+        newIndex[1] = index[maxIndex+1];
+         j = 2;
+        //std::cout << "Sorted 726 is: " << sorted << std::endl;
+      }
+      else
+      {
+        j = 1;
+      }
+      MagnitudeType a, b;
+      while( j < dimN)
+      {
+       for(int i = 0; i < dimN; i++) 
+       {
+          prod(i,0) = MCT::one();
+          for(int k = 0; k < j; k++)
+          {
+            a = thetaN(i,0) - sorted(k,0);
+            b = thetaN(i,1) - sorted(k,1);
+            //TODO Conversion of log to scalar/magnitudeType here??
+            //prod(i,0) = prod(i,0) + log10(Teuchos::ScalarTraits<MagnitudeType>::squareroot(a*a + b*b));//Cmplx test
+            prod(i,0) = prod(i,0) + log10(sqrt(a*a + b*b));
+          }
+        }
+        MagnitudeType * maxPointer = std::max_element(prod.values(), (prod.values()+dimN));
+        int maxIndex = (maxPointer- prod.values());
+       // std::cout << "Theta next max is: " << *maxPointer << std::endl;
+        sorted(j,0) = thetaN(maxIndex,0);
+        sorted(j,1) = thetaN(maxIndex,1);
+        newIndex[j] = index[maxIndex];
+        //std::cout << "Sorted 749 is: " << sorted << std::endl;
+        if(sorted(j,1)!= SCT::zero() && !SCT::isComplex) //Complex harmonic Ritz Value //Cmplx test
+        {
+          j++;
+          sorted(j,0) = thetaN(maxIndex,0);
+          sorted(j,1) = -thetaN(maxIndex,1);
+          newIndex[j] = index[maxIndex+1];
+          //std::cout << "Sorted 753 is: " << sorted << std::endl;
+        }
+        j++;
+      }
+      thetaN = sorted;
+      index = newIndex;
+     // std::cout << "Sorted theta is: " << thetaN << std::endl;
+     // std::cout << "New index is: " << std::endl;
+     // for(int i=0; i<index.size(); ++i)
+     //   std::cout << index[i] << std::endl;
+     // std::cout <<std::endl;
+      //End Modified Leja ordering
+  }
   template <class ScalarType, class MV, class OP>
   void GmresPolyOp<ScalarType, MV, OP>::ApplyPoly( const MV& x, MV& y ) const 
   {
@@ -631,6 +952,8 @@ namespace Belos {
         ApplyArnoldiPoly(x, y);
       else if (polyType_ == "Gmres")
         ApplyGmresPoly(x, y);
+      else if (polyType_ == "Roots")
+        ApplyRootsPoly(x, y);
     }
     else {
       // Just apply the operator in problem_ to x and return y.
@@ -667,6 +990,56 @@ namespace Belos {
       }
       problem_->apply(*X, *Y);
       MVT::MvAddMv(pCoeff_(i,0), *Y, SCT::one(), y, y); //y= coeff_i(A^ix) +y
+    }
+
+    // Apply right preconditioner.
+    if (!RP_.is_null()) {
+      Teuchos::RCP<MV> Ytmp = MVT::CloneCopy(y);
+      problem_->applyRightPrec( *Ytmp, y );
+    }
+  }
+
+  template <class ScalarType, class MV, class OP>
+  void GmresPolyOp<ScalarType, MV, OP>::ApplyRootsPoly( const MV& x, MV& y ) const 
+  {
+    MVT::MvInit( y, SCT::zero() );
+    Teuchos::RCP<MV> prod = MVT::CloneCopy(x);
+    Teuchos::RCP<MV> Xtmp = MVT::Clone( x, MVT::GetNumberVecs(x) );
+    Teuchos::RCP<MV> Xtmp2 = MVT::Clone( x, MVT::GetNumberVecs(x) );
+
+    // Apply left preconditioner.
+    if (!LP_.is_null()) {
+      problem_->applyLeftPrec( *prod, *Xtmp ); // Left precondition x into the first vector 
+      prod = Xtmp;
+    } 
+    
+    int i=0;   
+    while(i < dim_-1)
+    {
+      if(theta_(i,1)== SCT::zero() || SCT::isComplex) //Real harmonic Ritz Value or complex scalars
+      {
+        MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(i,0), *prod, y); //poly = poly + 1/theta_i * prod
+        problem_->apply(*prod, *Xtmp); // temp = A*prod
+        MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/theta_(i,0), *Xtmp, *prod); //prod = prod - 1/theta_i * temp
+        i++;
+      }
+      else //Current theta is a+bi
+      {
+        MagnitudeType mod = theta_(i,0)*theta_(i,0) + theta_(i,1)*theta_(i,1); //mod = a^2 + b^2
+        problem_->apply(*prod, *Xtmp); // temp = A*prod
+        MVT::MvAddMv(2*theta_(i,0), *prod, -SCT::one(), *Xtmp, *Xtmp); //temp = 2a*prod-temp //TODO: This 2 in SCT form??
+        MVT::MvAddMv(SCT::one(), y, SCT::one()/mod, *Xtmp, y); //poly = poly + 1/mod*temp
+        if( i < dim_-2 )
+        {
+          problem_->apply(*Xtmp, *Xtmp2); // temp2 = A*temp
+          MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/mod, *Xtmp2, *prod); //prod = prod - 1/mod * temp2
+        }
+        i = i + 2; 
+      }
+    }
+    if(theta_(dim_-1,1)== SCT::zero() || SCT::isComplex) 
+    {
+      MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(dim_-1,0), *prod, y); //poly = poly + 1/theta_i * prod
     }
 
     // Apply right preconditioner.
