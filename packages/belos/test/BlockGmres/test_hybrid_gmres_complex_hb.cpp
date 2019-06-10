@@ -103,6 +103,8 @@ int main(int argc, char *argv[]) {
     bool norm_failure = false;
     bool proc_verbose = false;
     bool userandomrhs = true;
+    bool damppoly = false;
+    bool addRoots = true;
     int frequency = -1;        // frequency of status test output.
     int blocksize = 1;         // blocksize
     int numrhs = 1;            // number of right-hand sides to solve for
@@ -125,6 +127,8 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
+    cmdp.setOption("damp-poly","no-damp",&damppoly,"Damp the polynomial.");
+    cmdp.setOption("add-roots","no-add-roots",&addRoots,"Add extra roots as needed to stabilize the polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
     cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
     cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
@@ -222,6 +226,8 @@ int main(int argc, char *argv[]) {
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Verbosity", verbosity );               // Verbosity for polynomial construction
     polyList.set( "Random RHS", userandomrhs );           // Use RHS from linear system or random vector
+    polyList.set( "Damped Poly", damppoly );              // Option to damp polynomial
+    polyList.set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
     if ( outersolver != "" ) {
       polyList.set( "Outer Solver", outersolver );
       polyList.set( "Outer Solver Params", belosList );

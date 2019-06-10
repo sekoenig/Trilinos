@@ -60,6 +60,7 @@
   #include "Epetra_SerialComm.h"
 #endif
 #include "Epetra_CrsMatrix.h"
+#include <EpetraExt_MultiVectorIn.h>
 
 #include "Ifpack.h"
 
@@ -109,6 +110,7 @@ int main(int argc, char *argv[]) {
     std::string outersolver("Block Gmres");
     std::string polytype("Arnoldi");
     std::string filename("orsirr1.hb");
+    std::string rhsfile;
     std::string precond("right");
     MT tol = 1.0e-5;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
@@ -121,6 +123,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("add-roots","no-add-roots",&addRoots,"Add extra roots as needed to stabilize the polynomial.");
     cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
     cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
+    cmdp.setOption("rhsfile",&rhsfile,"Filename for test rhs b. ");
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
     cmdp.setOption("precond",&precond,"Preconditioning type (none, left, right).");
@@ -160,6 +163,18 @@ int main(int argc, char *argv[]) {
       X = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecX);
       B = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecB);
     }
+    if(rhsfile.compare("") != 0)
+    {
+      std::cout << "Reading in rhs" << std::endl;
+      Epetra_MultiVector *b=0;
+      int finfo = EpetraExt::MatrixMarketFileToMultiVector( rhsfile.c_str() , *Map, b );
+      if (finfo!=0)
+      {if(MyPID==0)std::cout << "First rhs file could not be read in!!!, info = "<< finfo << std::endl;}
+      else
+      {if(MyPID==0) std::cout << "rhs read was successful!" << std::endl;}
+      B = rcp(b);
+    }
+
     std::vector<double> tempnorm(numrhs), temprhs(numrhs);
     MVT::MvNorm(*B, temprhs);
     MVT::MvNorm(*X, tempnorm);
