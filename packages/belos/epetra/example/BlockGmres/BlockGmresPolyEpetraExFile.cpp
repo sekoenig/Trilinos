@@ -260,6 +260,7 @@ int main(int argc, char *argv[]) {
     polyList.set( "Random RHS", userandomrhs );           // Use RHS from linear system or random vector
     polyList.set( "Damped Poly", damppoly );              // Option to damp polynomial
     polyList.set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
+    polyList.set( "Orthogonalization", orthog);           // Type of orthogonalizaion: DGKS, IMGS, ICGS
     if ( outersolver != "" ) {
       polyList.set( "Outer Solver", outersolver );
       polyList.set( "Outer Solver Params", belosList );
