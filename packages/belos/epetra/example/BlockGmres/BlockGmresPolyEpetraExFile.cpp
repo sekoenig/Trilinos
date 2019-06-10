@@ -112,6 +112,7 @@ int main(int argc, char *argv[]) {
     std::string filename("orsirr1.hb");
     std::string rhsfile;
     std::string precond("right");
+    std::string orthog("DGKS");
     MT tol = 1.0e-5;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
 
@@ -131,6 +132,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
     cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
+    cmdp.setOption("orthog",&orthog,"Orthogonalization: DGKS, ICGS, IMGS");
     cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
     cmdp.setOption("max-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
     cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
@@ -165,7 +167,7 @@ int main(int argc, char *argv[]) {
     }
     if(rhsfile.compare("") != 0)
     {
-      std::cout << "Reading in rhs" << std::endl;
+      {if(MyPID==0) std::cout << "Reading in rhs" << std::endl;}
       Epetra_MultiVector *b=0;
       int finfo = EpetraExt::MatrixMarketFileToMultiVector( rhsfile.c_str() , *Map, b );
       if (finfo!=0)
@@ -178,7 +180,7 @@ int main(int argc, char *argv[]) {
     std::vector<double> tempnorm(numrhs), temprhs(numrhs);
     MVT::MvNorm(*B, temprhs);
     MVT::MvNorm(*X, tempnorm);
-    std::cout << "Norm of B: " << temprhs[0] << " Norm of X: " << tempnorm[0] << std::endl;
+    {if(MyPID==0) std::cout << "Norm of B: " << temprhs[0] << " Norm of X: " << tempnorm[0] << std::endl;}
     //X->PutScalar( 0.0 );
     //B->PutScalar( 1.0 );
     //
@@ -238,6 +240,7 @@ int main(int argc, char *argv[]) {
     belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
     belosList.set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
     belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested
+    belosList.set( "Orthogonalization", orthog);           // Type of orthogonalizaion: DGKS, IMGS, ICGS
     int verbosity = Belos::Errors + Belos::Warnings;
     if (verbose) {
       verbosity += Belos::FinalSummary + Belos::TimingDetails + Belos::StatusTestDetails;

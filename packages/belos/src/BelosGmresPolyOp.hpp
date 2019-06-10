@@ -359,7 +359,6 @@ namespace Belos {
   template <class ScalarType, class MV, class OP>
   void GmresPolyOp<ScalarType, MV, OP>::setParameters( const Teuchos::RCP<Teuchos::ParameterList>& params_in )
   {
-    std::cout << "In the new poly op!" << std::endl;
     // Check which Gmres polynomial to use
     if (params_in->isParameter("Polynomial Type")) {
       polyType_ = params_in->get("Polynomial Type", polyType_default_);
@@ -416,13 +415,11 @@ namespace Belos {
     // Check for damped polynomial
     if (params_in->isParameter("Damped Poly")) {
       damp_ = params_in->get("Damped Poly", damp_default_);
-      std::cout << "Damp option is: " << damp_ << std::endl;
     }
 
     // Check for root-adding
     if (params_in->isParameter("Add Roots")) {
       addRoots_ = params_in->get("Add Roots", addRoots_default_);
-      std::cout << "Add Roots option is: " << addRoots_ << std::endl;
     }
   }
 
@@ -439,13 +436,11 @@ namespace Belos {
     else
       MVT::Assign( *problem_->getRHS(), *V0 );
 
-    if ( !LP_.is_null() )
-    {
+    if ( !LP_.is_null() ) {
       Teuchos::RCP< MV > Vtemp = MVT::CloneCopy(*V0);
       problem_->applyLeftPrec( *Vtemp, *V0);
     }
-    if ( damp_ )
-    {
+    if ( damp_ ) {
       Teuchos::RCP< MV > Vtemp = MVT::CloneCopy(*V0);
       problem_->apply( *Vtemp, *V0);
     }
@@ -669,10 +664,8 @@ namespace Belos {
     else{ //Roots Poly
     H_ = Teuchos::SerialDenseMatrix<OT,ScalarType>(Teuchos::Copy, *gmresState.H, dim_, dim_);
     //Zero out below subdiagonal of H:
-    for(int i=0; i <= dim_-3; i++)
-    {
-      for(int k=i+2; k <= dim_-1; k++)
-      {
+    for(int i=0; i <= dim_-3; i++) {
+      for(int k=i+2; k <= dim_-1; k++) {
         H_(k,i) = SCT::zero();
       }
     }
@@ -724,54 +717,21 @@ namespace Belos {
     std::vector<ScalarType> work(1);
     std::vector<MagnitudeType> rwork(2*dim_);
 
-    //std::vector<MagnitudeType> wr(dim_), wi(dim_);
-    
-   // std::cout<< "wr is : " << std::endl;
-   // for(int i=0; i<wr.size(); ++i)
-  //std::cout << wr[i] << ' ';
-  //  std::cout<< "wi is : " << std::endl;
-  //  for(int i=0; i<wi.size(); ++i)
-  //std::cout << wi[i] << ' ';
-
-    //Unneeded, but to test like GCRODR:
-     // Real and imaginary (right) eigenvectors; Don't zero out matrix when constructing
-    //Teuchos::SerialDenseMatrix<int,ScalarType> vr(dim_,dim_,false);
-
     info = 2476;
     lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-    //lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),&wr[0], &wi[0],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-    //lapack.GEEV('N', 'V', dim_, H_.values(), H_.stride(), &wr[0], &wi[0],
-    //          vlr, ldv, vr.values(), vr.stride(), &work[0], lwork, &rwork[0], &info);
     lwork = std::abs (static_cast<int> (Teuchos::ScalarTraits<ScalarType>::real (work[0])));
-    std::cout << "lwork is " << lwork << std::endl;
     work.resize( lwork );
-    //lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),&wr[0], &wi[0],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-    //lapack.GEEV('N', 'V', dim_, H_.values(), H_.stride(), &wr[0], &wi[0],
-    //          vlr, ldv, vr.values(), vr.stride(), &work[0], lwork, &rwork[0], &info);
     lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-    //
-    //std::cout<< "wr is : " << std::endl;
-    //for(int i=0; i<wr.size(); ++i)
- // std::cout << wr[i] << ' ';
-//    for (std::vector<MagnitudeType>::const_iterator i = wr.begin(); i != wr.end(); ++i)
-//    std::cout << *i << ' ';
-      
-  //  std::cout<< "wi is : " << std::endl;
-   //     for(int i=0; i<wi.size(); ++i)
-    //      std::cout << wi[i] << ' ';
-//    for (std::vector<MagnitudeType>::const_iterator i = wi.begin(); i != wi.end(); ++i)
-//    std::cout << *i << ' ';
 
     if(info != 0)
       std::cout << "GEEV solve : info = " << info << std::endl;
-    std::cout << std::scientific << "Harmonic Ritz Values are: " << theta_ << std::endl;
+//    std::cout << std::scientific << "Harmonic Ritz Values are: " << theta_ << std::endl;
 
     std::vector<int> index(dim_);
     for(int i=0; i<dim_; ++i)
     { index[i] = i; }
 
     SortModLeja(theta_,index);
-    //std::cout << "Actual theta is: " << theta_ << std::endl;
 
     //Section to check for root adding:
     std::vector<std::complex<MagnitudeType>> cmplxHRitz (dim_);
@@ -785,12 +745,9 @@ namespace Belos {
     
     std::vector<MagnitudeType> pof (dim_,1.0);
     //std::cout << "pof is : " << std::endl;
-    for(int j=0; j<dim_; ++j)
-    {
-      for(int i=0; i<dim_; ++i)
-      {
-        if(i!=j)
-        {
+    for(int j=0; j<dim_; ++j) {
+      for(int i=0; i<dim_; ++i) {
+        if(i!=j) {
           pof[j] = std::abs(pof[j]*(1.0-(cmplxHRitz[j]/cmplxHRitz[i])));
         }
       }
@@ -829,14 +786,14 @@ namespace Belos {
           theta_(count,1) = theta_(i,1);
           thetaPert(count,0) = theta_(i,0)+(j+MCT::one())*5e-8;
           //std::cout << "Theta is: " << theta_(i,0) << " (j+1.0)*0.5= " << (j+1.0)*0.5 << " sum is: " << theta_(i,0)+(j+1.0)*0.5 << std::endl;
-          std::cout << std::scientific << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "Orig val is: " << theta_(count,0) << " Perturbed value is: " << thetaPert(count,0) << std::endl;
+          //std::cout << std::scientific << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "Orig val is: " << theta_(count,0) << " Perturbed value is: " << thetaPert(count,0) << std::endl;
           thetaPert(count,1) = theta_(i,1);
           ++count;
         }
       }
 
     //  std::cout << "Theta with extra roots on end is : " << theta_ << std::endl;
-      std::cout << "Theta pertrubed is: " << thetaPert << std::endl;
+      //std::cout << "Theta pertrubed is: " << thetaPert << std::endl;
 
       dim_ += totalExtra;
       std::cout<< "New poly degree is: " << dim_ << std::endl;
@@ -854,7 +811,7 @@ namespace Belos {
 
       theta_ = thetaPert;
 
-      std::cout << "Sorted with extra roots theta is: " << theta_ << std::endl;
+     // std::cout << "Sorted with extra roots theta is: " << theta_ << std::endl;
 
     }
 
