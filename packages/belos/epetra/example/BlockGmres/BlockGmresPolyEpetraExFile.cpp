@@ -54,6 +54,7 @@
 
 #include "EpetraExt_readEpetraLinearSystem.h"
 #include "Epetra_Map.h"
+#include "Epetra_Import.h"
 #ifdef EPETRA_MPI
   #include "Epetra_MpiComm.h"
 #else
@@ -177,6 +178,29 @@ int main(int argc, char *argv[]) {
       B = rcp(b);
     }
 
+    // Rebalance linear system across multiple processors.
+    // NOTE: After this section A, X, B, and Map will all be rebalanced over multiple MPI processors.
+    if ( Comm.NumProc() > 1 ) { 
+      RCP<Epetra_Map> newMap = Teuchos::rcp( new Epetra_Map( Map->NumGlobalElements(), Map->IndexBase(), Comm ) );
+      RCP<Epetra_Import> newImport = Teuchos::rcp( new Epetra_Import( *newMap, *Map ) );
+
+      // Create rebalanced versions of the linear system.
+      RCP<Epetra_CrsMatrix> newA = Teuchos::rcp( new Epetra_CrsMatrix( Copy, *newMap, 0 ) );
+      newA->Import( *A, *newImport, Insert );
+      newA->FillComplete();
+      RCP<Epetra_MultiVector> newB = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
+      newB->Import( *B, *newImport, Insert );
+      RCP<Epetra_MultiVector> newX = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
+      newX->Import( *X, *newImport, Insert );
+
+      // Set the pointers to the new rebalance linear system.
+      A = newA;
+      B = newB;
+      X = newX;
+      Map = newMap;
+    }   
+
+
     std::vector<double> tempnorm(numrhs), temprhs(numrhs);
     MVT::MvNorm(*B, temprhs);
     MVT::MvNorm(*X, tempnorm);
@@ -287,7 +311,7 @@ int main(int argc, char *argv[]) {
     // *************Start the block Gmres iteration*************************
     // *******************************************************************
     //
-    
+
     // Create an iterative solver manager.
     RCP< Belos::SolverManager<double,MV,OP> > newSolver
       = rcp( new Belos::GmresPolySolMgr<double,MV,OP>(rcp(&problem,false), rcp(&polyList,false)));
