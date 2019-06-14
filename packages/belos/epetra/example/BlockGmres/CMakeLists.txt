@@ -2,6 +2,7 @@
 ASSERT_DEFINED(${PACKAGE_NAME}_ENABLE_Galeri)
 ASSERT_DEFINED(${PACKAGE_NAME}_ENABLE_Triutils)
 ASSERT_DEFINED(${PACKAGE_NAME}_ENABLE_EpetraExt)
+ASSERT_DEFINED(${PACKAGE_NAME}_ENABLE_Isorropia)
 
 IF (${PACKAGE_NAME}_ENABLE_Triutils AND ${PACKAGE_NAME}_ENABLE_EpetraExt)
     
@@ -47,13 +48,17 @@ IF (${PACKAGE_NAME}_ENABLE_Triutils AND ${PACKAGE_NAME}_ENABLE_EpetraExt)
       STANDARD_PASS_OUTPUT
       )
 
-    TRIBITS_ADD_EXECUTABLE_AND_TEST(
-      BlockGmresPoly_Epetra_File_Ex
-      SOURCES BlockGmresPolyEpetraExFile.cpp
-      COMM serial mpi
-      ARGS "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Arnoldi"
-           "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Gmres"
-      )
+    ASSERT_DEFINED(${PACKAGE_NAME}_ENABLE_Isorropia)
+    IF(${PACKAGE_NAME}_ENABLE_Isorropia)
+
+      TRIBITS_ADD_EXECUTABLE_AND_TEST(
+        BlockGmresPoly_Epetra_File_Ex
+        SOURCES BlockGmresPolyEpetraExFile.cpp
+        COMM serial mpi
+        ARGS "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Arnoldi"
+             "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Gmres"
+        )
+    ENDIF(${PACKAGE_NAME}_ENABLE_Isorropia)
 
   ENDIF(${PACKAGE_NAME}_ENABLE_Ifpack)
 
