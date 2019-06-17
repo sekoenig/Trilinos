@@ -79,6 +79,9 @@
 #include "Teuchos_SerialDenseSolver.hpp"
 #include "Teuchos_ParameterList.hpp"
 
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+  #include "Teuchos_TimeMonitor.hpp"
+#endif // BELOS_TEUCHOS_TIME_MONITOR
 
 namespace Belos {
  
@@ -175,8 +178,6 @@ namespace Belos {
 
     private:
 
-      std::string polyUpdateLabel;
-
       typedef MultiVecTraits<ScalarType,MV> MVT;
 
       Teuchos::RCP<MV> mv_;
@@ -222,7 +223,10 @@ namespace Belos {
     {
       setParameters( params_ );
 
-      polyUpdateLabel = label_ + ": Hybrid Gmres";
+      polyUpdateLabel_ = label_ + ": Hybrid Gmres: Vector Update";
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+      timerPolyUpdate_ = Teuchos::TimeMonitor::getNewCounter(polyUpdateLabel_);
+#endif // BELOS_TEUCHOS_TIME_MONITOR
 
       if (polyType_ == "Arnoldi" || polyType_=="Roots")
         generateArnoldiPoly();
@@ -293,6 +297,11 @@ namespace Belos {
     int polyDegree() const { return dim_; }
 
     private:
+
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+    Teuchos::RCP<Teuchos::Time> timerPolyUpdate_;
+#endif // BELOS_TEUCHOS_TIME_MONITOR
+    std::string polyUpdateLabel_;
 
     //! Default constructor
     GmresPolyOp() {}
@@ -744,7 +753,7 @@ namespace Belos {
     // Store theta (with cols for real and imag parts of Harmonic Ritz Vals) 
     // as one vector of complex numbers to perform arithmetic:
     std::vector<std::complex<MagnitudeType>> cmplxHRitz (dim_);
-    for(int i=0; i<cmplxHRitz.size(); ++i){
+    for(unsigned int i=0; i<cmplxHRitz.size(); ++i){
       cmplxHRitz[i] = std::complex<MagnitudeType>( theta_(i,0), theta_(i,1) );
     }
    
@@ -767,7 +776,8 @@ namespace Belos {
         totalExtra += extra[i];
       }
     }
-    std::cout << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;
+    if (totalExtra)
+      printer_->stream(Warnings) << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;
 
     // If requested to add roots, append them to the theta matrix:
     if(addRoots_ && totalExtra>0)
@@ -918,7 +928,12 @@ namespace Belos {
       AX = Xtmp;
     } 
 
-    MVT::MvAddMv(pCoeff_(0,0), *AX, SCT::zero(), y, y); //y= coeff_i(A^ix)
+    {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+      Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+      MVT::MvAddMv(pCoeff_(0,0), *AX, SCT::zero(), y, y); //y= coeff_i(A^ix)
+    }
     for( int i=1; i < dim_+1; i++)
     {
       Teuchos::RCP<MV> X, Y;
@@ -933,7 +948,12 @@ namespace Belos {
         Y = AX;
       }
       problem_->apply(*X, *Y);
-      MVT::MvAddMv(pCoeff_(i,0), *Y, SCT::one(), y, y); //y= coeff_i(A^ix) +y
+      {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+        Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+        MVT::MvAddMv(pCoeff_(i,0), *Y, SCT::one(), y, y); //y= coeff_i(A^ix) +y
+      }
     }
 
     // Apply right preconditioner.
@@ -962,27 +982,50 @@ namespace Belos {
     {
       if(theta_(i,1)== SCT::zero() || SCT::isComplex) //Real Harmonic Ritz value or complex scalars
       {
-        MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(i,0), *prod, y); //poly = poly + 1/theta_i * prod
+        {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+          Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+          MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(i,0), *prod, y); //poly = poly + 1/theta_i * prod
+        }
         problem_->apply(*prod, *Xtmp); // temp = A*prod
-        MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/theta_(i,0), *Xtmp, *prod); //prod = prod - 1/theta_i * temp
+        {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+          Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+          MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/theta_(i,0), *Xtmp, *prod); //prod = prod - 1/theta_i * temp
+        }
         i++;
       }
       else //Current theta is complex and has a conjugate; combine to preserve real arithmetic 
       {
         MagnitudeType mod = theta_(i,0)*theta_(i,0) + theta_(i,1)*theta_(i,1); //mod = a^2 + b^2
         problem_->apply(*prod, *Xtmp); // temp = A*prod
-        MVT::MvAddMv(2*theta_(i,0), *prod, -SCT::one(), *Xtmp, *Xtmp); //temp = 2a*prod-temp 
-        MVT::MvAddMv(SCT::one(), y, SCT::one()/mod, *Xtmp, y); //poly = poly + 1/mod*temp
+        {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+          Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+          MVT::MvAddMv(2*theta_(i,0), *prod, -SCT::one(), *Xtmp, *Xtmp); //temp = 2a*prod-temp 
+          MVT::MvAddMv(SCT::one(), y, SCT::one()/mod, *Xtmp, y); //poly = poly + 1/mod*temp
+        }
         if( i < dim_-2 )
         {
           problem_->apply(*Xtmp, *Xtmp2); // temp2 = A*temp
-          MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/mod, *Xtmp2, *prod); //prod = prod - 1/mod * temp2
+          {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+            Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+            MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/mod, *Xtmp2, *prod); //prod = prod - 1/mod * temp2
+          }
         }
         i = i + 2; 
       }
     }
     if(theta_(dim_-1,1)== SCT::zero() || SCT::isComplex) 
     {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+      Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
       MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(dim_-1,0), *prod, y); //poly = poly + 1/theta_i * prod
     }
 
@@ -1060,7 +1103,12 @@ namespace Belos {
 
         // Compute A*v_curr - v_prev*H(1:i,i)
         Teuchos::SerialDenseMatrix<OT,ScalarType> h(Teuchos::View,H_,i+1,1,0,i);
-        MVT::MvTimesMatAddMv( -SCT::one(), *v_prev, h, SCT::one(), *v_next );
+        {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+          Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+          MVT::MvTimesMatAddMv( -SCT::one(), *v_prev, h, SCT::one(), *v_next );
+        }
 
         // Scale by H(i+1,i)
         MVT::MvScale( *v_next, SCT::one()/H_(i+1,i) );  
@@ -1068,10 +1116,18 @@ namespace Belos {
 
       // Compute output y = V*y_./r0_
       if (!RP_.is_null()) {
-        MVT::MvTimesMatAddMv( SCT::one()/r0_(0), *V_, y_, SCT::zero(), *wR_ );
+        {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+          Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
+          MVT::MvTimesMatAddMv( SCT::one()/r0_(0), *V_, y_, SCT::zero(), *wR_ );
+        }
         problem_->applyRightPrec( *wR_, *y_view );
       } 
       else {
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+        Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
+#endif
         MVT::MvTimesMatAddMv( SCT::one()/r0_(0), *V_, y_, SCT::zero(), *y_view );
       }
     } // (int j=0; j<n; ++j)
