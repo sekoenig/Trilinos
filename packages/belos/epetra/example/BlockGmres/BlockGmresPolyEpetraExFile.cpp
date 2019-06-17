@@ -125,6 +125,7 @@ int main(int argc, char *argv[]) {
     std::string filename("orsirr1.hb");
     std::string rhsfile;
     std::string precond("right");
+    std::string partition("zoltan");
     std::string orthog("DGKS");
     MT tol = 1.0e-5;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
@@ -150,6 +151,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("max-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
     cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
     cmdp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
+    cmdp.setOption("partition",&partition,"Partitioning type (zoltan, linear, none).");
     if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
       return -1;
     }
@@ -189,58 +191,58 @@ int main(int argc, char *argv[]) {
       {if(MyPID==0) std::cout << "rhs read was successful!" << std::endl;}
       B = rcp(b);
     }
-/*
-    // Rebalance linear system across multiple processors.
-    // NOTE: After this section A, X, B, and Map will all be rebalanced over multiple MPI processors.
-    if ( Comm.NumProc() > 1 ) { 
-      RCP<Epetra_Map> newMap = Teuchos::rcp( new Epetra_Map( Map->NumGlobalElements(), Map->IndexBase(), Comm ) );
-      RCP<Epetra_Import> newImport = Teuchos::rcp( new Epetra_Import( *newMap, *Map ) );
 
-      // Create rebalanced versions of the linear system.
-      RCP<Epetra_CrsMatrix> newA = Teuchos::rcp( new Epetra_CrsMatrix( Copy, *newMap, 0 ) );
-      newA->Import( *A, *newImport, Insert );
-      newA->FillComplete();
-      RCP<Epetra_MultiVector> newB = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
-      newB->Import( *B, *newImport, Insert );
-      RCP<Epetra_MultiVector> newX = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
-      newX->Import( *X, *newImport, Insert );
-
-      // Set the pointers to the new rebalance linear system.
-      A = newA;
-      B = newB;
-      X = newX;
-      Map = newMap;
-      }  
-      */
-
-    
 #ifdef EPETRA_MPI
-    //Redistribute system with Zoltan:
-    // Create the parameter list and fill it with values.
-    Teuchos::ParameterList paramlist;
-    Teuchos::ParameterList& sublist = paramlist.sublist("ZOLTAN");
-    paramlist.set("PARTITIONING METHOD", "HYPERGRAPH");
-    sublist.set("LB_APPROACH", "PARTITION");
+    if(partition == "linear"){
+      // Rebalance linear system across multiple processors.
+      // NOTE: After this section A, X, B, and Map will all be rebalanced over multiple MPI processors.
+      if ( Comm.NumProc() > 1 ) { 
+        RCP<Epetra_Map> newMap = Teuchos::rcp( new Epetra_Map( Map->NumGlobalElements(), Map->IndexBase(), Comm ) );
+        RCP<Epetra_Import> newImport = Teuchos::rcp( new Epetra_Import( *newMap, *Map ) );
 
-    Epetra_LinearProblem origProblem( A.get(), X.get(), B.get() );
-    if ( Comm.NumProc() > 1 ) { 
+        // Create rebalanced versions of the linear system.
+        RCP<Epetra_CrsMatrix> newA = Teuchos::rcp( new Epetra_CrsMatrix( Copy, *newMap, 0 ) );
+        newA->Import( *A, *newImport, Insert );
+        newA->FillComplete();
+        RCP<Epetra_MultiVector> newB = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
+        newB->Import( *B, *newImport, Insert );
+        RCP<Epetra_MultiVector> newX = Teuchos::rcp( new Epetra_MultiVector( *newMap, numrhs ) );
+        newX->Import( *X, *newImport, Insert );
 
-      Teuchos::RCP<const Epetra_CrsGraph> graph =  Teuchos::rcp( &(A->Graph()), false);
+        // Set the pointers to the new rebalance linear system.
+        A = newA;
+        B = newB;
+        X = newX;
+        Map = newMap;
+      }  
+    } else if(partition == "zoltan"){
+      //Redistribute system with Zoltan:
+      // Create the parameter list and fill it with values.
+      Teuchos::ParameterList paramlist;
+      Teuchos::ParameterList& sublist = paramlist.sublist("ZOLTAN");
+      paramlist.set("PARTITIONING METHOD", "HYPERGRAPH");
+      sublist.set("LB_APPROACH", "PARTITION");
 
-      Teuchos::RCP<Isorropia::Epetra::Partitioner> partitioner =
-        Teuchos::rcp(new Isorropia::Epetra::Partitioner(graph, paramlist));
+      Epetra_LinearProblem origProblem( A.get(), X.get(), B.get() );
+      if ( Comm.NumProc() > 1 ) { 
 
-      Isorropia::Epetra::Redistributor rd(partitioner);
+        Teuchos::RCP<const Epetra_CrsGraph> graph =  Teuchos::rcp( &(A->Graph()), false);
 
-      Teuchos::RCP<Epetra_CrsMatrix> bal_matrix = rd.redistribute(*origProblem.GetMatrix());
-      Teuchos::RCP<Epetra_MultiVector> bal_x = rd.redistribute(*origProblem.GetLHS());
-      Teuchos::RCP<Epetra_MultiVector> bal_b = rd.redistribute(*origProblem.GetRHS());
+        Teuchos::RCP<Isorropia::Epetra::Partitioner> partitioner =
+          Teuchos::rcp(new Isorropia::Epetra::Partitioner(graph, paramlist));
 
-      A = bal_matrix;
-      B = bal_b;
-      X = bal_x;
-      Map = Teuchos::rcp( new Epetra_Map( bal_matrix->RowMatrixRowMap() ) );
+        Isorropia::Epetra::Redistributor rd(partitioner);
 
+        Teuchos::RCP<Epetra_CrsMatrix> bal_matrix = rd.redistribute(*origProblem.GetMatrix());
+        Teuchos::RCP<Epetra_MultiVector> bal_x = rd.redistribute(*origProblem.GetLHS());
+        Teuchos::RCP<Epetra_MultiVector> bal_b = rd.redistribute(*origProblem.GetRHS());
+
+        A = bal_matrix;
+        B = bal_b;
+        X = bal_x;
+        Map = Teuchos::rcp( new Epetra_Map( bal_matrix->RowMatrixRowMap() ) );
+
+      }
     }
     //End redistribute
 #endif
