@@ -69,6 +69,18 @@
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
 
+//#ifdef EPETRA_MPI
+//#include <Isorropia_Epetra.hpp>
+//#include <EpetraExt_Isorropia_CrsGraph.h>
+//#include <EpetraExt_LPTrans_From_GraphTrans.h>
+//#endif
+
+#include <Epetra_LinearProblem.h>
+#include <Isorropia_Exception.hpp>
+#include <Isorropia_Epetra.hpp>
+#include <Isorropia_EpetraPartitioner.hpp>
+#include <Isorropia_EpetraRedistributor.hpp>
+
 int main(int argc, char *argv[]) {
   //
   int MyPID = 0;
@@ -177,7 +189,7 @@ int main(int argc, char *argv[]) {
       {if(MyPID==0) std::cout << "rhs read was successful!" << std::endl;}
       B = rcp(b);
     }
-
+/*
     // Rebalance linear system across multiple processors.
     // NOTE: After this section A, X, B, and Map will all be rebalanced over multiple MPI processors.
     if ( Comm.NumProc() > 1 ) { 
@@ -198,8 +210,41 @@ int main(int argc, char *argv[]) {
       B = newB;
       X = newX;
       Map = newMap;
-    }   
+      }  
+      */
 
+    
+#ifdef EPETRA_MPI
+    //Redistribute system with Zoltan:
+    // Create the parameter list and fill it with values.
+    Teuchos::ParameterList paramlist;
+    Teuchos::ParameterList& sublist = paramlist.sublist("ZOLTAN");
+    paramlist.set("PARTITIONING METHOD", "HYPERGRAPH");
+    sublist.set("LB_APPROACH", "PARTITION");
+
+    Epetra_LinearProblem origProblem( A.get(), X.get(), B.get() );
+    if ( Comm.NumProc() > 1 ) { 
+
+      Teuchos::RCP<const Epetra_CrsGraph> graph =  Teuchos::rcp( &(A->Graph()), false);
+
+      Teuchos::RCP<Isorropia::Epetra::Partitioner> partitioner =
+        Teuchos::rcp(new Isorropia::Epetra::Partitioner(graph, paramlist));
+
+      Isorropia::Epetra::Redistributor rd(partitioner);
+
+      Teuchos::RCP<Epetra_CrsMatrix> bal_matrix = rd.redistribute(*origProblem.GetMatrix());
+      Teuchos::RCP<Epetra_MultiVector> bal_x = rd.redistribute(*origProblem.GetLHS());
+      Teuchos::RCP<Epetra_MultiVector> bal_b = rd.redistribute(*origProblem.GetRHS());
+
+      A = bal_matrix;
+      B = bal_b;
+      X = bal_x;
+      Map = Teuchos::rcp( new Epetra_Map( bal_matrix->RowMatrixRowMap() ) );
+
+    }
+    //End redistribute
+#endif
+  
 
     std::vector<double> tempnorm(numrhs), temprhs(numrhs);
     MVT::MvNorm(*B, temprhs);
