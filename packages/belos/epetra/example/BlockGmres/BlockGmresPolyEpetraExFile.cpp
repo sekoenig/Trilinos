@@ -296,6 +296,7 @@ int main(int argc, char *argv[]) {
       // NOTE:  This is necessary because Belos expects an operator to apply the
       //        preconditioner with Apply() NOT ApplyInverse().
       belosPrec = rcp( new Belos::EpetraPrecOp( Prec ) );
+      std::cout << "ILU Preconditioner has been created." << std::endl;
     }
     //
     // ********Other information used by block solver***********
@@ -379,6 +380,7 @@ int main(int argc, char *argv[]) {
     //
     // Perform solve
     //
+    std::cout << "Performing Solve: " << std::endl;
     Belos::ReturnType ret = newSolver->solve();
     //
     // Compute actual residuals.
