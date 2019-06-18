@@ -269,6 +269,8 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   clp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
   int maxrestarts = 50;
   clp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
+  int stepsize = 5;
+  clp.setOption("step-size",&stepsize,"Step size for s-step GMRES.");
   //End poly options
 
   clp.recogniseAllOptions(true);
@@ -317,6 +319,9 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   belosList->set("Output Frequency",      maxsubspace); 
   if (!scaleResidualHist)
     belosList->set("Implicit Residual Scaling", "None");
+  belosList->set("Step Size", stepsize); //Step size for s-step GMRES
+  belosList->set("CholeskyQR", true); //Setting for s-step GMRES
+  belosList->set("Compute Ritz Values", false); //for s-step GMRES
 
   RCP<Teuchos::ParameterList> polyList = Teuchos::parameterList();
   if(belosType == "GmresPoly"){
