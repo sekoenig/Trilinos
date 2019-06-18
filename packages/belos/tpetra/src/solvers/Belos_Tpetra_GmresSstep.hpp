@@ -300,7 +300,7 @@ private:
       }
 
       // Restart cycle
-      for (iter = 0; iter < restart && metric > input.tol; iter+=step) {
+      while(iter < restart && ! output.converged){
         if (outPtr != nullptr) {
           *outPtr << "Current iteration: iter=" << iter
                   << ", restart=" << restart
@@ -370,40 +370,46 @@ private:
         else {
           metric = STM::zero ();
         }
+
+        iter+=step; 
+
+        if(metric <= input.tol || iter >= restart) {
+          // Update solution 
+          blas.TRSM (Teuchos::LEFT_SIDE, Teuchos::UPPER_TRI,
+              Teuchos::NO_TRANS, Teuchos::NON_UNIT_DIAG,
+              iter, 1, one,
+              T.values(), T.stride(), y.values(), y.stride());
+          Teuchos::Range1D cols(0, iter-1);
+          Teuchos::RCP<const MV> Qj = Q.subView(cols);
+          if (input.precoSide == "right") {
+            dense_vector_type y_iter (Teuchos::View, y.values (), iter);
+
+            MVT::MvTimesMatAddMv (one, *Qj, y_iter, zero, R);
+            M.apply (R, MP);
+            X.update (one, MP, one);
+          }
+          else {
+            dense_vector_type y_iter (Teuchos::View, y.values (), iter);
+
+            MVT::MvTimesMatAddMv (one, *Qj, y_iter, one, X);
+          }
+          // Compute real residual (not-preconditioned)
+          P = * (Q.getVectorNonConst (0));
+          A.apply (X, P);
+          P.update (one, B, -one);
+          r_norm = P.norm2 (); // residual norm
+          output.absResid = r_norm;
+          output.relResid = r_norm / b0_norm;
+
+          metric = this->getConvergenceMetric (r_norm, b0_norm, input);
+          if (metric <= input.tol) {
+            output.converged = true;
+          }
+        }
       } // End of restart cycle
 
-      // Update solution
-      blas.TRSM (Teuchos::LEFT_SIDE, Teuchos::UPPER_TRI,
-                 Teuchos::NO_TRANS, Teuchos::NON_UNIT_DIAG,
-                 iter, 1, one,
-                 T.values(), T.stride(), y.values(), y.stride());
-      Teuchos::Range1D cols(0, iter-1);
-      Teuchos::RCP<const MV> Qj = Q.subView(cols);
-      if (input.precoSide == "right") {
-        dense_vector_type y_iter (Teuchos::View, y.values (), iter);
-
-        MVT::MvTimesMatAddMv (one, *Qj, y_iter, zero, R);
-        M.apply (R, MP);
-        X.update (one, MP, one);
-      }
-      else {
-        dense_vector_type y_iter (Teuchos::View, y.values (), iter);
-
-        MVT::MvTimesMatAddMv (one, *Qj, y_iter, one, X);
-      }
-      // Compute real residual (not-preconditioned)
-      P = * (Q.getVectorNonConst (0));
-      A.apply (X, P);
-      P.update (one, B, -one);
-      r_norm = P.norm2 (); // residual norm
-      output.absResid = r_norm;
-      output.relResid = r_norm / b0_norm;
-
-      metric = this->getConvergenceMetric (r_norm, b0_norm, input);
-      if (metric <= input.tol) {
-        output.converged = true;
-      }
-      else if (output.numIters < input.maxNumIters) {
+      //Restart if not converged:
+      if (output.numIters < input.maxNumIters && ! output.converged) {
         // Initialize starting vector for restart
         if (input.precoSide == "left") { // left-precond'd residual norm
           Tpetra::deep_copy (R, P);
