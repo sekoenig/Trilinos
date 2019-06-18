@@ -253,6 +253,24 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   int provideNodeComm = 0;                            clp.setOption("nodecomm",          &provideNodeComm,  "make the nodal communicator available w/ reduction factor X");
 #endif
 
+  //Additional options used with poly prec GMRES:
+  bool damppoly = false;
+  clp.setOption("damp-poly","no-damp",&damppoly,"Damp the polynomial.");
+  bool addRoots = true;
+  clp.setOption("add-roots","no-add-roots",&addRoots,"Add extra roots as needed to stabilize the polynomial.");
+  //clp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
+//  clp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
+  std::string polytype("Roots");
+  clp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
+//  clp.setOption("orthog",&orthog,"Orthogonalization: DGKS, ICGS, IMGS"); 
+  int maxdegree = 25;
+  clp.setOption("max-poly-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
+  int maxsubspace = 50; 
+  clp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
+  int maxrestarts = 50;
+  clp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
+  //End poly options
+
   clp.recogniseAllOptions(true);
   switch (clp.parse(argc, argv)) {
     case Teuchos::CommandLineProcessor::PARSE_HELP_PRINTED:        return EXIT_SUCCESS;
@@ -262,7 +280,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   }
 
   TEUCHOS_TEST_FOR_EXCEPTION(xmlFileName != "" && yamlFileName != "", std::runtime_error,
-                             "Cannot provide both xml and yaml input files");
+      "Cannot provide both xml and yaml input files");
 
   // Instead of checking each time for rank, create a rank 0 stream
   RCP<Teuchos::FancyOStream> fancy = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
@@ -287,10 +305,37 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
     out << "WARNING: CG will not work with COMPLEX scalars, switching to GMRES"<<std::endl;
   }
 
+  // Create Belos parameter list
+  RCP<Teuchos::ParameterList> belosList = Teuchos::parameterList();
+  belosList->set("Maximum Iterations",    maxIts); // Maximum number of iterations allowed
+  belosList->set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
+  belosList->set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
+  tol = dtol; //Hack here... sometimes tol gets set elsewhere??
+  belosList->set("Convergence Tolerance", tol);    // Relative convergence tolerance requested
+  belosList->set( "Orthogonalization", "ICGS");           // Type of orthogonalizaion: DGKS, IMGS, ICGS
+  belosList->set("Verbosity",             Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary + Belos::TimingDetails);
+  belosList->set("Output Frequency",      maxsubspace); 
+  if (!scaleResidualHist)
+    belosList->set("Implicit Residual Scaling", "None");
+
+  RCP<Teuchos::ParameterList> polyList = Teuchos::parameterList();
+  if(belosType == "GmresPoly"){
+    polyList->set( "Polynomial Type", "Roots" );          // Type of polynomial to be generated
+    polyList->set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
+    polyList->set("Verbosity",             Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary + Belos::TimingDetails);
+    polyList->set( "Random RHS", true );           // Use RHS from linear system or random vector
+    polyList->set( "Damped Poly", damppoly );              // Option to damp polynomial
+    polyList->set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
+    polyList->set( "Orthogonalization", "ICGS");           // Type of orthogonalizaion: DGKS, IMGS, ICGS
+    polyList->set( "Outer Solver", "Block Gmres" );
+    polyList->set( "Outer Solver Params", *belosList );
+  }
+
+
 #ifdef HAVE_MUELU_AMGX
-//Initialize AMGX
-MueLu::MueLu_AMGX_initialize();
-MueLu::MueLu_AMGX_initialize_plugins();
+  //Initialize AMGX
+  MueLu::MueLu_AMGX_initialize();
+  MueLu::MueLu_AMGX_initialize_plugins();
 #endif
 
   bool isDriver = paramList.isSublist("Run1");
@@ -477,9 +522,14 @@ MueLu::MueLu_AMGX_initialize_plugins();
             tm = Teuchos::null;
           }
           
+          if(belosType == "GmresPoly"){
           // Solve the system numResolves+1 times
-          SystemSolve(A,X,B,H,Prec,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
-          
+          SystemSolve(A,X,B,H,Prec,polyList,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
+          } 
+          else{
+          // Solve the system numResolves+1 times
+          SystemSolve(A,X,B,H,Prec,belosList,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
+          }
           comm->barrier();
         }
         catch(const std::exception& e) { 
