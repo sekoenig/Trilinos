@@ -162,6 +162,17 @@ int main(int argc, char *argv[]) {
     }
     if (!verbose)
       frequency = -1;  // reset frequency if test is not verbose
+    if( precond != "none" && precond != "right" && precond != "left")
+    {
+      if(MyPID==0) std::cout << "Error: Invalid string for precond param." << std::endl;
+      return -1; 
+    }
+    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT")
+    {
+      if(MyPID==0) std::cout << "Error: Invalid string for prec-type param." << std::endl;
+      return -1; 
+    }
+    
     //
     // Get the problem
     //
