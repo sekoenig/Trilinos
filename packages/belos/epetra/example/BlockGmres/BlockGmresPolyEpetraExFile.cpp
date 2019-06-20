@@ -62,6 +62,7 @@
 #endif
 #include "Epetra_CrsMatrix.h"
 #include <EpetraExt_MultiVectorIn.h>
+#include <EpetraExt_CrsMatrixIn.h>
 
 #include "Ifpack.h"
 
@@ -120,12 +121,14 @@ int main(int argc, char *argv[]) {
     int maxdegree = 25;        // maximum degree of polynomial
     int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
     int maxrestarts = 50;      // number of restarts allowed
+    int OverlapLevel = 1;   //Overlap level for non-poly preconditioners must be >= 0. If Comm.NumProc() == 1,it is ignored.   
     std::string outersolver("Block Gmres");
     std::string polytype("Arnoldi");
     std::string filename("orsirr1.hb");
     std::string rhsfile;
     std::string precond("right");
     std::string partition("zoltan");
+    std::string PrecType = "ILU"; // incomplete LU
     std::string orthog("DGKS");
     MT tol = 1.0e-5;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
@@ -141,7 +144,9 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("rhsfile",&rhsfile,"Filename for test rhs b. ");
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
-    cmdp.setOption("precond",&precond,"Preconditioning type (none, left, right).");
+    cmdp.setOption("precond",&precond,"Preconditioning placement (none, left, right).");
+    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT).");
+    cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
@@ -160,16 +165,49 @@ int main(int argc, char *argv[]) {
     //
     // Get the problem
     //
+    //RCP<Epetra_Map> Map;
+    //RCP<Epetra_CrsMatrix> A;
+    //RCP<Epetra_MultiVector> B, X;
+    //RCP<Epetra_Vector> vecB, vecX;
+    //EpetraExt::readEpetraLinearSystem(filename, Comm, &A, &Map, &vecX, &vecB);
+    //A->OptimizeStorage();
+
+
+    //  
+    // Get the problem
+    //  
+    const std::string::size_type ext_dot = filename.rfind(".");
+    TEUCHOS_TEST_FOR_EXCEPT( ext_dot == std::string::npos );
+    std::string ext = filename.substr(ext_dot+1);
+
+    bool generate_rhs = (numrhs>1);
     RCP<Epetra_Map> Map;
+    Epetra_CrsMatrix* ptrA = 0;
     RCP<Epetra_CrsMatrix> A;
     RCP<Epetra_MultiVector> B, X;
     RCP<Epetra_Vector> vecB, vecX;
-    EpetraExt::readEpetraLinearSystem(filename, Comm, &A, &Map, &vecX, &vecB);
-    A->OptimizeStorage();
+    if ( ext != "mtx" && ext != "mm" )
+    {   
+      if(MyPID==0){std::cout << "WARNING: Do not try to read in really big .hb files! " << std::endl;}
+      EpetraExt::readEpetraLinearSystem(filename, Comm, &A, &Map, &vecX, &vecB);
+    }   
+    else
+    {   
+      int ret = EpetraExt::MatrixMarketFileToCrsMatrix(filename.c_str(), Comm, ptrA, false, true);
+      if(ret != 0)
+      { std::cout<< "Error in Matrix Market file read-in" << std::endl;}
+      A = Teuchos::rcp( ptrA );
+      TEUCHOS_TEST_FOR_EXCEPT( ptrA == 0 );
+      Map = Teuchos::rcp( new Epetra_Map( A->RowMap() ) );
+      generate_rhs = true;
+    }    
+    
+    //A->OptimizeStorage();
+
     proc_verbose = verbose && (MyPID==0);  /* Only print on the zero processor */
 
     // Check to see if the number of right-hand sides is the same as requested.
-    if (numrhs>1) {
+    if (generate_rhs) {
       X = rcp( new Epetra_MultiVector( *Map, numrhs ) );
       B = rcp( new Epetra_MultiVector( *Map, numrhs ) );
       X->Random();
@@ -268,36 +306,72 @@ int main(int argc, char *argv[]) {
 
       // create the preconditioner. For valid PrecType values,
       // please check the documentation
-      std::string PrecType = "ILU"; // incomplete LU
-      int OverlapLevel = 1; // must be >= 0. If Comm.NumProc() == 1,
-      // it is ignored.
+      // Pass solver type to Amesos.
 
+      int ilutFill_ = 2; 
+      double aThresh_ = .0001;
+      double rThresh_ = 1.0001;
+      double dropTol_ = 1e-3;
+      if (PrecType == "Amesos")
+      {
+        ifpackList.set("amesos: solver type", "Amesos_Klu");
+        //if (diagPerturb_ != 0.0)
+        //  ifpackList.set("AddToDiag", diagPerturb_);
+      }
+      else if (PrecType == "ILUT")
+      {
+        ifpackList.set("fact: absolute threshold", aThresh_);
+        ifpackList.set("fact: relative threshold", rThresh_);
+        ifpackList.set("fact: ilut level-of-fill", (double)ilutFill_);
+        ifpackList.set("fact: drop tolerance", dropTol_);
+      }
+      else if (PrecType == "ILU")
+      {
+        ifpackList.set("fact: absolute threshold", aThresh_);
+        ifpackList.set("fact: relative threshold", rThresh_);
+        ifpackList.set("fact: level-of-fill", (int)ilutFill_);
+        ifpackList.set("fact: drop tolerance", dropTol_);
+      }
+
+      if (OverlapLevel)
+      {
+        // the combine mode is on the following:
+        // "Add", "Zero", "Insert", "InsertAdd", "Average", "AbsMax"
+        // Their meaning is as defined in file Epetra_CombineMode.h
+        ifpackList.set("schwarz: combine mode", "Add"); //Add is defualt combine mode.
+      }
+  
       RCP<Ifpack_Preconditioner> Prec = Teuchos::rcp( Factory.Create(PrecType, &*A, OverlapLevel) );
       assert(Prec != Teuchos::null);
 
-      // specify parameters for ILU
-      ifpackList.set("fact: level-of-fill", 1);
-      // the combine mode is on the following:
-      // "Add", "Zero", "Insert", "InsertAdd", "Average", "AbsMax"
-      // Their meaning is as defined in file Epetra_CombineMode.h
-      ifpackList.set("schwarz: combine mode", "Add");
       // sets the parameters
       IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
-
+      if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
       // initialize the preconditioner. At this point the matrix must
       // have been FillComplete()'d, but actual values are ignored.
       IFPACK_CHK_ERR(Prec->Initialize());
+      if(MyPID==0){
+        std::cout << "Prec Initialized." << std::endl;
+        std::cout << "Initialization time: " << Prec->InitializeTime() << std::endl;
+      }
+
 
       // Builds the preconditioners, by looking for the values of
       // the matrix.
       IFPACK_CHK_ERR(Prec->Compute());
+      if(MyPID==0){
+        std::cout << "Prec computed." << std::endl;
+        std::cout << "Pre compute time: " << Prec->ComputeTime() << std::endl;
+      }
 
       // Create the Belos preconditioned operator from the Ifpack preconditioner.
       // NOTE:  This is necessary because Belos expects an operator to apply the
       //        preconditioner with Apply() NOT ApplyInverse().
       belosPrec = rcp( new Belos::EpetraPrecOp( Prec ) );
-      std::cout << "ILU Preconditioner has been created." << std::endl;
+      if(MyPID==0) std::cout << "ILU Preconditioner has been created." << std::endl;
     }
+
+
     //
     // ********Other information used by block solver***********
     // *****************(can be user specified)******************
@@ -380,7 +454,7 @@ int main(int argc, char *argv[]) {
     //
     // Perform solve
     //
-    std::cout << "Performing Solve: " << std::endl;
+    if(MyPID==0) std::cout << "Performing Solve: " << std::endl;
     Belos::ReturnType ret = newSolver->solve();
     //
     // Compute actual residuals.
