@@ -65,6 +65,8 @@
 #include <EpetraExt_CrsMatrixIn.h>
 
 #include "Ifpack.h"
+#include <Ifpack_IlukGraph.h>
+#include <Ifpack_CrsRiluk.h>
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -145,7 +147,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
     cmdp.setOption("precond",&precond,"Preconditioning placement (none, left, right).");
-    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT).");
+    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, none).");
     cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
@@ -167,7 +169,7 @@ int main(int argc, char *argv[]) {
       if(MyPID==0) std::cout << "Error: Invalid string for precond param." << std::endl;
       return -1; 
     }
-    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT")
+    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT" && PrecType != "ILUK2" && PrecType != "none")
     {
       if(MyPID==0) std::cout << "Error: Invalid string for prec-type param." << std::endl;
       return -1; 
@@ -308,64 +310,100 @@ int main(int argc, char *argv[]) {
     //
     RCP<Belos::EpetraPrecOp> belosPrec;
 
-    if (precond != "none") {
-      ParameterList ifpackList;
+    if (precond != "none" && PrecType != "none") {
+        int ilutFill_ = 1; 
+        double aThresh_ = 0.0001;
+        double rThresh_ = 1.0001;
+        double dropTol_ = 1e-3;
+      if(PrecType == "ILUK2"){
+        // Ifpack preconditioning classes.
+        Teuchos::RCP<Ifpack_IlukGraph> ilukGraph_;
+        Teuchos::RCP<Ifpack_CrsRiluk>  rILUK_;
 
-      // allocates an IFPACK factory. No data is associated
-      // to this object (only method Create()).
-      Ifpack Factory;
+        // Initialize the graph if we need to.
+        if ( Teuchos::is_null( ilukGraph_ ) )
+        {
+          const Epetra_CrsGraph & Graph = A->Graph();
+          ilukGraph_ = Teuchos::rcp( new Ifpack_IlukGraph( Graph, ilutFill_, OverlapLevel ) );
+          int graphRet = ilukGraph_->ConstructFilledGraph();
+          TEUCHOS_TEST_FOR_EXCEPT( graphRet != 0 );
 
-      // create the preconditioner. For valid PrecType values,
-      // please check the documentation
-      // Pass solver type to Amesos.
+          // Create the preconditioner if one doesn't exist.
+          if ( Teuchos::is_null( rILUK_ ) )
+          {
+            rILUK_ = Teuchos::rcp( new Ifpack_CrsRiluk( *ilukGraph_ ) );
+            rILUK_->SetAbsoluteThreshold( aThresh_ );
+            rILUK_->SetRelativeThreshold( rThresh_ );
+          }
 
-      int ilutFill_ = 2; 
-      double aThresh_ = .0001;
-      double rThresh_ = 1.0001;
-      double dropTol_ = 1e-3;
-      if (PrecType == "Amesos")
-      {
-        ifpackList.set("amesos: solver type", "Amesos_Klu");
-        //if (diagPerturb_ != 0.0)
-        //  ifpackList.set("AddToDiag", diagPerturb_);
+          if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
+          int initErr = rILUK_->InitValues( *A );
+          TEUCHOS_TEST_FOR_EXCEPT( initErr != 0 );
+          std::cout << "Prec Initialized." << std::endl;
+
+          int factErr = rILUK_->Factor();
+          TEUCHOS_TEST_FOR_EXCEPT( factErr != 0 );
+          std::cout << "Prec Computed." << std::endl;
+        }
+
+        // Create the Belos preconditioned operator from the Ifpack preconditioner.
+        // NOTE:  This is necessary because Belos expects an operator to apply the
+        //        preconditioner with Apply() NOT ApplyInverse().
+        belosPrec = rcp( new Belos::EpetraPrecOp( rILUK_ ) );
       }
-      else if (PrecType == "ILUT")
-      {
-        ifpackList.set("fact: absolute threshold", aThresh_);
-        ifpackList.set("fact: relative threshold", rThresh_);
-        ifpackList.set("fact: ilut level-of-fill", (double)ilutFill_);
-        ifpackList.set("fact: drop tolerance", dropTol_);
-      }
-      else if (PrecType == "ILU")
-      {
-        ifpackList.set("fact: absolute threshold", aThresh_);
-        ifpackList.set("fact: relative threshold", rThresh_);
-        ifpackList.set("fact: level-of-fill", (int)ilutFill_);
-        ifpackList.set("fact: drop tolerance", dropTol_);
-      }
+      else{
+        ParameterList ifpackList;
 
-      if (OverlapLevel)
-      {
-        // the combine mode is on the following:
-        // "Add", "Zero", "Insert", "InsertAdd", "Average", "AbsMax"
-        // Their meaning is as defined in file Epetra_CombineMode.h
-        ifpackList.set("schwarz: combine mode", "Add"); //Add is defualt combine mode.
-      }
-  
-      RCP<Ifpack_Preconditioner> Prec = Teuchos::rcp( Factory.Create(PrecType, &*A, OverlapLevel) );
-      assert(Prec != Teuchos::null);
+        // allocates an IFPACK factory. No data is associated
+        // to this object (only method Create()).
+        Ifpack Factory;
 
-      // sets the parameters
-      IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
-      if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
-      // initialize the preconditioner. At this point the matrix must
+        // create the preconditioner. For valid PrecType values,
+        // please check the documentation
+        // Pass solver type to Amesos.
+
+        if (PrecType == "Amesos")
+        {
+          ifpackList.set("amesos: solver type", "Amesos_Klu");
+          //if (diagPerturb_ != 0.0)
+          //  ifpackList.set("AddToDiag", diagPerturb_);
+        }
+        else if (PrecType == "ILUT")
+        {
+          ifpackList.set("fact: absolute threshold", aThresh_);
+          ifpackList.set("fact: relative threshold", rThresh_);
+          ifpackList.set("fact: ilut level-of-fill", (double)ilutFill_);
+          ifpackList.set("fact: drop tolerance", dropTol_);
+        }
+        else if (PrecType == "ILU")
+        {
+          ifpackList.set("fact: absolute threshold", aThresh_);
+          ifpackList.set("fact: relative threshold", rThresh_);
+          ifpackList.set("fact: level-of-fill", (int)ilutFill_);
+          ifpackList.set("fact: drop tolerance", dropTol_);
+        }
+
+        if (OverlapLevel)
+        {
+          // the combine mode is on the following:
+          // "Add", "Zero", "Insert", "InsertAdd", "Average", "AbsMax"
+          // Their meaning is as defined in file Epetra_CombineMode.h
+          ifpackList.set("schwarz: combine mode", "Add"); //Add is defualt combine mode.
+        }
+
+        RCP<Ifpack_Preconditioner> Prec = Teuchos::rcp( Factory.Create(PrecType, &*A, OverlapLevel) );
+        assert(Prec != Teuchos::null);
+
+        // sets the parameters
+        IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
+        if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
+        // initialize the preconditioner. At this point the matrix must
       // have been FillComplete()'d, but actual values are ignored.
       IFPACK_CHK_ERR(Prec->Initialize());
       if(MyPID==0){
         std::cout << "Prec Initialized." << std::endl;
         std::cout << "Initialization time: " << Prec->InitializeTime() << std::endl;
       }
-
 
       // Builds the preconditioners, by looking for the values of
       // the matrix.
@@ -380,7 +418,9 @@ int main(int argc, char *argv[]) {
       //        preconditioner with Apply() NOT ApplyInverse().
       belosPrec = rcp( new Belos::EpetraPrecOp( Prec ) );
       if(MyPID==0) std::cout << "ILU Preconditioner has been created." << std::endl;
-    }
+
+      }//End else for Ifpack factory precs
+    }//End if prec exists
 
 
     //
