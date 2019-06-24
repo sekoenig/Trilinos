@@ -124,6 +124,7 @@ int main(int argc, char *argv[]) {
     int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
     int maxrestarts = 50;      // number of restarts allowed
     int OverlapLevel = 1;   //Overlap level for non-poly preconditioners must be >= 0. If Comm.NumProc() == 1,it is ignored.   
+    int ilutFill_ = 1;      //Fill level for ILU factorization
     std::string outersolver("Block Gmres");
     std::string polytype("Arnoldi");
     std::string filename("orsirr1.hb");
@@ -149,6 +150,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("precond",&precond,"Preconditioning placement (none, left, right).");
     cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, none).");
     cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
+    cmdp.setOption("fill",&ilutFill_,"Fill level for ILU-type preconditioners.");
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
@@ -311,7 +313,6 @@ int main(int argc, char *argv[]) {
     RCP<Belos::EpetraPrecOp> belosPrec;
 
     if (precond != "none" && PrecType != "none") {
-        int ilutFill_ = 1; 
         double aThresh_ = 0.0001;
         double rThresh_ = 1.0001;
         double dropTol_ = 1e-3;
@@ -339,11 +340,11 @@ int main(int argc, char *argv[]) {
           if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
           int initErr = rILUK_->InitValues( *A );
           TEUCHOS_TEST_FOR_EXCEPT( initErr != 0 );
-          std::cout << "Prec Initialized." << std::endl;
+          if(MyPID==0) std::cout << "Prec Initialized." << std::endl;
 
           int factErr = rILUK_->Factor();
           TEUCHOS_TEST_FOR_EXCEPT( factErr != 0 );
-          std::cout << "Prec Computed." << std::endl;
+          if(proc_verbose) std::cout << "Prec Computed." << std::endl;
         }
 
         // Create the Belos preconditioned operator from the Ifpack preconditioner.
@@ -412,6 +413,11 @@ int main(int argc, char *argv[]) {
         std::cout << "Prec computed." << std::endl;
         std::cout << "Pre compute time: " << Prec->ComputeTime() << std::endl;
       }
+
+      //Check conditioner number of preconditioner:
+      double condEst;
+      condEst = Prec->Condest();
+      if(proc_verbose ) std::cout << "ILU condition est:" << condEst << std::endl;
 
       // Create the Belos preconditioned operator from the Ifpack preconditioner.
       // NOTE:  This is necessary because Belos expects an operator to apply the
