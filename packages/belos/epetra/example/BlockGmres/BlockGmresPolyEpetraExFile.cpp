@@ -125,6 +125,9 @@ int main(int argc, char *argv[]) {
     int maxrestarts = 50;      // number of restarts allowed
     int OverlapLevel = 1;   //Overlap level for non-poly preconditioners must be >= 0. If Comm.NumProc() == 1,it is ignored.   
     int ilutFill_ = 1;      //Fill level for ILU factorization
+    double aThresh_ = 0.0001;
+    double rThresh_ = 1.0001;
+    double dropTol_ = 1e-3;
     std::string outersolver("Block Gmres");
     std::string polytype("Arnoldi");
     std::string filename("orsirr1.hb");
@@ -151,6 +154,9 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, none).");
     cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
     cmdp.setOption("fill",&ilutFill_,"Fill level for ILU-type preconditioners.");
+    cmdp.setOption("athresh",&aThresh_,"Absolute Threshold for ILU-type preconditioners.");
+    cmdp.setOption("rthresh",&rThresh_,"Relative Threshold for ILU-type preconditioners.");
+    cmdp.setOption("droptol",&dropTol_,"Drop tolerance for ILU-type preconditioners.");
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
@@ -313,9 +319,6 @@ int main(int argc, char *argv[]) {
     RCP<Belos::EpetraPrecOp> belosPrec;
 
     if (precond != "none" && PrecType != "none") {
-        double aThresh_ = 0.0001;
-        double rThresh_ = 1.0001;
-        double dropTol_ = 1e-3;
       if(PrecType == "ILUK2"){
         // Ifpack preconditioning classes.
         Teuchos::RCP<Ifpack_IlukGraph> ilukGraph_;
