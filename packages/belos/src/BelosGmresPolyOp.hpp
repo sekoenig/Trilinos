@@ -317,7 +317,7 @@ namespace Belos {
     static constexpr int verbosity_default_ = Belos::Errors;
     static constexpr bool randomRHS_default_ = true;
     static constexpr const char * label_default_ = "Belos";
-    static constexpr const char * polyType_default_ = "Arnoldi";
+    static constexpr const char * polyType_default_ = "Roots";
     static constexpr const char * orthoType_default_ = "DGKS";
     static constexpr std::ostream * outputStream_default_ = &std::cout;
     static constexpr bool damp_default_ = false;
@@ -357,12 +357,6 @@ namespace Belos {
     Teuchos::SerialDenseMatrix< OT, ScalarType > pCoeff_;
 
     // Variables for Roots polynomial:
-    //
-    // These are to hold the harmonic Ritz values.  If poly doesn't have max deg, 
-    // arrays will be long, but I think this will be okay. 
-    //int length_ = maxDegree_;
-    //MagnitudeType thetaReal_[length_];
-    //MagnitudeType thetaImag_[length_];
     Teuchos::SerialDenseMatrix< OT, MagnitudeType > theta_; 
     
     //Sorting function:
@@ -548,7 +542,6 @@ namespace Belos {
     MVT::MvInit( *newX, SCT::zero() );
     if (randomRHS_) {
       MVT::MvRandom( *newB );
-      //MVT::MvPrint(*newB, std::cout );
     }
     else {
       MVT::Assign( *(MVT::CloneView(*(problem_->getRHS()), idx)), *newB );
@@ -676,6 +669,7 @@ namespace Belos {
     }
     else{ //Generate Roots Poly
 
+    //---------Section to find Harmonic Ritz values (These are polynomial roots.)--------------
     //Copy of square H used to find poly roots:
     H_ = Teuchos::SerialDenseMatrix<OT,ScalarType>(Teuchos::Copy, *gmresState.H, dim_, dim_);
     //Zero out below subdiagonal of H:
@@ -739,7 +733,6 @@ namespace Belos {
     if(info != 0){
       std::cout << "GEEV solve : info = " << info << std::endl;
     }
-    //std::cout << std::scientific << "Harmonic Ritz Values are: " << theta_ << std::endl;
 
     // Set index for sort function and sort Harmonic Ritz Values:
     std::vector<int> index(dim_);
@@ -747,8 +740,9 @@ namespace Belos {
       index[i] = i; 
     }
     SortModLeja(theta_,index);
+    //----End compute Harmonic Ritz Values (polynomial roots)------------
 
-    //---Begin Root Adding Section---- 
+    //-----------Section to add roots if needed for stability----------- 
     
     // Store theta (with cols for real and imag parts of Harmonic Ritz Vals) 
     // as one vector of complex numbers to perform arithmetic:
@@ -776,8 +770,8 @@ namespace Belos {
         totalExtra += extra[i];
       }
     }
-    if (totalExtra)
-      printer_->stream(Warnings) << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;
+    if (totalExtra){
+      printer_->stream(Warnings) << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;}
 
     // If requested to add roots, append them to the theta matrix:
     if(addRoots_ && totalExtra>0)
@@ -800,7 +794,8 @@ namespace Belos {
 
       // Update polynomial degree:
       dim_ += totalExtra;
-      std::cout<< "New poly degree is: " << dim_ << std::endl;
+      if (totalExtra){
+        printer_->stream(Warnings) << "New poly degree is: " << dim_ << std::endl;}
 
       // Create a new index and sort perturbed roots:
       std::vector<int> index2(dim_);
@@ -893,7 +888,7 @@ namespace Belos {
       j++;
     }
 
-    //Return sorted values:
+    //Return sorted values and sorted indices:
     thetaN = sorted;
     index = newIndex;
   } //End Modified Leja ordering
@@ -966,7 +961,7 @@ namespace Belos {
   template <class ScalarType, class MV, class OP>
   void GmresPolyOp<ScalarType, MV, OP>::ApplyRootsPoly( const MV& x, MV& y ) const 
   {
-    MVT::MvInit( y, SCT::zero() );
+    MVT::MvInit( y, SCT::zero() ); //Zero out y to take the vector with poly applied.
     Teuchos::RCP<MV> prod = MVT::CloneCopy(x);
     Teuchos::RCP<MV> Xtmp = MVT::Clone( x, MVT::GetNumberVecs(x) );
     Teuchos::RCP<MV> Xtmp2 = MVT::Clone( x, MVT::GetNumberVecs(x) );
