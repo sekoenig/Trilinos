@@ -71,8 +71,8 @@ uninitialized_view(const std::string& name, const size_t& size)
 template<class RowPtr, class Indices, class Values, class Padding>
 void
 pad_crs_arrays(
-    RowPtr& row_ptr_beg,
-    RowPtr& row_ptr_end,
+               const RowPtr& row_ptr_beg,
+               const RowPtr& row_ptr_end,
     Indices& indices,
     Values& values,
     const Padding& padding)
@@ -191,12 +191,17 @@ insert_crs_indices(
     IndexMap&& map,
     std::function<void(size_t const, size_t const, size_t const)> cb)
 {
-  using offset_type = typename std::decay<decltype (row_ptrs[0])>::type;
-  using ordinal_type = typename std::decay<decltype (cur_indices[0])>::type;
-
   if (new_indices.size() == 0) {
     return 0;
   }
+
+  if (cur_indices.size() == 0) {
+    // No room to insert new indices
+    return Teuchos::OrdinalTraits<size_t>::invalid();
+  }
+
+  using offset_type = typename std::decay<decltype (row_ptrs[0])>::type;
+  using ordinal_type = typename std::decay<decltype (cur_indices[0])>::type;
 
   const offset_type start = row_ptrs[row];
   offset_type end = start + static_cast<offset_type> (num_assigned);
@@ -296,8 +301,8 @@ find_crs_indices(
 template<class RowPtr, class Indices, class Padding>
 void
 padCrsArrays(
-    RowPtr& rowPtrBeg,
-    RowPtr& rowPtrEnd,
+             const RowPtr& rowPtrBeg,
+             const RowPtr& rowPtrEnd,
     Indices& indices,
     const Padding& padding)
 {
@@ -310,8 +315,8 @@ padCrsArrays(
 template<class RowPtr, class Indices, class Values, class Padding>
 void
 padCrsArrays(
-    RowPtr& rowPtrBeg,
-    RowPtr& rowPtrEnd,
+             const RowPtr& rowPtrBeg,
+             const RowPtr& rowPtrEnd,
     Indices& indices,
     Values& values,
     const Padding& padding)

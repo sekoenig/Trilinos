@@ -22,6 +22,7 @@ TRIBITS_ADD_EXECUTABLE(
   FEMAssembly
   SOURCES fem_assembly_main.cpp
   COMM serial mpi
+  CATEGORIES BASIC PERFORMANCE
 )
 
 TRIBITS_ADD_TEST(
@@ -34,9 +35,27 @@ TRIBITS_ADD_TEST(
   )
 
 TRIBITS_ADD_TEST(
+    FEMAssembly 
+    NAME FEMAssembly_InsertGlobalIndicesFESPKokkos
+    ARGS "--with-insert-global-indices-fe --with-StaticProfile --num-elements-x=200 --num-elements-y=200 --kokkos"
+    COMM serial mpi
+    NUM_MPI_PROCS 4
+  STANDARD_PASS_OUTPUT
+  )
+
+TRIBITS_ADD_TEST(
   FEMAssembly
   NAME FEMAssembly_TotalElementLoopSP
   ARGS "--with-total-element-loop --with-StaticProfile --num-elements-x=200 --num-elements-y=200"
+  COMM serial mpi
+  NUM_MPI_PROCS 4
+  STANDARD_PASS_OUTPUT
+)
+
+TRIBITS_ADD_TEST(
+  FEMAssembly
+  NAME FEMAssembly_TotalElementLoopSPKokkos
+  ARGS "--with-total-element-loop --with-StaticProfile --num-elements-x=200 --num-elements-y=200 --kokkos"
   COMM serial mpi
   NUM_MPI_PROCS 4
   STANDARD_PASS_OUTPUT
@@ -71,3 +90,18 @@ IF (Tpetra_ENABLE_DEPRECATED_CODE)
   )
 ENDIF()
 
+
+###################################
+# Performance Testing
+###################################
+
+TRIBITS_ADD_TEST(
+  FEMAssembly
+  NAME Performance_StrongScaling_FEMAssembly_InsertGlobalIndicesFESPKokkos
+  ARGS "--with-insert-global-indices-fe --with-StaticProfile --num-elements-x=480 --num-elements-y=480 --kokkos"
+  COMM mpi
+  NUM_MPI_PROCS 1 4 9 16 25 36
+  STANDARD_PASS_OUTPUT
+  RUN_SERIAL
+  CATEGORIES PERFORMANCE
+)
