@@ -532,7 +532,6 @@ namespace Belos {
     MVT::MvInit( *newX, SCT::zero() );
     if (randomRHS_) {
       MVT::MvRandom( *newB );
-      //MVT::MvPrint(*newB, std::cout );
     }
     else {
       MVT::Assign( *(MVT::CloneView(*(problem_->getRHS()), idx)), *newB );
@@ -682,95 +681,6 @@ namespace Belos {
     E(dim_-1,0) = SCT::one();
       
     Teuchos::SerialDenseSolver< OT, ScalarType > HSolver;
-    HSolver.setMatrix( Teuchos::rcp( &Htemp, false ) );
-    HSolver.solveWithTransposeFlag( Teuchos::CONJ_TRANS );
-    HSolver.setVectors( Teuchos::rcp( &F, false ), Teuchos::rcp( &E, false ) );
-    HSolver.factorWithEquilibration( true );
-    int info = 0;
-    info = HSolver.factor();
-    if(info != 0)
-      std::cout << "Hsolver factor: info = " << info << std::endl;
-    
-    info = HSolver.solve();
-    if(info != 0)
-      std::cout << "Hsolver solve : info = " << info << std::endl;
-
-    F.scale(Hlast*Hlast); 
-    //std::cout<< "F scaled is: " << F << std::endl;
-    HlastCol += F; 
-    //std::cout<< "New H is: " << H_ << std::endl;
-
-    Teuchos::LAPACK< OT, ScalarType > lapack;
-    theta_.shape(dim_,2);//1st col for real part, 2nd col for complex
-    //theta_.putScalar(8764.0);
-    //std::cout << "Orig theta is: " << theta_ << std::endl;
-
-    const int ldv = 1;
-    ScalarType* vlr = 0;
-
-    // Size of workspace and workspace for DGEEV
-    int lwork = -1;
-    std::vector<ScalarType> work(1);
-    std::vector<MagnitudeType> rwork(2*dim_);
-
-    info = 2476;
-    lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-    lwork = std::abs (static_cast<int> (Teuchos::ScalarTraits<ScalarType>::real (work[0])));
-    work.resize( lwork );
-    lapack.GEEV('N','N',dim_,H_.values(),H_.stride(),theta_[0],theta_[1],vlr, ldv, vlr, ldv, &work[0], lwork, &rwork[0], &info);
-
-    if(info != 0)
-      std::cout << "GEEV solve : info = " << info << std::endl;
-//    std::cout << std::scientific << "Harmonic Ritz Values are: " << theta_ << std::endl;
-
-    std::vector<int> index(dim_);
-    for(int i=0; i<dim_; ++i)
-    { index[i] = i; }
-
-    SortModLeja(theta_,index);
-
-    //Section to check for root adding:
-    std::vector<std::complex<MagnitudeType>> cmplxHRitz (dim_);
-    for(int i=0; i<cmplxHRitz.size(); ++i)
-      {cmplxHRitz[i] = std::complex<MagnitudeType>( theta_(i,0), theta_(i,1) );}
-    std::cout << std::endl;
-    //std::cout << "My complex harm ritz values are: " << std::endl;
-    //for(int i=0; i<cmplxHRitz.size(); ++i)
-    //{  std::cout << cmplxHRitz[i] << std::endl; }
-    //std::cout << std::endl;
-    
-    std::vector<MagnitudeType> pof (dim_,1.0);
-    //std::cout << "pof is : " << std::endl;
-    for(int j=0; j<dim_; ++j) {
-      for(int i=0; i<dim_; ++i) {
-        if(i!=j) {
-          pof[j] = std::abs(pof[j]*(1.0-(cmplxHRitz[j]/cmplxHRitz[i])));
-        }
-      }
-      //std::cout << pof[j] << std::endl;
-    }
-    //std::cout << std::endl;
-
-    std::vector<int> extra (dim_);
-    int totalExtra = 0;
-    //std::cout << "Extra is: " << std::endl;
-    for(int i=0; i<dim_; ++i)
-    {
-      extra[i] = ceil((log10(pof[i])-4.0)/14.0);
-      if(extra[i] > 0)
-      {
-        totalExtra += extra[i];
-      }
-      //std::cout << extra[i] << std::endl;
-    }
-    std::cout <<std::endl;
-
-    std::cout << "Warning: Need to add " << totalExtra << " extra roots." << std::endl;
-
-    if(addRoots_ && totalExtra>0)
-    {
-      theta_.reshape(dim_+totalExtra,2);
-=======
     HSolver.setMatrix( Teuchos::rcpFromRef(Htemp));
     HSolver.solveWithTransposeFlag( Teuchos::CONJ_TRANS );
     HSolver.setVectors( Teuchos::rcpFromRef(F), Teuchos::rcpFromRef(E));
@@ -981,87 +891,6 @@ namespace Belos {
   } //End Modified Leja ordering
 
   template <class ScalarType, class MV, class OP>
-  void GmresPolyOp<ScalarType, MV, OP>::SortModLeja(Teuchos::SerialDenseMatrix< OT, MagnitudeType > &thetaN, std::vector<int> &index) const 
-  {
-      int dimN = index.size();
-      std::vector<int> newIndex(dimN);
-    
-    //Section for Modified Leja Ordering:
-    
-      Teuchos::SerialDenseMatrix< OT, MagnitudeType > sorted (thetaN.numRows(), thetaN.numCols());
-      Teuchos::SerialDenseMatrix< OT, MagnitudeType > absVal (thetaN.numRows(), 1);
-      Teuchos::SerialDenseMatrix< OT, MagnitudeType > prod (thetaN.numRows(), 1);
-      for(int i = 0; i < dimN; i++)
-      {
-        absVal(i,0) = sqrt(thetaN(i,0)*thetaN(i,0) + thetaN(i,1)*thetaN(i,1));
-      }
-     // std::cout << "Abs vals of thetas: " << absVal << std::endl;
-     //std::cout << "first absVal: " << *absVal.values() << " last absVal: " << *(absVal.values() + dimN-1) << std::endl;
-      MagnitudeType * maxPointer = std::max_element(absVal.values(), (absVal.values()+dimN));
-      //std::cout << "value at maxPointer is : " << *maxPointer << std::endl;
-      int maxIndex = (maxPointer- absVal.values());
-      //std::cout << "Max abs val is: " << absVal(maxIndex, 0) << std::endl;
-
-      //Put larges abs value first in the list:
-      sorted(0,0) = thetaN(maxIndex,0);
-      sorted(0,1) = thetaN(maxIndex,1);
-      newIndex[0] = index[maxIndex];
-      //std::cout << "Sorted 718 is: " << sorted << std::endl;
-      int j;  
-      if(sorted(0,1)!= SCT::zero() && !SCT::isComplex) //Complex harmonic Ritz Value //Cmplx test
-      {
-        sorted(1,0) = thetaN(maxIndex,0);
-        sorted(1,1) = -thetaN(maxIndex,1);
-        newIndex[1] = index[maxIndex+1];
-         j = 2;
-        //std::cout << "Sorted 726 is: " << sorted << std::endl;
-      }
-      else
-      {
-        j = 1;
-      }
-      MagnitudeType a, b;
-      while( j < dimN)
-      {
-       for(int i = 0; i < dimN; i++) 
-       {
-          prod(i,0) = MCT::one();
-          for(int k = 0; k < j; k++)
-          {
-            a = thetaN(i,0) - sorted(k,0);
-            b = thetaN(i,1) - sorted(k,1);
-            //TODO Conversion of log to scalar/magnitudeType here??
-            //prod(i,0) = prod(i,0) + log10(Teuchos::ScalarTraits<MagnitudeType>::squareroot(a*a + b*b));//Cmplx test
-            prod(i,0) = prod(i,0) + log10(sqrt(a*a + b*b));
-          }
-        }
-        MagnitudeType * maxPointer = std::max_element(prod.values(), (prod.values()+dimN));
-        int maxIndex = (maxPointer- prod.values());
-       // std::cout << "Theta next max is: " << *maxPointer << std::endl;
-        sorted(j,0) = thetaN(maxIndex,0);
-        sorted(j,1) = thetaN(maxIndex,1);
-        newIndex[j] = index[maxIndex];
-        //std::cout << "Sorted 749 is: " << sorted << std::endl;
-        if(sorted(j,1)!= SCT::zero() && !SCT::isComplex) //Complex harmonic Ritz Value //Cmplx test
-        {
-          j++;
-          sorted(j,0) = thetaN(maxIndex,0);
-          sorted(j,1) = -thetaN(maxIndex,1);
-          newIndex[j] = index[maxIndex+1];
-          //std::cout << "Sorted 753 is: " << sorted << std::endl;
-        }
-        j++;
-      }
-      thetaN = sorted;
-      index = newIndex;
-     // std::cout << "Sorted theta is: " << thetaN << std::endl;
-     // std::cout << "New index is: " << std::endl;
-     // for(int i=0; i<index.size(); ++i)
-     //   std::cout << index[i] << std::endl;
-     // std::cout <<std::endl;
-      //End Modified Leja ordering
-  }
-  template <class ScalarType, class MV, class OP>
   void GmresPolyOp<ScalarType, MV, OP>::ApplyPoly( const MV& x, MV& y ) const 
   {
     if (dim_) {
@@ -1189,56 +1018,6 @@ namespace Belos {
 #ifdef BELOS_TEUCHOS_TIME_MONITOR
       Teuchos::TimeMonitor updateTimer( *timerPolyUpdate_ );
 #endif
-      MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(dim_-1,0), *prod, y); //poly = poly + 1/theta_i * prod
-    }
-
-    // Apply right preconditioner.
-    if (!RP_.is_null()) {
-      Teuchos::RCP<MV> Ytmp = MVT::CloneCopy(y);
-      problem_->applyRightPrec( *Ytmp, y );
-    }
-  }
-
-  template <class ScalarType, class MV, class OP>
-  void GmresPolyOp<ScalarType, MV, OP>::ApplyRootsPoly( const MV& x, MV& y ) const 
-  {
-    MVT::MvInit( y, SCT::zero() );
-    Teuchos::RCP<MV> prod = MVT::CloneCopy(x);
-    Teuchos::RCP<MV> Xtmp = MVT::Clone( x, MVT::GetNumberVecs(x) );
-    Teuchos::RCP<MV> Xtmp2 = MVT::Clone( x, MVT::GetNumberVecs(x) );
-
-    // Apply left preconditioner.
-    if (!LP_.is_null()) {
-      problem_->applyLeftPrec( *prod, *Xtmp ); // Left precondition x into the first vector 
-      prod = Xtmp;
-    } 
-    
-    int i=0;   
-    while(i < dim_-1)
-    {
-      if(theta_(i,1)== SCT::zero() || SCT::isComplex) //Real harmonic Ritz Value or complex scalars
-      {
-        MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(i,0), *prod, y); //poly = poly + 1/theta_i * prod
-        problem_->apply(*prod, *Xtmp); // temp = A*prod
-        MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/theta_(i,0), *Xtmp, *prod); //prod = prod - 1/theta_i * temp
-        i++;
-      }
-      else //Current theta is a+bi
-      {
-        MagnitudeType mod = theta_(i,0)*theta_(i,0) + theta_(i,1)*theta_(i,1); //mod = a^2 + b^2
-        problem_->apply(*prod, *Xtmp); // temp = A*prod
-        MVT::MvAddMv(2*theta_(i,0), *prod, -SCT::one(), *Xtmp, *Xtmp); //temp = 2a*prod-temp //TODO: This 2 in SCT form??
-        MVT::MvAddMv(SCT::one(), y, SCT::one()/mod, *Xtmp, y); //poly = poly + 1/mod*temp
-        if( i < dim_-2 )
-        {
-          problem_->apply(*Xtmp, *Xtmp2); // temp2 = A*temp
-          MVT::MvAddMv(SCT::one(), *prod, -SCT::one()/mod, *Xtmp2, *prod); //prod = prod - 1/mod * temp2
-        }
-        i = i + 2; 
-      }
-    }
-    if(theta_(dim_-1,1)== SCT::zero() || SCT::isComplex) 
-    {
       MVT::MvAddMv(SCT::one(), y, SCT::one()/theta_(dim_-1,0), *prod, y); //poly = poly + 1/theta_i * prod
     }
 
