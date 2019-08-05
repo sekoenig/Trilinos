@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
   using Teuchos::RCP;
   using Teuchos::rcp;
 
-  bool verbose = false;
+  bool verbose = true;
   bool success = true;
   try {
     bool proc_verbose = false;
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     bool userandomrhs = true;
     bool damppoly = false;
     bool addRoots = true;
-    int frequency = -1;        // frequency of status test output.
+    int frequency = 50;        // frequency of status test output.
     int blocksize = 1;         // blocksize
     int numrhs = 1;            // number of right-hand sides to solve for
     int maxiters = 3000;         // maximum number of iterations allowed per linear system
@@ -129,14 +129,14 @@ int main(int argc, char *argv[]) {
     double rThresh_ = 1.0001;
     double dropTol_ = 1e-3;
     std::string outersolver("Block Gmres");
-    std::string polytype("Arnoldi");
+    std::string polytype("Roots");
     std::string filename("orsirr1.hb");
     std::string rhsfile;
     std::string precond("right");
     std::string partition("zoltan");
     std::string PrecType = "ILU"; // incomplete LU
-    std::string orthog("DGKS");
-    MT tol = 1.0e-5;           // relative residual tolerance
+    std::string orthog("ICGS");
+    MT tol = 1.0e-8;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
 
     Teuchos::CommandLineProcessor cmdp(false,true);
