@@ -45,7 +45,9 @@
 // random right-hand-sides.  The initial guesses are all set to zero.
 //
 // NOTE: No preconditioner is used in this example.
-//
+#include <iterator>
+#include <sstream>
+
 #include "BelosConfigDefs.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
@@ -111,14 +113,14 @@ int main(int argc, char *argv[]) {
   try {
     bool proc_verbose = false;
     bool debug = false;
-    bool userandomrhs = true;
+    bool userandomrhs = true; //NOTE: Polys will be different between runs unless problem rhs is used for poly.
     bool damppoly = false;
     bool addRoots = true;
     int frequency = 50;        // frequency of status test output.
     int blocksize = 1;         // blocksize
     int numrhs = 1;            // number of right-hand sides to solve for
     int maxiters = 3000;         // maximum number of iterations allowed per linear system
-    int maxdegree = 25;        // maximum degree of polynomial
+    int maxdegree;        // maximum degree of polynomial
     int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
     int maxrestarts = 50;      // number of restarts allowed
     int OverlapLevel = 1;   //Overlap level for non-poly preconditioners must be >= 0. If Comm.NumProc() == 1,it is ignored.   
@@ -138,6 +140,7 @@ int main(int argc, char *argv[]) {
     std::string PrecType = "ILU"; // incomplete LU
     std::string orthog("ICGS");
     std::string MatrixType("Laplace3D");
+    std::string degreesToTest("25");
     MT tol = 1.0e-8;           // relative residual tolerance
     MT polytol = tol/10;       // relative residual tolerance for polynomial construction
 
@@ -165,7 +168,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
     cmdp.setOption("orthog",&orthog,"Orthogonalization: DGKS, ICGS, IMGS");
     cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
-    cmdp.setOption("max-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
+    cmdp.setOption("degrees",&degreesToTest,"Polynomial degrees to test. Separated by spaces. e.g. \"5 10 20\"");
     cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
     cmdp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
     cmdp.setOption("partition",&partition,"Partitioning type (zoltan, linear, none).");
@@ -189,6 +192,9 @@ int main(int argc, char *argv[]) {
       if(MyPID==0) std::cout << "Error: Invalid string for prec-type param." << std::endl;
       return -1; 
     }
+
+    std::istringstream istr( degreesToTest );
+    std::vector<int> degreeVector{ std::istream_iterator<int>( istr ), std::istream_iterator<int>() };
 
     proc_verbose = verbose && (MyPID==0);  /* Only print on the zero processor */
     //
@@ -451,7 +457,6 @@ int main(int argc, char *argv[]) {
 
     ParameterList polyList;
     polyList.set( "Polynomial Type", polytype );          // Type of polynomial to be generated
-    polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Verbosity", verbosity );               // Verbosity for polynomial construction
     polyList.set( "Random RHS", userandomrhs );           // Use RHS from linear system or random vector
@@ -485,58 +490,71 @@ int main(int argc, char *argv[]) {
     // *******************************************************************
     //
 
-    // Create an iterative solver manager.
+    for( unsigned int i=0; i < degreeVector.size(); i++){
+      maxdegree = degreeVector[i];
+      polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
+      std::cout << "Next poly degree is: " << maxdegree << std::endl;
+      // Create an iterative solver manager.
     RCP< Belos::SolverManager<double,MV,OP> > newSolver
       = rcp( new Belos::GmresPolySolMgr<double,MV,OP>(rcp(&problem,false), rcp(&polyList,false)));
-
-    //
-    // **********Print out information about problem*******************
-    //
-    if (proc_verbose) {
-      std::cout << std::endl << std::endl;
-      std::cout << "Dimension of matrix: " << NumGlobalElements << std::endl;
-      std::cout << "Number of right-hand sides: " << numrhs << std::endl;
-      std::cout << "Block size used by solver: " << blocksize << std::endl;
-      std::cout << "Max number of restarts allowed: " << maxrestarts << std::endl;
-      std::cout << "Max number of Gmres iterations per restart cycle: " << maxiters << std::endl;
-      std::cout << "Relative residual tolerance: " << tol << std::endl;
-      std::cout << std::endl;
-    }
-    //
-    // Perform solve
-    //
-    if(MyPID==0) std::cout << "Performing Solve: " << std::endl;
-    Belos::ReturnType ret = newSolver->solve();
-    //
-    // Compute actual residuals.
-    //
-    bool badRes = false;
-    std::vector<double> actual_resids( numrhs );
-    std::vector<double> rhs_norm( numrhs );
-    Epetra_MultiVector resid(*Map, numrhs);
-    OPT::Apply( *A, *X, resid );
-    MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
-    MVT::MvNorm( resid, actual_resids );
-    MVT::MvNorm( *B, rhs_norm );
-    if (proc_verbose) {
-      std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
-      for ( int i=0; i<numrhs; i++) {
-        double actRes = actual_resids[i]/rhs_norm[i];
-        std::cout << "Act resid: " << actual_resids[i] << "  rhs norm " << rhs_norm[i] << std::endl;
-        std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
-        if (actRes > tol) badRes = true;
+      //
+      // **********Print out information about problem*******************
+      //
+      if (proc_verbose) {
+        std::cout << std::endl << std::endl;
+        std::cout << "Dimension of matrix: " << NumGlobalElements << std::endl;
+        std::cout << "Number of right-hand sides: " << numrhs << std::endl;
+        std::cout << "Block size used by solver: " << blocksize << std::endl;
+        std::cout << "Max number of restarts allowed: " << maxrestarts << std::endl;
+        std::cout << "Max number of Gmres iterations per restart cycle: " << maxiters << std::endl;
+        std::cout << "Relative residual tolerance: " << tol << std::endl;
+        std::cout << std::endl;
       }
-    }
+      //
+      // Perform solve
+      //
+      if(MyPID==0) std::cout << "Performing Solve: " << std::endl;
+      Belos::ReturnType ret = newSolver->solve();
+      int numIters = newSolver->getNumIters();
+      if (proc_verbose)
+        std::cout << "Number of iterations performed for the initial solve: " << numIters << std::endl;
+      //
+      // Compute actual residuals.
+      //
+      bool badRes = false;
+      std::vector<double> actual_resids( numrhs );
+      std::vector<double> rhs_norm( numrhs );
+      Epetra_MultiVector resid(*Map, numrhs);
+      OPT::Apply( *A, *X, resid );
+      MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
+      MVT::MvNorm( resid, actual_resids );
+      MVT::MvNorm( *B, rhs_norm );
+      if (proc_verbose) {
+        std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
+        for ( int i=0; i<numrhs; i++) {
+          double actRes = actual_resids[i]/rhs_norm[i];
+          std::cout << "Act resid: " << actual_resids[i] << "  rhs norm " << rhs_norm[i] << std::endl;
+          std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
+          if (actRes > tol) badRes = true;
+        }
+      }
 
-    if (ret!=Belos::Converged || badRes) {
-      success = false;
-      if (proc_verbose)
-        std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
-    } else {
-      success = true;
-      if (proc_verbose)
-        std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
-    }
+      if (ret!=Belos::Converged || badRes) {
+        success = false;
+        if (proc_verbose)
+          std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
+      } else {
+        success = true;
+        if (proc_verbose)
+          std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
+      }
+      // Zero out previous timers
+      Teuchos::TimeMonitor::zeroOutTimers();
+      //Reset solution for next solve:
+      X->PutScalar( 0.0 );
+      newSolver->reset( Belos::Problem );
+      newSolver = Teuchos::null; //Delete old solver so we can start with new one. 
+    }//end for loop over poly degrees
   }
   TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
 
