@@ -245,13 +245,33 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   bool profileSetup = false;                          clp.setOption("cuda-profile-setup", "no-cuda-profile-setup", &profileSetup, "enable CUDA profiling for setup");
   bool profileSolve = false;                          clp.setOption("cuda-profile-solve", "no-cuda-profile-solve", &profileSolve, "enable CUDA profiling for solve");
 #else
-  bool profileSetup = false;   
-  bool profileSolve = false;   
+  bool profileSetup = false;
+  bool profileSolve = false;
 #endif
   int  cacheSize = 0;                                 clp.setOption("cachesize",               &cacheSize,       "cache size (in KB)");
 #ifdef HAVE_MPI
   int provideNodeComm = 0;                            clp.setOption("nodecomm",          &provideNodeComm,  "make the nodal communicator available w/ reduction factor X");
 #endif
+
+  //Additional options used with poly prec GMRES:
+  bool damppoly = false;
+  clp.setOption("damp-poly","no-damp",&damppoly,"Damp the polynomial.");
+  bool addRoots = true;
+  clp.setOption("add-roots","no-add-roots",&addRoots,"Add extra roots as needed to stabilize the polynomial.");
+  //clp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
+//  clp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
+  std::string polytype("Roots");
+  clp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
+//  clp.setOption("orthog",&orthog,"Orthogonalization: DGKS, ICGS, IMGS"); 
+  int maxdegree = 25;
+  clp.setOption("max-poly-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
+  int maxsubspace = 50; 
+  clp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
+  int maxrestarts = 50;
+  clp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
+  int stepsize = 5;
+  clp.setOption("step-size",&stepsize,"Step size for s-step GMRES.");
+  //End poly options
 
   clp.recogniseAllOptions(true);
   switch (clp.parse(argc, argv)) {
@@ -262,7 +282,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
   }
 
   TEUCHOS_TEST_FOR_EXCEPTION(xmlFileName != "" && yamlFileName != "", std::runtime_error,
-                             "Cannot provide both xml and yaml input files");
+      "Cannot provide both xml and yaml input files");
 
   // Instead of checking each time for rank, create a rank 0 stream
   RCP<Teuchos::FancyOStream> fancy = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
@@ -287,10 +307,40 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
     out << "WARNING: CG will not work with COMPLEX scalars, switching to GMRES"<<std::endl;
   }
 
+  // Create Belos parameter list
+  RCP<Teuchos::ParameterList> belosList = Teuchos::parameterList();
+  belosList->set("Maximum Iterations",    maxIts); // Maximum number of iterations allowed
+  belosList->set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
+  belosList->set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
+  tol = dtol; //Hack here... sometimes tol gets set elsewhere??
+  belosList->set("Convergence Tolerance", tol);    // Relative convergence tolerance requested
+  belosList->set( "Orthogonalization", "ICGS");           // Type of orthogonalizaion: DGKS, IMGS, ICGS
+  belosList->set("Verbosity",             Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary + Belos::TimingDetails);
+  belosList->set("Output Frequency",      maxsubspace); 
+  if (!scaleResidualHist)
+    belosList->set("Implicit Residual Scaling", "None");
+  belosList->set("Step Size", stepsize); //Step size for s-step GMRES
+  belosList->set("CholeskyQR", true); //Setting for s-step GMRES
+  belosList->set("Compute Ritz Values", false); //for s-step GMRES
+
+  RCP<Teuchos::ParameterList> polyList = Teuchos::parameterList();
+  if(belosType == "GmresPoly"){
+    polyList->set( "Polynomial Type", "Roots" );          // Type of polynomial to be generated
+    polyList->set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
+    polyList->set("Verbosity",             Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary + Belos::TimingDetails);
+    polyList->set( "Random RHS", true );           // Use RHS from linear system or random vector
+    polyList->set( "Damped Poly", damppoly );              // Option to damp polynomial
+    polyList->set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
+    polyList->set( "Orthogonalization", "ICGS");           // Type of orthogonalizaion: DGKS, IMGS, ICGS
+    polyList->set( "Outer Solver", "Block Gmres" );
+    polyList->set( "Outer Solver Params", *belosList );
+  }
+
+
 #ifdef HAVE_MUELU_AMGX
-//Initialize AMGX
-MueLu::MueLu_AMGX_initialize();
-MueLu::MueLu_AMGX_initialize_plugins();
+  //Initialize AMGX
+  MueLu::MueLu_AMGX_initialize();
+  MueLu::MueLu_AMGX_initialize_plugins();
 #endif
 
   bool isDriver = paramList.isSublist("Run1");
@@ -357,7 +407,7 @@ MueLu::MueLu_AMGX_initialize_plugins();
   int numReruns = 1;
   if (paramList.isParameter("number of reruns"))
     numReruns = paramList.get<int>("number of reruns");
-   
+
   for (int rerunCount = 1; rerunCount <= numReruns; rerunCount++) {
     bool stop = false;
     ParameterList mueluList, runList;
@@ -406,6 +456,7 @@ MueLu::MueLu_AMGX_initialize_plugins();
       solveType = dsolveType;
       tol       = dtol;
 
+
       if (isDriver) {
         if (runList.isParameter("filename")) {
           // Redirect all output into a filename We have to redirect all output,
@@ -427,18 +478,15 @@ MueLu::MueLu_AMGX_initialize_plugins();
       RCP<Teuchos::FancyOStream> fancy2 = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
       Teuchos::FancyOStream& out2 = *fancy2;
       out2.setOutputToRootOnly(0);
-
-
-
       out2 << galeriStream.str();
 
       // =========================================================================
       // Preconditioner construction
       // =========================================================================
       bool useAMGX = mueluList.isParameter("use external multigrid package") && (mueluList.get<std::string>("use external multigrid package") == "amgx");
-      bool useML   = mueluList.isParameter("use external multigrid package") && (mueluList.get<std::string>("use external multigrid package") == "ml");  
+      bool useML   = mueluList.isParameter("use external multigrid package") && (mueluList.get<std::string>("use external multigrid package") == "ml");
 #ifdef HAVE_MPI
-      if(provideNodeComm && !useAMGX && !useML) {        
+      if(provideNodeComm && !useAMGX && !useML) {
         Teuchos::ParameterList& userParamList = mueluList.sublist("user data");
         userParamList.set("Node Comm",nodeComm);
       }
@@ -455,16 +503,16 @@ MueLu::MueLu_AMGX_initialize_plugins();
         // Build the preconditioner numRebuilds+1 times
         MUELU_SWITCH_TIME_MONITOR(tm,"Driver: 2 - MueLu Setup");
         PreconditionerSetup(A,coordinates,nullspace,mueluList,profileSetup,useAMGX,useML,numRebuilds,H,Prec);
-        
+
         comm->barrier();
         tm = Teuchos::null;
       }
-      catch(const std::exception& e) { 
+      catch(const std::exception& e) {
         out2<<"MueLu_Driver: preconditioner setup crashed w/ message:"<<e.what()<<std::endl;
         H=Teuchos::null; Prec=Teuchos::null;
         preconditionerOK = false;
       }
-      
+
       // =========================================================================
       // System solution (Ax = b)
       // =========================================================================
@@ -477,14 +525,19 @@ MueLu::MueLu_AMGX_initialize_plugins();
             tm = Teuchos::null;
           }
           
+          if(belosType == "GmresPoly"){
           // Solve the system numResolves+1 times
-          SystemSolve(A,X,B,H,Prec,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
-          
+          SystemSolve(A,X,B,H,Prec,polyList,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
+          } 
+          else{
+          // Solve the system numResolves+1 times
+          SystemSolve(A,X,B,H,Prec,belosList,out2,solveType,belosType,profileSolve,useAMGX,useML,cacheSize,numResolves,scaleResidualHist,solvePreconditioned,maxIts,tol);
+          }
           comm->barrier();
         }
-        catch(const std::exception& e) { 
+        catch(const std::exception& e) {
           out2<<"MueLu_Driver: solver crashed w/ message:"<<e.what()<<std::endl;
-        }       
+        }
       }
       else {
         out2<<"MueLu_Driver: Not solving system due to crash in preconditioner setup"<<std::endl;
@@ -543,8 +596,8 @@ MueLu::MueLu_AMGX_initialize_plugins();
 
 #ifdef HAVE_MUELU_AMGX
 // Finalize AMGX
-//MueLu::MueLu_AMGX_finalize();
-//MueLu::MueLu_AMGX_finalize_plugins();
+MueLu::MueLu_AMGX_finalize_plugins();
+MueLu::MueLu_AMGX_finalize();
 #endif
 
   return EXIT_SUCCESS;

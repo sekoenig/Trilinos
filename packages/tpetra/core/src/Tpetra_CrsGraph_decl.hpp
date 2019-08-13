@@ -34,8 +34,6 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Questions? Contact Michael A. Heroux (maherou@sandia.gov)
-//
 // ************************************************************************
 // @HEADER
 
@@ -402,7 +400,7 @@ namespace Tpetra {
     TPETRA_DEPRECATED
     CrsGraph (const Teuchos::RCP<const map_type>& rowMap,
               const Teuchos::ArrayRCP<const size_t>& numEntPerRow,
-	      const ProfileType pftype = DynamicProfile,
+	      const ProfileType pftype = TPETRA_DEFAULT_PROFILE_TYPE,
               const Teuchos::RCP<Teuchos::ParameterList>& params = Teuchos::null);
 #endif // TPETRA_ENABLE_DEPRECATED_CODE
 
@@ -488,7 +486,7 @@ namespace Tpetra {
     CrsGraph (const Teuchos::RCP<const map_type>& rowMap,
               const Teuchos::RCP<const map_type>& colMap,
               const Teuchos::ArrayRCP<const size_t>& numEntPerRow,
-	      const ProfileType pftype = DynamicProfile,
+	      const ProfileType pftype = TPETRA_DEFAULT_PROFILE_TYPE,
               const Teuchos::RCP<Teuchos::ParameterList>& params = Teuchos::null);
 #endif // TPETRA_ENABLE_DEPRECATED_CODE
 
@@ -597,6 +595,17 @@ namespace Tpetra {
               const Teuchos::RCP<const map_type>& domainMap = Teuchos::null,
               const Teuchos::RCP<const map_type>& rangeMap = Teuchos::null,
               const Teuchos::RCP<Teuchos::ParameterList>& params = Teuchos::null);
+
+    //! Create a fill-complete CrsGraph from all the things it needs.
+    CrsGraph (const local_graph_type& lclGraph,
+              const Teuchos::RCP<const map_type>& rowMap,
+              const Teuchos::RCP<const map_type>& colMap,
+              const Teuchos::RCP<const map_type>& domainMap,
+              const Teuchos::RCP<const map_type>& rangeMap,
+              const Teuchos::RCP<const import_type>& importer,
+              const Teuchos::RCP<const export_type>& exporter,
+              const Teuchos::RCP<Teuchos::ParameterList>& params =
+                Teuchos::null);
 
     //! Copy constructor (default).
     CrsGraph (const CrsGraph<local_ordinal_type, global_ordinal_type, node_type>&) = default;
@@ -2876,7 +2885,7 @@ namespace Tpetra {
           fillCompleteClone = params->get ("fillComplete clone", fillCompleteClone);
           useLocalIndices = params->get ("Locally indexed clone", useLocalIndices);
           if (params->get ("Static profile clone", true) == false) {
-            pftype = DynamicProfile;
+            pftype = ProfileType(StaticProfile+1); // DynamicProfile (Tpetra_ConfigDefs.h)
           }
           debug = params->get ("Debug", debug);
         }
