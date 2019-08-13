@@ -102,7 +102,7 @@ class GmresPolySolMgrPolynomialFailure : public BelosError {public:
 //
 /// The GMRES polynomial can be created in conjunction with any standard preconditioner.
 /// Simply pass the preconditioner to the LinearProblem before calling the GmresPolySolMgr
-/// and you preconditioner will be combined with the polynomial automatically.
+/// and your preconditioner will be combined with the polynomial automatically.
 ///
 /// Here is a list of all the parameters that this solver accepts:
 ///   - "Polynomial Type" (\c std::string): The desired polynomial type: 
@@ -182,7 +182,7 @@ public:
    *   - "Polynomial Tolerance" - a \c MagnitudeType specifying the polynomial tolerance (sometimes) used to 
    *                            generate polynomial. Default: 1e-8
    *   - "Outer Solver" -a \c std::string specifying name of outer solver in Belos solver factory.  Default: ""
-   *   - "Outer Solver Params" -a \c Teuchos::parameterList giving parameters for the outer solver.
+   *   - "Outer Solver Params" -a \c Teuchos::ParameterList giving parameters for the outer solver.
    *   - "Timer Label" -a \c std::string specifying the label on polynomial solve timers.
    */
   GmresPolySolMgr( const Teuchos::RCP<LinearProblem<ScalarType,MV,OP> > &problem,
