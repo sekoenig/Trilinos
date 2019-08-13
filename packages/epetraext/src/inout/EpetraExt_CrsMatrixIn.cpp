@@ -303,6 +303,7 @@ int MatrixMarketFileToCrsMatrixHandle(const char *filename,
     handle = fopen(filename,"r");  // Open file
     if (handle == 0) {
       rv = -1; // file not found
+      if (verbose) std::cout << std::endl << "Error: File not found!!" << filename << std::endl;
     }
 
     // Check first line, which should be
@@ -318,10 +319,11 @@ int MatrixMarketFileToCrsMatrixHandle(const char *filename,
     if ( (rv != -1) && (strcmp(token1, "%%MatrixMarket") ||
         strcmp(token2, "matrix") ||
         strcmp(token3, "coordinate") ||
-        strcmp(token4, "real") ||
-        strcmp(token5, "general")) ) {
+        strcmp(token4, "real") 
+        ) ) {
       if (handle!=0) fclose(handle);
       rv = -1;
+      if (verbose) std::cout << std::endl << "Error: First line of file does not match any known format!!" << filename << std::endl;
     }
 
     // Next, strip off header lines (which start with "%")

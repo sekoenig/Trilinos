@@ -125,6 +125,7 @@ int Ifpack_Amesos::SetParameters(Teuchos::ParameterList& List_in)
 //==============================================================================
 int Ifpack_Amesos::Initialize()
 {
+  std::cout << "In Ifpack_Amesos:: Initialize" << std::endl;
   using std::cerr;
   using std::endl;
 
@@ -195,8 +196,9 @@ int Ifpack_Amesos::Initialize()
     Solver_ = Teuchos::rcp( Factory.Create("Amesos_Lapack",*Problem_) );
   }
   // if empty, give up.
-  if (Solver_ == Teuchos::null)
+  if (Solver_ == Teuchos::null){
     IFPACK_CHK_ERR(-1);
+  }
 
   IFPACK_CHK_ERR(Solver_->SetUseTranspose(UseTranspose_));
   Solver_->SetParameters(List_);
