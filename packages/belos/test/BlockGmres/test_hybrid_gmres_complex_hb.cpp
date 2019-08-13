@@ -221,7 +221,6 @@ int main(int argc, char *argv[]) {
     belosList.set( "Verbosity", verbosity );
 
     ParameterList polyList;
-    polyList.set( "Polynomial Type", polytype );          // Type of polynomial to be generated
     polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Polynomial Type", polyType );          // Type of polynomial to construct
