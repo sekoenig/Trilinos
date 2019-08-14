@@ -77,7 +77,7 @@
 #include <MueLu_ParameterListInterpreter.hpp>
 #include <MueLu_Utilities.hpp>
 #include <MatrixLoad.hpp>
-#include <DriverCore.hpp>
+#include <DriverCore2.hpp>
 
 #ifdef HAVE_MUELU_BELOS
 #include <BelosConfigDefs.hpp>
