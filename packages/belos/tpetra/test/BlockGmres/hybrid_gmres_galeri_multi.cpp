@@ -49,10 +49,12 @@
 #include "BelosLinearProblem.hpp"
 #include "BelosTpetraAdapter.hpp"
 #include "BelosGmresPolySolMgr.hpp"
+#include "BelosSolverFactory.hpp"
 
 // I/O for Harwell-Boeing files
 #define HIDE_TPETRA_INOUT_IMPLEMENTATIONS
 #include <Tpetra_MatrixIO.hpp>
+#include <MatrixMarket_Tpetra.hpp>
 
 #include <Teuchos_CommandLineProcessor.hpp>
 #include <Teuchos_ParameterList.hpp>
@@ -83,6 +85,11 @@ namespace BelosTpetra {
 #include <Galeri_XpetraProblemFactory.hpp>
 #include <Galeri_XpetraUtils.hpp>
 #include <Galeri_XpetraMaps.hpp>
+
+//#include <Ifpack2_Factory.hpp>
+#include <Zoltan2_PartitioningProblem.hpp>
+#include <Zoltan2_XpetraCrsMatrixAdapter.hpp>
+#include <Zoltan2_XpetraMultiVectorAdapter.hpp>
 
 using namespace Teuchos;
 using Tpetra::Operator;
@@ -140,7 +147,7 @@ int main(int argc, char *argv[]) {
     double conv = 1.0; //Convection term
     std::string outersolver("Block Gmres");
     std::string polytype("Roots");
-    std::string filename("bcsstk14.hb");
+    std::string filename;
     std::string rhsfile;
     std::string precond("right");
     std::string partition("zoltan");
@@ -209,8 +216,8 @@ int main(int argc, char *argv[]) {
     std::vector<int> degreeVector{ std::istream_iterator<int>( istr ), std::istream_iterator<int>() };
 
     //Add new Tpetra solvers to solver factory:
-    BelosTpetra::Impl::register_CgPipeline (verbose);
-    BelosTpetra::Impl::register_GmresSstep (verbose);
+    BelosTpetra::Impl::register_CgPipeline (false);
+    BelosTpetra::Impl::register_GmresSstep (false);
 
     Teuchos::RCP<Tpetra::CrsMatrix<ST>> A;
     RCP< const map_type> map;
@@ -230,23 +237,43 @@ int main(int argc, char *argv[]) {
       GaleriList.set ("nz", nx);
       GaleriList.set ("diff", diff);
       GaleriList.set ("conv", conv);
-
-      Tpetra::global_size_t nGlobalElts = nx * nx * nx;
+      Tpetra::global_size_t nGlobalElts;
+      if( MatrixType == "Laplace3D" || MatrixType == "Cross3D"|| MatrixType == "Star3D"|| MatrixType == "Elasticity3D"){
+        nGlobalElts = nx * nx * nx;
+      }
+      else{ //Assume 2D map
+        nGlobalElts = nx * nx;
+      }
+      if(proc_verbose){ std::cout << "Creating Map " << std::endl; }
       map = rcp(new map_type(nGlobalElts, 0, comm));
 
+      if(proc_verbose){ std::cout << "Building Problem" << std::endl; }
       typedef Galeri::Xpetra::Problem<map_type, Tpetra::CrsMatrix<ST>, MV> Galeri_t;
       RCP<Galeri_t> galeriProblem = Galeri::Xpetra::BuildProblem<ST, LO, GO, 
-        map_type, Tpetra::CrsMatrix<ST>, MV> ("Laplace3D", map, GaleriList);
+        map_type, Tpetra::CrsMatrix<ST>, MV> (MatrixType, map, GaleriList);
+      if(proc_verbose){ std::cout << "Building Matrix" << std::endl; }
       A = galeriProblem->BuildMatrix();
+    }
+    if(proc_verbose) {
+      std::cout << "Matrix Size is: " << A->getGlobalNumRows() << std::endl;
+      std::cout << "Number of Entries: " << A->getGlobalNumEntries() << std::endl;
+    }  
+
+
+    // Read RHS from a file
+    RCP<MV> B, X; 
+    if (rhsfile != "") {
+      if (proc_verbose) std::cout << "RHS read from " << rhsfile << std::endl;
+      RCP<const map_type> rhsMap = A->getRangeMap(); 
+      B = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readDenseFile (rhsfile, comm, rhsMap, false, false);
+    } else {
+      B = rcp (new MV(A->getRangeMap(), numrhs));
+      B->randomize();
     }
 
     // Create initial vectors
-    RCP<MV> B, X;
-    X = rcp( new MV(map,numrhs) );
-    B = rcp( new MV(map,numrhs) );
-    MVT::MvRandom( *B );
+    X = rcp (new MV(A->getRangeMap(), numrhs));
     MVT::MvInit( *X, 0.0 );
-
 
     //Double-check norms for debugging:
     std::vector<double> tempnorm(numrhs), temprhs(numrhs);
@@ -286,10 +313,6 @@ int main(int argc, char *argv[]) {
     polyList.set( "Damped Poly", damppoly );              // Option to damp polynomial
     polyList.set( "Add Roots", addRoots );                // Option to add roots to stabilize poly 
     polyList.set( "Orthogonalization", orthog);           // Type of orthogonalizaion: DGKS, IMGS, ICGS
-    if ( outersolver != "" ) {
-      polyList.set( "Outer Solver", outersolver );
-      polyList.set( "Outer Solver Params", belosList );
-    }
 
     // Construct an unpreconditioned linear problem instance.
     //
@@ -301,6 +324,8 @@ int main(int argc, char *argv[]) {
         std::cout << std::endl << "ERROR:  Belos::LinearProblem failed to set up correctly!" << std::endl;
       return EXIT_FAILURE;
     }
+
+    Belos::GenericSolverFactory<ST, MV, OP> factory;
     //
     // *******************************************************************
     // *************Start the block Gmres iteration***********************
@@ -309,9 +334,12 @@ int main(int argc, char *argv[]) {
     for( unsigned int i=0; i < degreeVector.size(); i++){
       maxdegree = degreeVector[i];
       polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
-      std::cout << "Next poly degree is: " << maxdegree << std::endl;
+      if(proc_verbose){std::cout << "Next poly degree is: " << maxdegree << std::endl;}
 
-      Belos::GmresPolySolMgr<ST,MV,OP> solver( rcpFromRef(problem), rcpFromRef(polyList) );
+      Belos::GmresPolySolMgr<ST,MV,OP> innerSolver( rcpFromRef(problem), rcpFromRef(polyList) );
+      RCP<Belos::SolverManager<ST, MV, OP> > solver = factory.create( outersolver, rcpFromRef(belosList) );
+      TEUCHOS_TEST_FOR_EXCEPTION(solver == Teuchos::null, std::invalid_argument, "Selected solver is not valid.");
+      solver->setProblem(rcpFromRef(problem)); 
 
       //
       // **********Print out information about problem*******************
@@ -328,7 +356,7 @@ int main(int argc, char *argv[]) {
       //
       // Perform solve
       //
-      Belos::ReturnType ret = solver.solve();
+      Belos::ReturnType ret = solver->solve();
       //
       // Compute actual residuals.
       //
@@ -364,7 +392,7 @@ int main(int argc, char *argv[]) {
       Teuchos::TimeMonitor::zeroOutTimers();
       //Reset solution for next solve:
       MVT::MvInit( *X, 0.0 );
-      solver.reset( Belos::Problem );
+      solver->reset( Belos::Problem );
       //newSolver = Teuchos::null; //Delete old solver so we can start with new one. 
     }//end for loop over poly degrees
 

@@ -34,13 +34,11 @@ TRIBITS_ADD_EXECUTABLE_AND_TEST(
   )
 
 IF (${PACKAGE_NAME}_ENABLE_Galeri)
-
  TRIBITS_ADD_EXECUTABLE(
   Tpetra_HybridGMRES_Galeri_multi
   SOURCES hybrid_gmres_galeri_multi.cpp
   COMM serial mpi
   )
-
 ENDIF()
 
 TRIBITS_COPY_FILES_TO_BINARY_DIR(Tpetra_BlockGMRES_hb_CopyFiles
