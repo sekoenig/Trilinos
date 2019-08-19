@@ -84,7 +84,6 @@
 #include <Xpetra_EpetraCrsMatrix.hpp>
 #endif
 #include <Xpetra_Parameters.hpp>
-#include <Xpetra_UseDefaultTypes.hpp>
 
 // FROSCH thyra includes
 #include "Thyra_FROSchLinearOp_def.hpp"
@@ -92,10 +91,11 @@
 #include <FROSch_Tools_def.hpp>
 
 typedef unsigned                                    UN;
-typedef Scalar                                      SC;
-typedef LocalOrdinal                                LO;
-typedef GlobalOrdinal                               GO;
+typedef double                                      SC;
+typedef int                                         LO;
+typedef FROSch::DefaultGlobalOrdinal                GO;
 typedef KokkosClassic::DefaultNode::DefaultNodeType NO;
+
 
 using namespace std;
 using namespace Teuchos;
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
         return(EXIT_SUCCESS);
     }
     
-    int N;
+    int N = 0;
     int color=1;
     if (Dimension == 2) {
         N = (int) (pow(CommWorld->getSize(),1/2.) + 100*numeric_limits<double>::epsilon()); // 1/H
@@ -178,12 +178,12 @@ int main(int argc, char *argv[])
             dofsPerNodeVector[block] = (UN) max(int(DofsPerNode-block),1);
             
             ParameterList GaleriList;
-            GaleriList.set("nx", int(N*(M+block)));
-            GaleriList.set("ny", int(N*(M+block)));
-            GaleriList.set("nz", int(N*(M+block)));
-            GaleriList.set("mx", int(N));
-            GaleriList.set("my", int(N));
-            GaleriList.set("mz", int(N));
+            GaleriList.set("nx", GO(N*(M+block)));
+            GaleriList.set("ny", GO(N*(M+block)));
+            GaleriList.set("nz", GO(N*(M+block)));
+            GaleriList.set("mx", GO(N));
+            GaleriList.set("my", GO(N));
+            GaleriList.set("mz", GO(N));
             
             RCP<const Map<LO,GO,NO> > UniqueMapTmp;
             RCP<MultiVector<SC,LO,GO,NO> > CoordinatesTmp;

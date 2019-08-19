@@ -54,16 +54,15 @@
 #include "Xpetra_CrsMatrixWrap.hpp"
 #include "Xpetra_CrsMatrix.hpp"
 #include <Xpetra_DefaultPlatform.hpp>
-#include <Xpetra_UseDefaultTypes.hpp>
 
 #include <FROSch_DDInterface_def.hpp>
 
 #include <FROSch_Tools_decl.hpp>
 
 typedef unsigned                                    UN;
-typedef Scalar                                      SC;
-typedef LocalOrdinal                                LO;
-typedef GlobalOrdinal                               GO;
+typedef double                                      SC;
+typedef int                                         LO;
+typedef FROSch::DefaultGlobalOrdinal                GO;
 typedef KokkosClassic::DefaultNode::DefaultNodeType NO;
 
 using namespace std;
@@ -101,7 +100,7 @@ int main(int argc, char *argv[])
         return(EXIT_SUCCESS);
     }
 
-    int N;
+    int N = 0;
     int color=1;
     if (Dimension == 2) {
         N = (int) (pow(CommWorld->getSize(),1/2.) + 100*numeric_limits<double>::epsilon()); // 1/H
@@ -131,12 +130,12 @@ int main(int argc, char *argv[])
         Comm->barrier(); if (Comm->getRank()==0) cout << "#############\n# Assembly #\n#############\n" << endl;
 
         ParameterList GaleriList;
-        GaleriList.set("nx", int(N*M));
-        GaleriList.set("ny", int(N*M));
-        GaleriList.set("nz", int(N*M));
-        GaleriList.set("mx", int(N));
-        GaleriList.set("my", int(N));
-        GaleriList.set("mz", int(N));
+        GaleriList.set("nx", GO(N*M));
+        GaleriList.set("ny", GO(N*M));
+        GaleriList.set("nz", GO(N*M));
+        GaleriList.set("mx", GO(N));
+        GaleriList.set("my", GO(N));
+        GaleriList.set("mz", GO(N));
 
         RCP<const Map<LO,GO,NO> > UniqueMap;
         RCP<MultiVector<SC,LO,GO,NO> > Coordinates;

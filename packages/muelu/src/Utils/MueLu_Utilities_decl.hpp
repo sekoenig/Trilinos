@@ -151,9 +151,9 @@ namespace MueLu {
     go away, while others should be moved to Xpetra.
     */
   template <class Scalar,
-  class LocalOrdinal  = int,
-  class GlobalOrdinal = LocalOrdinal,
-  class Node          = KokkosClassic::DefaultNode::DefaultNodeType>
+            class LocalOrdinal = DefaultLocalOrdinal,
+            class GlobalOrdinal = DefaultGlobalOrdinal,
+            class Node = DefaultNode>
   class Utilities : public UtilitiesBase<Scalar, LocalOrdinal, GlobalOrdinal, Node> {
 #undef MUELU_UTILITIES_SHORT
     //#include "MueLu_UseShortNames.hpp"
@@ -753,7 +753,17 @@ namespace MueLu {
               // Compute the transpose A of the Tpetra matrix tpetraOp.
               RCP<Tpetra::CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node> > A;
               Tpetra::RowMatrixTransposer<Scalar, LocalOrdinal, GlobalOrdinal, Node> transposer(rcpFromRef(tpetraOp),label);
-              A = transposer.createTranspose(params);
+
+              {
+                using Teuchos::ParameterList;
+                using Teuchos::rcp;
+                RCP<ParameterList> transposeParams = params.is_null () ?
+                  rcp (new ParameterList) :
+                  rcp (new ParameterList (*params));
+                transposeParams->set ("sort", false);
+                A = transposer.createTranspose(transposeParams);
+              }
+
               RCP<Xpetra::TpetraCrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node> > AA   = rcp(new Xpetra::TpetraCrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>(A));
               RCP<CrsMatrix>                                                           AAA  = rcp_implicit_cast<CrsMatrix>(AA);
               RCP<Matrix>                                                              AAAA = rcp( new CrsMatrixWrap(AAA));

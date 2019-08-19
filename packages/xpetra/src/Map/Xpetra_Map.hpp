@@ -81,8 +81,8 @@ namespace Xpetra {
     NotSpecified
   };
 
-  template <class LocalOrdinal = int,
-            class GlobalOrdinal = LocalOrdinal,
+  template <class LocalOrdinal,
+            class GlobalOrdinal,
             class Node = KokkosClassic::DefaultNode::DefaultNodeType>
   class Map
     : public Teuchos::Describable

@@ -796,6 +796,7 @@ int Ifpack_AdditiveSchwarz<T>::SetParameters(Teuchos::ParameterList& List_in)
 template<typename T>
 int Ifpack_AdditiveSchwarz<T>::Initialize()
 {
+  std::cout << "In Additive Schwarz Initialize." << std::endl;
   IsInitialized_ = false;
   IsComputed_ = false; // values required
   Condest_ = -1.0; // zero-out condest
@@ -840,7 +841,7 @@ int Ifpack_AdditiveSchwarz<T>::Initialize()
   Comm().Barrier();
 */
 # endif
-
+  //std::cout << "End computer overlap matrix.  Begin setup." << std::endl;
   IFPACK_CHK_ERR(Setup());
 
 # ifdef IFPACK_NODE_AWARE_CODE

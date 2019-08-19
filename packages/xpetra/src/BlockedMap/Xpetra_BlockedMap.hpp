@@ -61,9 +61,9 @@ namespace Xpetra {
   template<class LO, class GO, class N> class MapFactory;
 #endif
 
-  template <class LocalOrdinal = Map<>::local_ordinal_type,
-            class GlobalOrdinal = typename Map<LocalOrdinal>::global_ordinal_type,
-            class Node = typename Map<LocalOrdinal, GlobalOrdinal>::node_type>
+  template <class LocalOrdinal,
+            class GlobalOrdinal,
+            class Node = KokkosClassic::DefaultNode::DefaultNodeType>
   class BlockedMap
     : public Map< LocalOrdinal, GlobalOrdinal, Node >
   {
@@ -83,7 +83,8 @@ namespace Xpetra {
     //! Constructor
     /*!
      */
-    BlockedMap() {
+    BlockedMap()
+    {
       bThyraMode_ = false;
     }
 
@@ -99,7 +100,8 @@ namespace Xpetra {
     //!
     //! In Xpetra mode, the fullmap has to be the same as the union of the GIDs stored in the submaps in maps. The intersection of the GIDs of the sub-
     //! maps in maps must be empty.
-    BlockedMap(const RCP<const Map>& fullmap, const std::vector<RCP<const Map> >& maps, bool bThyraMode = false) {
+    BlockedMap(const RCP<const Map>& fullmap, const std::vector<RCP<const Map> >& maps, bool bThyraMode = false)
+    {
       bThyraMode_ = bThyraMode;
 
       if(bThyraMode == false) {
@@ -186,7 +188,8 @@ namespace Xpetra {
     }
 
     //! Expert constructor for Thyra maps
-    BlockedMap(const std::vector<RCP<const Map> >& maps, const std::vector<RCP<const Map> >& thyramaps) {
+    BlockedMap(const std::vector<RCP<const Map> >& maps, const std::vector<RCP<const Map> >& thyramaps)
+    {
       bThyraMode_ = true;
 
       // plausibility check
@@ -222,7 +225,8 @@ namespace Xpetra {
     }
 
     //! copy constructor
-    BlockedMap(const BlockedMap& input) {
+    BlockedMap(const BlockedMap& input)
+    {
       bThyraMode_ = input.getThyraMode();
       fullmap_ = Teuchos::null;
       maps_.resize(input.getNumMaps(), Teuchos::null);
@@ -231,8 +235,8 @@ namespace Xpetra {
     }
 
     //! Destructor.
-    virtual ~BlockedMap() {
-
+    virtual ~BlockedMap()
+    {
       // make sure all RCP's are freed
       for(size_t v = 0; v < maps_.size(); ++v) {
         maps_[v] = Teuchos::null;
