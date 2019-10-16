@@ -87,9 +87,9 @@ namespace BelosTpetra {
 #include <Galeri_XpetraMaps.hpp>
 
 //#include <Ifpack2_Factory.hpp>
-#include <Zoltan2_PartitioningProblem.hpp>
-#include <Zoltan2_XpetraCrsMatrixAdapter.hpp>
-#include <Zoltan2_XpetraMultiVectorAdapter.hpp>
+//#include <Zoltan2_PartitioningProblem.hpp>
+//#include <Zoltan2_XpetraCrsMatrixAdapter.hpp>
+//#include <Zoltan2_XpetraMultiVectorAdapter.hpp>
 
 using namespace Teuchos;
 using Tpetra::Operator;
