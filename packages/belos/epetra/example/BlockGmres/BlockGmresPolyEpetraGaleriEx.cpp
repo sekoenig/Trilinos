@@ -71,6 +71,7 @@
 #include "Ifpack.h"
 #include <Ifpack_IlukGraph.h>
 #include <Ifpack_CrsRiluk.h>
+#include "Ifpack_Chebyshev.h"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -153,7 +154,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
     cmdp.setOption("precond",&precond,"Preconditioning placement (none, left, right).");
-    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, none).");
+    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, Cheby, none).");
     cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
     cmdp.setOption("fill",&ilutFill_,"Fill level for ILU-type preconditioners.");
     cmdp.setOption("athresh",&aThresh_,"Absolute Threshold for ILU-type preconditioners.");
@@ -184,7 +185,7 @@ int main(int argc, char *argv[]) {
       if(MyPID==0) std::cout << "Error: Invalid string for precond param." << std::endl;
       return -1; 
     }
-    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT" && PrecType != "ILUK2" && PrecType != "none")
+    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT" && PrecType != "ILUK2" && PrecType != "Cheby" && PrecType != "none")
     {
       if(MyPID==0) std::cout << "Error: Invalid string for prec-type param." << std::endl;
       return -1; 
@@ -346,6 +347,44 @@ int main(int argc, char *argv[]) {
         //        preconditioner with Apply() NOT ApplyInverse().
         belosPrec = rcp( new Belos::EpetraPrecOp( rILUK_ ) );
       }
+      else if(PrecType == "Cheby"){
+
+        ParameterList ChebyList;
+        ChebyList.set("chebyshev: degree", maxdegree); //Do NOT need to subtract 1 to make it correspond to our poly Ap(A).
+        maxdegree = 0; //Turn off our poly when using Cheby poly. 
+
+        Teuchos::RCP<Ifpack_Chebyshev> Cheby = Teuchos::rcp( new Ifpack_Chebyshev(&*A) );
+        Cheby->SetParameters(ChebyList);
+        // Build a Chebyshev Polynomial
+        Cheby->Initialize();
+        if(MyPID==0){
+          std::cout << "Prec Initialized." << std::endl;
+          std::cout << "Initialization time: " << Cheby->InitializeTime() << std::endl;
+        }
+        // Cheby.SetParameters(ChebyList);
+        Cheby->Compute();
+        if(MyPID==0){
+          std::cout << "Prec computed." << std::endl;
+          std::cout << "Pre compute time: " << Cheby->ComputeTime() << std::endl;
+        }
+        belosPrec = rcp( new Belos::EpetraPrecOp( Cheby ) );
+        
+        /*Ifpack_Chebyshev Cheby(&*A);
+        Cheby.SetParameters(ChebyList);
+        // Build a Chebyshev Polynomial
+        Cheby.Initialize();
+        if(MyPID==0){
+          std::cout << "Prec Initialized." << std::endl;
+          std::cout << "Initialization time: " << Cheby.InitializeTime() << std::endl;
+        }
+        // Cheby.SetParameters(ChebyList);
+        Cheby.Compute();
+        if(MyPID==0){
+          std::cout << "Prec computed." << std::endl;
+          std::cout << "Pre compute time: " << Cheby.ComputeTime() << std::endl;
+        }
+        belosPrec = rcp( new Belos::EpetraPrecOp( Cheby ) );*/
+      }
       else{
         ParameterList ifpackList;
 
@@ -393,31 +432,31 @@ int main(int argc, char *argv[]) {
         IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
         if(MyPID==0) std::cout << "Prec paremeters set. Overlap is: " << OverlapLevel << std::endl;
         // initialize the preconditioner. At this point the matrix must
-      // have been FillComplete()'d, but actual values are ignored.
-      IFPACK_CHK_ERR(Prec->Initialize());
-      if(MyPID==0){
-        std::cout << "Prec Initialized." << std::endl;
-        std::cout << "Initialization time: " << Prec->InitializeTime() << std::endl;
-      }
+        // have been FillComplete()'d, but actual values are ignored.
+        IFPACK_CHK_ERR(Prec->Initialize());
+        if(MyPID==0){
+          std::cout << "Prec Initialized." << std::endl;
+          std::cout << "Initialization time: " << Prec->InitializeTime() << std::endl;
+        }
 
-      // Builds the preconditioners, by looking for the values of
-      // the matrix.
-      IFPACK_CHK_ERR(Prec->Compute());
-      if(MyPID==0){
-        std::cout << "Prec computed." << std::endl;
-        std::cout << "Pre compute time: " << Prec->ComputeTime() << std::endl;
-      }
+        // Builds the preconditioners, by looking for the values of
+        // the matrix.
+        IFPACK_CHK_ERR(Prec->Compute());
+        if(MyPID==0){
+          std::cout << "Prec computed." << std::endl;
+          std::cout << "Pre compute time: " << Prec->ComputeTime() << std::endl;
+        }
 
-      //Check conditioner number of preconditioner:
-      double condEst;
-      condEst = Prec->Condest();
-      if(proc_verbose ) std::cout << "ILU condition est:" << condEst << std::endl;
+        //Check conditioner number of preconditioner:
+        double condEst;
+        condEst = Prec->Condest();
+        if(proc_verbose ) std::cout << "ILU condition est:" << condEst << std::endl;
 
-      // Create the Belos preconditioned operator from the Ifpack preconditioner.
-      // NOTE:  This is necessary because Belos expects an operator to apply the
-      //        preconditioner with Apply() NOT ApplyInverse().
-      belosPrec = rcp( new Belos::EpetraPrecOp( Prec ) );
-      if(MyPID==0) std::cout << "ILU Preconditioner has been created." << std::endl;
+        // Create the Belos preconditioned operator from the Ifpack preconditioner.
+        // NOTE:  This is necessary because Belos expects an operator to apply the
+        //        preconditioner with Apply() NOT ApplyInverse().
+        belosPrec = rcp( new Belos::EpetraPrecOp( Prec ) );
+        if(MyPID==0) std::cout << "ILU Preconditioner has been created." << std::endl;
 
       }//End else for Ifpack factory precs
     }//End if prec exists
