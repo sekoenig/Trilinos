@@ -4,6 +4,12 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 ADD_SUBDIRECTORY(AdditiveSchwarzRILUK)
 
+TRIBITS_ADD_EXECUTABLE(
+  belos_poly_Galeri_Multi_Tpetra
+  SOURCES hybrid_gmres_galeri_multi.cpp
+  COMM serial mpi
+  )
+
 IF (Tpetra_INST_DOUBLE)
   TRIBITS_ADD_EXECUTABLE(
     tif_belos
