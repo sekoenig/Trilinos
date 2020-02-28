@@ -428,8 +428,15 @@ namespace Belos {
     //Make power basis:
     std::vector<int> index(1,0);
     Teuchos::RCP< MV > V0 = MVT::CloneViewNonConst(*V, index);
-    if (randomRHS_)
+    if (randomRHS_){
       MVT::MvRandom( *V0 );
+      std::ofstream vecFile;
+      std::cout << "Writing random vector to file.\n";
+      vecFile.open( "VectorWrite.txt", std::ios::app | std::ios::out);
+      MVT::MvPrint( *V0, vecFile);
+      MVT::MvPrint( *V0, std::cout);
+      vecFile.close();
+    }
     else
       MVT::Assign( *problem_->getRHS(), *V0 );
 
@@ -532,6 +539,11 @@ namespace Belos {
     MVT::MvInit( *newX, SCT::zero() );
     if (randomRHS_) {
       MVT::MvRandom( *newB );
+      std::ofstream vecFile;
+      std::cout << "Writing random vector to file.\n";
+      vecFile.open( "VectorWrite.txt", std::ios::app | std::ios::out);
+      MVT::MvPrint( *newB, vecFile);
+      vecFile.close();
     }
     else {
       MVT::Assign( *(MVT::CloneView(*(problem_->getRHS()), idx)), *newB );
