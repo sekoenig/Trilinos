@@ -69,6 +69,8 @@
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 
+#include <fstream>
+
 using namespace Teuchos;
 using Tpetra::Operator;
 using Tpetra::CrsMatrix;
@@ -159,6 +161,12 @@ int main(int argc, char *argv[]) {
     B = rcp( new MV(map,numrhs) );
     OPT::Apply( *A, *X, *B );
     MVT::MvInit( *X, 0.0 );
+    std::ofstream vecFile;
+    std::cout << "Writing rhs vector to file.\n";
+    vecFile.open( "RhsWrite.txt", std::ios::out);
+    MVT::MvPrint( *B, vecFile);
+    vecFile.close();
+
 
     //
     // ********Other information used by block solver***********

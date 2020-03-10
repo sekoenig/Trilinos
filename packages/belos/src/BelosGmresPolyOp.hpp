@@ -79,6 +79,8 @@
 #include "Teuchos_SerialDenseSolver.hpp"
 #include "Teuchos_ParameterList.hpp"
 
+#include <fstream>
+
 #ifdef BELOS_TEUCHOS_TIME_MONITOR
   #include "Teuchos_TimeMonitor.hpp"
 #endif // BELOS_TEUCHOS_TIME_MONITOR
