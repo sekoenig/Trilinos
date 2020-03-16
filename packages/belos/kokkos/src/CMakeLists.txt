@@ -12,7 +12,7 @@
 # src
 #
 
-SET(HEADERS "")
+#SET(HEADERS "")
 SET(SOURCES "")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
@@ -23,7 +23,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
-APPEND_SET(HEADERS
+#APPEND_SET(HEADERS
 #  BelosMultiVecTraits_Tpetra.hpp
 #  BelosOperatorTraits_Tpetra.hpp
 #  BelosSolverFactory_Tpetra.hpp
@@ -31,7 +31,7 @@ APPEND_SET(HEADERS
 #  BelosTpetraOperator.hpp
 #  Belos_Details_Tpetra_registerLinearSolverFactory.hpp
 #  Belos_Details_Tpetra_registerSolverFactory.hpp
-  )
+  #)
 
 APPEND_SET(SOURCES
    ViewPlay.cpp
@@ -45,7 +45,14 @@ APPEND_SET(SOURCES
 #
 TRIBITS_ADD_LIBRARY(
   beloskokkos
-  HEADERS ${HEADERS}
+#  HEADERS ${HEADERS}
   SOURCES ${SOURCES}
   DEPLIBS belos
   )
+
+TRIBITS_ADD_EXECUTABLE(
+  KokkosViewPlay
+  SOURCES ViewPlay.cpp
+  COMM serial mpi
+  )
+
