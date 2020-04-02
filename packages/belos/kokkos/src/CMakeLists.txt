@@ -36,7 +36,8 @@ APPEND_SET(HEADERS
 
 APPEND_SET(SOURCES
    ViewPlay.cpp
-   BelosKokkosMultiVec.cpp
+   KokkosTestMV.cpp
+#  BelosKokkosMultiVec.cpp
 #  BelosTpetraAdapter.cpp
 #  Belos_Details_Tpetra_registerLinearSolverFactory.cpp
 #  Belos_Details_Tpetra_registerSolverFactory.cpp
@@ -59,8 +60,14 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
-  KokkosMultiVec
-  SOURCES BelosKokkosMultiVec.cpp
+  KokkosTestMV
+  SOURCES KokkosTestMV.cpp
   COMM serial mpi
   )
+
+#TRIBITS_ADD_EXECUTABLE(
+#  KokkosMultiVec
+#  SOURCES BelosKokkosMultiVec.cpp
+#  COMM serial mpi
+#  )
 

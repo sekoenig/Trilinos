@@ -23,9 +23,12 @@
 //    KokkosMultiVec(const Kokkos_BlockMap& Map_in, double * array, const int numvecs, const int stride=0);
 //    KokkosMultiVec(const Kokkos_BlockMap& Map_in, const int numvecs, bool zeroOut=true);
 //    KokkosMultiVec(Kokkos_DataAccess CV_in, const Kokkos_MultiVector& P_vec, const std::vector<int>& index);
-//    KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
-//    KokkosMultiVec(const Kokkos_MultiVector & P_vec);
-    KokkosMultiVec();
+    KokkosMultiVec<ScalarType> (const std::string label, const int numrows, const int numvecs);
+    KokkosMultiVec<ScalarType> (const int numrows, const int numvecs);
+    KokkosMultiVec<ScalarType> (const int numrows);
+    //KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
+    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**> & sourceView);
+    //KokkosMultiVec();
     ~KokkosMultiVec();
 
     //! @name Member functions inherited from Belos::MultiVec
@@ -38,91 +41,201 @@
     ///
     /// \param numvecs [in] The number of columns in the output
     ///   multivector.  Must be positive.
-    MultiVec<double> * Clone ( const int numvecs ) const;
+    MultiVec<ScalarType> * Clone ( const int numvecs ) const{
+       KokkosMultiVec<ScalarType>  temp("MV",this->extent(0),numvecs);
+       return &temp;
+    }
 
     /// A virtual "copy constructor" returning a pointer to a new
     /// object of the pure virtual class.  This vector's entries are
     /// copied and a new stand-alone multivector is created.  (deep
     /// copy).
-    MultiVec<double> * CloneCopy () const;
+    MultiVec<ScalarType> * CloneCopy () const{
+      KokkosMultiVec<ScalarType>  temp("MV",this->extent(0),this->extent(1));
+      Kokkos::deep_copy(temp,*this);
+      return &temp;
+    }
 
     /// A virtual "copy constructor" returning a pointer to the pure
     /// virtual class.  This vector's entries are copied and a new
     /// stand-alone MultiVector is created where only selected columns
     /// are chosen.  (deep copy).
-    MultiVec<double> * CloneCopy ( const std::vector<int>& index ) const;
+    MultiVec<ScalarType> * CloneCopy ( const std::vector<int>& index ) const{
+      int numvecs = index.at(1) + 1 - index.at(0);
+      KokkosMultiVec<ScalarType> B("B", this->extent(0), numvecs);
+      // Be careful with indexing- need to add 1 to last index value b/c Belos includes value at last index while Kokkos doesn't.
+      // TODO might need to check that index bounds are valid. 
+      Kokkos::deep_copy(B,Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1)));
+      return &B; 
+    }
 
     /// A virtual view "constructor" returning a pointer to the pure
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
-    MultiVec<double> * CloneViewNonConst ( const std::vector<int>& index );
+    MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){
+      Kokkos::View<ScalarType**> B = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
+      return &B; 
+    }
 
     /// A virtual view constructor returning a pointer to the pure
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
-    const MultiVec<double> * CloneView ( const std::vector<int>& index ) const;
+    const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const;
 
     /// Set a subblock of the multivector, which need not be
     /// contiguous, and is given by the indices.
-    void SetBlock ( const MultiVec<double>& A, const std::vector<int>& index );
+    void SetBlock ( const MultiVec<ScalarType>& A, const std::vector<int>& index ){
+//TODO skip subview if wants whole multivec?
+//TODO check bounds of index?? //TODO Looking at Belos::MultiVec, I'm not sure I did this right. 
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      Kokkos::View<ScalarType**> Asub = Kokkos::subview(*A_vec, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
+      Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
+      Kokkos::deep_copy(ThisSub, Asub);
+    }
+
+/*void Assign(const MV &A, MV &mv){
+   Kokkos::deep_copy(mv,A);
+}*/
 
     //! The number of rows in the multivector.
-    ptrdiff_t GetGlobalLength () const
-    {
-//#ifndef EPETRA_NO_64BIT_GLOBAL_INDICES
-//       if ( Map().GlobalIndicesLongLong() )
-//          return static_cast<ptrdiff_t>( GlobalLength64() );
-//       else
-//          return static_cast<ptrdiff_t>( GlobalLength() );
-//#else
-//          return static_cast<ptrdiff_t>( GlobalLength() );
-//#endif
-      return 0;
+    ptrdiff_t GetGlobalLength () const {
+      return static_cast<ptrdiff_t>(this->extent(0));
     }
 
     //! The number of columns in the multivector.
-    int GetNumberVecs () const { return 0; }
-//return NumVectors(); }
+    int GetNumberVecs () const { return this->extent(1); }
 
     //! *this <- alpha * A * B + beta * (*this)
-    void MvTimesMatAddMv ( const double alpha, const MultiVec<double>& A,
-                           const Teuchos::SerialDenseMatrix<int,double>& B, const double beta );
+    void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
+                           const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      Kokkos::View<ScalarType**> mat("mat", A_vec->extent(1), this->extent(1));
+      Teuchos2KokkosMat(B,mat);
+      KokkosBlas::gemm("N", "N", alpha, *A_vec, mat, beta, *this);
+    }
+
     //! *this <- alpha * A + beta * B
-    void MvAddMv ( const double alpha, const MultiVec<double>& A, const double beta,
-                   const MultiVec<double>& B);
+    void MvAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, const ScalarType beta,
+                   const MultiVec<ScalarType>& B){
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      KokkosMultiVec<ScalarType> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(B));
+      Kokkos::deep_copy(*this, B);
+      KokkosBlas::axpby(alpha, *A_vec, beta, *this);
+    }
 
     //! Scale each element of the vectors in \c *this with \c alpha.
-    void MvScale ( const double alpha ) {
-//      TEUCHOS_TEST_FOR_EXCEPTION( this->Scale( alpha )!=0, KokkosMultiVecFailure,
-//                          "Belos::KokkosMultiVec::MvScale() call to Scale() returned a nonzero value."); }
-                          }
+    void MvScale ( const ScalarType alpha ) {
+      //Later- Can we do this better with less copying?  TODO
+      KokkosMultiVec<ScalarType> temp = Clone( *this, this->extent(1));
+      KokkosBlas::scal(temp, alpha, *this); 
+      Kokkos::deep_copy(*this, temp);
+    }
 
     //! Scale each element of the \c i-th vector in \c *this with \c alpha[i].
-    void MvScale ( const std::vector<double>& alpha );
+    void MvScale ( const std::vector<ScalarType>& alpha ){
+      //Later- Can we do this better with less copying?  TODO
+      KokkosMultiVec<ScalarType> temp = Clone( *this, this->extent(1));
+      Kokkos::View<ScalarType*> scalars("alpha", alpha.size());
+      for( int i = 0 ; i < alpha.size(); i++){
+        scalars(i) = alpha.at(i);
+      } 
+      KokkosBlas::scal(temp, scalars, *this); 
+      Kokkos::deep_copy(*this, temp);
+    }
 
     //! B <- alpha * A^T * (*this)
-    void MvTransMv ( const double alpha, const MultiVec<double>& A, Teuchos::SerialDenseMatrix<int,double>& B ) const;
+    void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      Kokkos::View<ScalarType**> soln("soln", A_vec->extent(1), this->extent(1));
+      KokkosBlas::gemm("C", "N", alpha, *A_vec, *this, ScalarType(0.0), soln);
+      Kokkos2TeuchosMat(soln, B);
+    }
+
 
     //! b[i] = A[i]^T * this[i]
-    void MvDot ( const MultiVec<double>& A, std::vector<double>& b ) const;
+    void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
+      Kokkos::View<ScalarType*> dotView("Dot",this->extent(1));
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      KokkosBlas::dot(dotView, *A_vec, *this); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
+      for(int i=0; i < this->extent(1); i++){
+        b.push_back(dotView(i)); //Is there a better way to do this?
+        //TODO: will probably have to mirror the normView to the host space. 
+      }
+    }
 
     //! alpha[i] = norm of i-th column of (*this)
-    void MvNorm ( std::vector<double>& normvec, NormType norm_type = TwoNorm ) const;
+    void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
+      Kokkos::View<ScalarType*> normView("Norm",this->extent(1));
+      switch( norm_type ) { 
+        case ( OneNorm ) : 
+          KokkosBlas::nrm1(normView, *this);
+          break;
+        case ( TwoNorm ) : 
+          KokkosBlas::nrm2(normView, *this);
+          break;
+        case ( InfNorm ) : 
+          KokkosBlas::nrminf(normView, *this);
+          break;
+        default:
+          TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
+              "Belos::KokkosMultiVec::MvNorm: Invalid norm_type "
+              << norm_type << ".  The current list of valid norm "
+              "types is {OneNorm, TwoNorm, InfNorm}.");
+      }   
+      for(int i=0; i < this->extent(1); i++){
+        normvec.push_back(normView(i)); //Is there a better way to do this?
+        //TODO: will probably have to mirror the normView to the host space. 
+      }
+    }
 
     //! Fill all columns of *this with random values.
     void MvRandom() {
-      //TEUCHOS_TEST_FOR_EXCEPTION( Random()!=0, KokkosMultiVecFailure,
-                          //"Belos::KokkosMultiVec::MvRandom() call to Random() returned a nonzero value."); }
-                          }
+      Kokkos::Random_XorShift64_Pool<> pool(12371);
+      Kokkos::fill_random(*this, pool, -1,1);
+    }
 
     //! Initialize each element of (*this) to the scalar value alpha.
-    void MvInit ( const double alpha ) {
-      //TEUCHOS_TEST_FOR_EXCEPTION( PutScalar(alpha)!=0, KokkosMultiVecFailure,
-                          //"Belos::KokkosMultiVec::MvInit() call to PutScalar() returned a nonzero value."); }
-                          }
+    void MvInit ( const ScalarType alpha ) {
+       Kokkos::deep_copy(*this,alpha);
+    }
 
     //! Print (*this) to the given output stream.
-    void MvPrint( std::ostream& os ) const { os << *this << std::endl; };
-  private:
+    void MvPrint( std::ostream& os ) const {
+      for(int i = 0; i < (this->extent(0)); i++){
+        for (int j = 0; j < (this->extent(1)); j++){
+          os << *this(i , j) << "  ";
+        }
+        os << std::endl;
+      } 
+    os << std::endl;
+    }
+
+private:
+    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T){
+      TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != T.numRows() || K.extent(1) != T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
+  //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
+      for(int i = 0; i < K.extent(0); i++){
+        for (int j = 0; j < K.extent(1); j++){
+          T(i,j) = K(i,j);
+        }
+      } 
+    }
+
+    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**> & K){
+      TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != T.numRows() || K.extent(1) != T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
+      //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
+      for(int i = 0; i < K.extent(0); i++){
+        for (int j = 0; j < K.extent(1); j++){
+          K(i,j) = T(i,j);
+        }
+      } 
+    }
+
   };
 }// end namespace Belos
+
+//using MV = Kokkos::View<ScalarType**>;
+//Creation Methods
+
+
+
