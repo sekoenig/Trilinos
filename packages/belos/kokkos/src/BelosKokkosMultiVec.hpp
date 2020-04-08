@@ -23,12 +23,12 @@
 //    KokkosMultiVec(const Kokkos_BlockMap& Map_in, double * array, const int numvecs, const int stride=0);
 //    KokkosMultiVec(const Kokkos_BlockMap& Map_in, const int numvecs, bool zeroOut=true);
 //    KokkosMultiVec(Kokkos_DataAccess CV_in, const Kokkos_MultiVector& P_vec, const std::vector<int>& index);
-    KokkosMultiVec<ScalarType> (const std::string label, const int numrows, const int numvecs);
-    KokkosMultiVec<ScalarType> (const int numrows, const int numvecs);
-    KokkosMultiVec<ScalarType> (const int numrows);
+    KokkosMultiVec<ScalarType> (const std::string label, const int numrows, const int numvecs) : Kokkos::View<ScalarType**>(label,numrows,numvecs){}
+    KokkosMultiVec<ScalarType> (const int numrows, const int numvecs) : Kokkos::View<ScalarType**>("MV",numrows,numvecs){}
+    KokkosMultiVec<ScalarType> (const int numrows) : Kokkos::View<ScalarType**>("MV",numrows,1){}
     //KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
-    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**> & sourceView);
-    //KokkosMultiVec();
+    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**> & sourceView) : Kokkos::View<ScalarType**>(sourceView){} 
+    //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
     ~KokkosMultiVec();
 
     //! @name Member functions inherited from Belos::MultiVec
@@ -42,8 +42,8 @@
     /// \param numvecs [in] The number of columns in the output
     ///   multivector.  Must be positive.
     MultiVec<ScalarType> * Clone ( const int numvecs ) const{
-       KokkosMultiVec<ScalarType>  temp("MV",this->extent(0),numvecs);
-       return &temp;
+      KokkosMultiVec<ScalarType> * ptr = new KokkosMultiVec<ScalarType>(this->extent(0),numvecs);
+      return ptr;
     }
 
     /// A virtual "copy constructor" returning a pointer to a new
@@ -51,9 +51,10 @@
     /// copied and a new stand-alone multivector is created.  (deep
     /// copy).
     MultiVec<ScalarType> * CloneCopy () const{
-      KokkosMultiVec<ScalarType>  temp("MV",this->extent(0),this->extent(1));
-      Kokkos::deep_copy(temp,*this);
-      return &temp;
+      //KokkosMultiVec<ScalarType>  temp("MV",this->extent(0),this->extent(1));
+      KokkosMultiVec<ScalarType> * ptr = new KokkosMultiVec<ScalarType>(this->extent(0),this->extent(1));
+      Kokkos::deep_copy(*ptr,*this);
+      return ptr;
     }
 
     /// A virtual "copy constructor" returning a pointer to the pure
@@ -61,20 +62,40 @@
     /// stand-alone MultiVector is created where only selected columns
     /// are chosen.  (deep copy).
     MultiVec<ScalarType> * CloneCopy ( const std::vector<int>& index ) const{
-      int numvecs = index.at(1) + 1 - index.at(0);
-      KokkosMultiVec<ScalarType> B("B", this->extent(0), numvecs);
       // Be careful with indexing- need to add 1 to last index value b/c Belos includes value at last index while Kokkos doesn't.
       // TODO might need to check that index bounds are valid. 
-      Kokkos::deep_copy(B,Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1)));
-      return &B; 
+      int numvecs = index.size() + 1;
+      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>("B",this->extent(0),numvecs);
+      //KokkosMultiVec<ScalarType> B("B", this->extent(0), numvecs);
+      bool isAscending = true;
+      for(int i=0; i< (index.size()+1); i++){
+        if( index[i+1] <= index[i] ){
+          isAscending = false;
+        }
+      }
+      if(isAscending && index.size()==this->GetNumberVecs()){ //Copy entire multivec.
+        Kokkos::deep_copy(*B,*this);
+      }
+      else if (isAscending){ //Copy contiguous subset
+        Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::deep_copy(*B,ThisSub);
+      } 
+      else{ //Copy columns one by one
+        for(int i=0; i<index.size(); i++){
+          Kokkos::View<ScalarType**> Bsub = Kokkos::subview(*B, Kokkos::ALL, std::make_pair(i, i+1));
+          Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
+          Kokkos::deep_copy(Bsub, ThisSub);
+        }
+      }
+      return B; 
     }
 
     /// A virtual view "constructor" returning a pointer to the pure
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
     MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){
-      Kokkos::View<ScalarType**> B = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
-      return &B; 
+      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1)));
+      return B; 
     }
 
     /// A virtual view constructor returning a pointer to the pure
@@ -85,17 +106,30 @@
     /// Set a subblock of the multivector, which need not be
     /// contiguous, and is given by the indices.
     void SetBlock ( const MultiVec<ScalarType>& A, const std::vector<int>& index ){
-//TODO skip subview if wants whole multivec?
-//TODO check bounds of index?? //TODO Looking at Belos::MultiVec, I'm not sure I did this right. 
+      //TODO check bounds of index?? 
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
-      Kokkos::View<ScalarType**> Asub = Kokkos::subview(*A_vec, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
-      Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1));
-      Kokkos::deep_copy(ThisSub, Asub);
+      bool isAscending = true;
+      for(int i=0; i< (index.size()+1); i++){
+        if( index[i+1] <= index[i] ){
+          isAscending = false;
+        }
+      }
+      if(isAscending && index.size()==this->GetNumberVecs()){ //Copy entire multivec.
+        Kokkos::deep_copy(*this,*A_vec);
+      }
+      else if (isAscending){ //Copy contiguous subset
+        Kokkos::View<ScalarType**> Asub = Kokkos::subview(*A_vec, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::deep_copy(ThisSub, Asub);
+      } 
+      else{ //Copy columns one by one
+        for(int i=0; i<index.size(); i++){
+          Kokkos::View<ScalarType**> Asub = Kokkos::subview(*A_vec, Kokkos::ALL, std::make_pair(i, i+1));
+          Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(*this, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
+          Kokkos::deep_copy(ThisSub, Asub);
+        }
+      }
     }
-
-/*void Assign(const MV &A, MV &mv){
-   Kokkos::deep_copy(mv,A);
-}*/
 
     //! The number of rows in the multivector.
     ptrdiff_t GetGlobalLength () const {
@@ -119,14 +153,16 @@
                    const MultiVec<ScalarType>& B){
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
       KokkosMultiVec<ScalarType> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(B));
-      Kokkos::deep_copy(*this, B);
+      Kokkos::deep_copy(*this, *B_vec);
       KokkosBlas::axpby(alpha, *A_vec, beta, *this);
     }
 
     //! Scale each element of the vectors in \c *this with \c alpha.
     void MvScale ( const ScalarType alpha ) {
       //Later- Can we do this better with less copying?  TODO
-      KokkosMultiVec<ScalarType> temp = Clone( *this, this->extent(1));
+      //KokkosMultiVec<ScalarType> * temp = Clone(this->extent(1));
+      //KokkosMultiVec<ScalarType> * ptr = new KokkosMultiVec<ScalarType>(this->extent(0),numvecs);
+      KokkosMultiVec<ScalarType> temp(this->extent(0),this->extent(1));
       KokkosBlas::scal(temp, alpha, *this); 
       Kokkos::deep_copy(*this, temp);
     }
@@ -134,7 +170,8 @@
     //! Scale each element of the \c i-th vector in \c *this with \c alpha[i].
     void MvScale ( const std::vector<ScalarType>& alpha ){
       //Later- Can we do this better with less copying?  TODO
-      KokkosMultiVec<ScalarType> temp = Clone( *this, this->extent(1));
+      //KokkosMultiVec<ScalarType> * temp = Clone(this->extent(1));
+      KokkosMultiVec<ScalarType> temp(this->extent(0),this->extent(1));
       Kokkos::View<ScalarType*> scalars("alpha", alpha.size());
       for( int i = 0 ; i < alpha.size(); i++){
         scalars(i) = alpha.at(i);
@@ -203,7 +240,7 @@
     void MvPrint( std::ostream& os ) const {
       for(int i = 0; i < (this->extent(0)); i++){
         for (int j = 0; j < (this->extent(1)); j++){
-          os << *this(i , j) << "  ";
+          os << (*this)(i , j) << "  ";
         }
         os << std::endl;
       } 
@@ -211,7 +248,7 @@
     }
 
 private:
-    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T){
+    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != T.numRows() || K.extent(1) != T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
   //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(int i = 0; i < K.extent(0); i++){
@@ -221,7 +258,7 @@ private:
       } 
     }
 
-    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**> & K){
+    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**> & K) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != T.numRows() || K.extent(1) != T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
       //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(int i = 0; i < K.extent(0); i++){
