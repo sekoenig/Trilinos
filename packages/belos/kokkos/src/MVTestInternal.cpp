@@ -51,6 +51,9 @@
 
 #include "Teuchos_StandardCatchMacros.hpp"
 
+using std::cout;
+using std::endl;
+
 int main(int argc, char *argv[])
 {
   bool ierr;
@@ -66,7 +69,7 @@ int main(int argc, char *argv[])
   bool success = true;
   try {
     // number of global elements
-    int dim = 50;
+    int dim = 10;
     int blockSize = 5;
 
     // Create an Epetra_Matrix
@@ -104,6 +107,19 @@ int main(int argc, char *argv[])
       std::cout << norm2[i] << " ";
     }
     std::cout << std::endl;
+
+    int numvecs2 = 5;
+    std::vector<int> ind(numvecs2);
+    ind[0] = 0; 
+    ind[1] = 4; 
+    ind[2] = 2; 
+    ind[3] = 2; 
+    ind[4] = 3;
+
+    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec3 = 
+        Teuchos::rcp(dynamic_cast<Belos::KokkosMultiVec<double> *>(ivec2->CloneCopy(ind)));
+    std::cout << "Print cols 0 4 2 2 3 of vec 2:" << std::endl;
+    ivec3->MvPrint(cout);
 
 
     // Create an output manager to handle the I/O from the solver
