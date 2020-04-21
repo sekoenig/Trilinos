@@ -24,25 +24,13 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 APPEND_SET(HEADERS
-#  BelosMultiVecTraits_Tpetra.hpp
-#  BelosOperatorTraits_Tpetra.hpp
-#  BelosSolverFactory_Tpetra.hpp
-#  BelosTpetraAdapter.hpp
-#  BelosTpetraOperator.hpp
-#  Belos_Details_Tpetra_registerLinearSolverFactory.hpp
-#  Belos_Details_Tpetra_registerSolverFactory.hpp
-   BelosKokkosMultiVec.hpp
+   BelosKokkosAdapter.hpp
   )
 
 APPEND_SET(SOURCES
    ViewPlay.cpp
-#   KokkosTestMV.cpp
-   MVTester.cpp
    MVTestInternal.cpp
-#  BelosKokkosMultiVec.cpp
-#  BelosTpetraAdapter.cpp
-#  Belos_Details_Tpetra_registerLinearSolverFactory.cpp
-#  Belos_Details_Tpetra_registerSolverFactory.cpp
+   MVOPTester.cpp
   )
 
 #
@@ -50,7 +38,7 @@ APPEND_SET(SOURCES
 #
 TRIBITS_ADD_LIBRARY(
   beloskokkos
-#  HEADERS ${HEADERS}
+  HEADERS ${HEADERS}
   SOURCES ${SOURCES}
   DEPLIBS belos
   )
@@ -62,8 +50,8 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
-  MVTester
-  SOURCES MVTester.cpp
+  KokkosMVOPTester
+  SOURCES MVOPTester.cpp
   COMM serial mpi
   )
 
@@ -73,9 +61,9 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
-#TRIBITS_ADD_EXECUTABLE(
-#  KokkosMultiVec
-#  SOURCES BelosKokkosMultiVec.cpp
-#  COMM serial mpi
-#  )
 
+TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyKokkosMatrixMarketFiles
+  SOURCE_DIR ${Belos_SOURCE_DIR}/kokkos/src/
+  SOURCE_FILES bcsstk13.mtx
+  EXEDEPS KokkosMVOPTester
+  ) 

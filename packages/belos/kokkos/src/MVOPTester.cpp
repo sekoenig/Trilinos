@@ -47,8 +47,9 @@
 #include "BelosConfigDefs.hpp"
 #include "BelosMVOPTester.hpp"
 #include "BelosOutputManager.hpp"
-#include "BelosKokkosMultiVec.hpp"
+#include "BelosKokkosAdapter.hpp"
 
+#include "KokkosKernels_IOUtils.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
 
 int main(int argc, char *argv[])
@@ -74,18 +75,18 @@ int main(int argc, char *argv[])
 
     // Issue several useful typedefs;
     typedef Belos::MultiVec<double> KMV;
-    //typedef Belos::Operator<double> EOP; // unused
+    typedef Belos::Operator<double> KOP; // unused
 
     // Create a Kokkos MultiVec for an initial std::vector to start the solver.
     // Note that this needs to have the same number of columns as the blocksize.
     Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
     ivec->MvRandom();
     std::cout << "Printing the random multivec:" << std::endl;
-    ivec->MvPrint(std::cout);
+    //ivec->MvPrint(std::cout);
     Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec2 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
     ivec2->MvRandom();
     std::cout << "Printing the random multivec 2:" << std::endl;
-    ivec2->MvPrint(std::cout);
+    //ivec2->MvPrint(std::cout);
     std::vector<double> norm1;
     std::vector<double> norm2;
     for(int i = 0; i<blockSize; i++){
@@ -121,6 +122,28 @@ int main(int argc, char *argv[])
       MyOM->print(Belos::Warnings,"*** KokkosAdapter FAILED TestMultiVecTraits() ***\n\n");
     }
 
+
+    // Read in a matrix Market file and use it to test the Kokkos Operator.
+    KokkosSparse::CrsMatrix<double, int, Kokkos::OpenMP> crsMat = 
+            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<double, int, Kokkos::OpenMP>>("bcsstk13.mtx"); 
+    Teuchos::RCP<Belos::KokkosOperator<double, int, Kokkos::OpenMP>> myOp = 
+            Teuchos::rcp(new Belos::KokkosOperator<double,int,Kokkos::OpenMP>(crsMat));
+    
+    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec3 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 2) );
+    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec4 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 1) );
+      ivec4->MvInit(1.0);
+    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec5 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 1) );
+
+    std::cout << "Testing first op apply:" << std::endl;
+    myOp->Apply(*ivec4, *ivec5);
+    std::cout << "Op apply 1 resut: " << std::endl;
+    //ivec5->MvPrint(std::cout);   
+    std::cout << "Testing 2nd op apply: " << std::endl;
+    myOp->Apply(*ivec5, *ivec4);
+    std::cout << "Op apply 2 resut: " << std::endl;
+    //ivec4->MvPrint(std::cout);   
+
+    ierr = Belos::TestOperatorTraits<double,KMV,KOP>(MyOM,ivec3,myOp);
     if (!ierr) {
       success = false;
       MyOM->print(Belos::Warnings,"End Result: TEST FAILED\n");

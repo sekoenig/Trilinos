@@ -47,7 +47,7 @@
 #include "BelosConfigDefs.hpp"
 #include "BelosMVOPTester.hpp"
 #include "BelosOutputManager.hpp"
-#include "BelosKokkosMultiVec.hpp"
+#include "BelosKokkosAdapter.hpp"
 
 #include "Teuchos_StandardCatchMacros.hpp"
 
