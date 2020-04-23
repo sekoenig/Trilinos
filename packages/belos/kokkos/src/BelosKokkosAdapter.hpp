@@ -83,7 +83,7 @@
       KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>("B",myView.extent(0),numvecs);
       //KokkosMultiVec<ScalarType> B("B", this->extent(0), numvecs);
       bool isAscending = true;
-      for(unsigned int i=0; i< (index.size()+1); i++){
+      for(unsigned int i=0; i< (index.size()-1); i++){
         if( index[i+1] <= index[i] ){
           isAscending = false;
         }
@@ -119,7 +119,7 @@
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
     MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){ //TODO this won't work for non-contiguous!
-      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1)));
+      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
       return B; 
     }
 
@@ -127,7 +127,7 @@
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
     const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const { //TODO implement this!! This isn't const!!
-      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.at(0), index.at(1)+1)));
+      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
       return B; 
     }
 
@@ -138,7 +138,7 @@
       //TODO check bounds of index?? 
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       bool isAscending = true;
-      for(unsigned int i=0; i< (index.size()+1); i++){
+      for(unsigned int i=0; i< (index.size()-1); i++){
         if( index[i+1] <= index[i] ){
           isAscending = false;
         }
@@ -182,8 +182,22 @@
                    const MultiVec<ScalarType>& B){
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
       KokkosMultiVec<ScalarType> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(B));
-      Kokkos::deep_copy(myView, B_vec->myView);
-      KokkosBlas::axpby(alpha, A_vec->myView, beta, myView);
+    //  std::cout << "myView before deep_copy" << std::endl;
+   //   this->MvPrint(std::cout);
+      KokkosMultiVec<ScalarType> temp(myView.extent(0),myView.extent(1));
+      Kokkos::deep_copy(temp.myView, B_vec->myView);
+      //Kokkos::deep_copy(myView, B_vec->myView); // BAD!  Assumes myVec != A.  
+    //  std::cout << "myView after deep_copy" << std::endl;
+    //  this->MvPrint(std::cout);
+    //  std::cout << "Alpha is : " << alpha << " and beta is : " << beta << std::endl;
+    //  std::cout << "A_vec myView before axpby" << std::endl;
+    //  A_vec->MvPrint(std::cout);
+      KokkosBlas::axpby(alpha, A_vec->myView, beta, temp.myView);
+    //  std::cout << " myView after axpby" << std::endl;
+    //  this->MvPrint(std::cout);
+    //  std::cout << "A_vec myView after axpby" << std::endl;
+    //  A_vec->MvPrint(std::cout);
+      Kokkos::deep_copy(myView,temp.myView);
     }
 
     //! Scale each element of the vectors in \c *this with \c alpha.

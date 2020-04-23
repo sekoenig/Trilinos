@@ -121,6 +121,15 @@ int main(int argc, char *argv[])
     std::cout << "Print cols 0 4 2 2 3 of vec 2:" << std::endl;
     ivec3->MvPrint(cout);
 
+    ivec->MvInit(-1.0);
+    std::cout << "Print ivec, should be -1's." << std::endl;
+    ivec->MvPrint(cout);
+    ivec2->MvInit(3.0);
+    std::cout << "Print ivec2, should be 3's." << std::endl;
+    ivec2->MvPrint(cout);
+    ivec->MvAddMv(-5.0,*ivec,7.0,*ivec2);
+    std::cout << "Print ivec, should be 4's." << std::endl;
+    ivec->MvPrint(cout);
 
     // Create an output manager to handle the I/O from the solver
     Teuchos::RCP<Belos::OutputManager<double> > MyOM = Teuchos::rcp( new Belos::OutputManager<double>() );
