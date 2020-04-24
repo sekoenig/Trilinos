@@ -31,6 +31,8 @@ APPEND_SET(SOURCES
    ViewPlay.cpp
    MVTestInternal.cpp
    MVOPTester.cpp
+   PseudoBlockCGKokkosExFile.cpp
+   BlockGmresKokkosExFile.cpp
   )
 
 #
@@ -61,6 +63,41 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
+TRIBITS_ADD_EXECUTABLE(
+  PseudoBlockCGKokkosEx
+  SOURCES PseudoBlockCGKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  BlockGmresKokkosEx
+  SOURCES BlockGmresKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  PseudoBlockCGEpetraEx
+  SOURCES PseudoBlockCGEpetraExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  PseudoBlockCGTpetraEx
+  SOURCES PseudoBlockCGTpetraExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  BlockGmresEpetraEx
+  SOURCES BlockGmresEpetraExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  BlockGmresTpetraEx
+  SOURCES BlockGmresTpetraExFile.cpp
+  COMM serial mpi
+  )
 
 TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyKokkosMatrixMarketFiles
   SOURCE_DIR ${Belos_SOURCE_DIR}/kokkos/src/

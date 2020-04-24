@@ -144,6 +144,13 @@ int main(int argc, char *argv[])
     //ivec4->MvPrint(std::cout);   
 
     ierr = Belos::TestOperatorTraits<double,KMV,KOP>(MyOM,ivec3,myOp);
+    if (ierr) {
+      MyOM->print(Belos::Warnings,"*** KokkosAdapter PASSED TestOperatorTraits()\n");
+    }
+    else {
+      MyOM->print(Belos::Warnings,"*** KokkosAdapter FAILED TestOperatorTraits() ***\n\n");
+    }
+
     if (!ierr) {
       success = false;
       MyOM->print(Belos::Warnings,"End Result: TEST FAILED\n");
