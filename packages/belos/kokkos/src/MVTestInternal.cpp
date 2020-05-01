@@ -76,21 +76,22 @@ int main(int argc, char *argv[])
     //Teuchos::RCP<Epetra_CrsMatrix> A = Teuchos::rcp( new Epetra_CrsMatrix(Epetra_DataAccess::Copy, *Map, &NumNz[0]) );
 
     // Issue several useful typedefs;
-    typedef Belos::MultiVec<double> KMV;
-    //typedef Belos::Operator<double> EOP; // unused
+    typedef double ScalarType;
+    typedef Belos::MultiVec<ScalarType> KMV;
+    //typedef Belos::Operator<ScalarType> EOP; // unused
 
     // Create a Kokkos MultiVec for an initial std::vector to start the solver.
     // Note that this needs to have the same number of columns as the blocksize.
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(dim, blockSize) );
     ivec->MvRandom();
     std::cout << "Printing the random multivec:" << std::endl;
     ivec->MvPrint(std::cout);
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec2 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec2 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(dim, blockSize) );
     ivec2->MvRandom();
     std::cout << "Printing the random multivec 2:" << std::endl;
     ivec2->MvPrint(std::cout);
-    std::vector<double> norm1;
-    std::vector<double> norm2;
+    std::vector<ScalarType> norm1;
+    std::vector<ScalarType> norm2;
     for(int i = 0; i<blockSize; i++){
       norm1.push_back(-10.0);
       norm2.push_back(-10.0);
@@ -116,8 +117,8 @@ int main(int argc, char *argv[])
     ind[3] = 2; 
     ind[4] = 3;
 
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec3 = 
-        Teuchos::rcp(dynamic_cast<Belos::KokkosMultiVec<double> *>(ivec2->CloneCopy(ind)));
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec3 = 
+        Teuchos::rcp(dynamic_cast<Belos::KokkosMultiVec<ScalarType> *>(ivec2->CloneCopy(ind)));
     std::cout << "Print cols 0 4 2 2 3 of vec 2:" << std::endl;
     ivec3->MvPrint(cout);
 
@@ -132,13 +133,13 @@ int main(int argc, char *argv[])
     ivec->MvPrint(cout);
 
     // Create an output manager to handle the I/O from the solver
-    Teuchos::RCP<Belos::OutputManager<double> > MyOM = Teuchos::rcp( new Belos::OutputManager<double>() );
+    Teuchos::RCP<Belos::OutputManager<ScalarType> > MyOM = Teuchos::rcp( new Belos::OutputManager<ScalarType>() );
     if (verbose) {
       MyOM->setVerbosity( Belos::Warnings );
     }
 
     // test the Epetra adapter multivector
-    ierr = Belos::TestMultiVecTraits<double,KMV>(MyOM,ivec);
+    ierr = Belos::TestMultiVecTraits<ScalarType,KMV>(MyOM,ivec);
     if (ierr) {
       MyOM->print(Belos::Warnings,"*** KokkosAdapter PASSED TestMultiVecTraits()\n");
     }
