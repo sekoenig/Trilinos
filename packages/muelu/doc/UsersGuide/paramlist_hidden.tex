@@ -60,7 +60,13 @@
         
 \cbb{aggregation: ordering}{string}{"natural"}{Node ordering strategy. Possible values: "natural" (local index order), "graph" (filtered graph breadth-first order), "random" (random local index order).}
         
-\cbb{aggregation: drop scheme}{string}{"classical"}{Connectivity dropping scheme for a graph used in aggregation. Possible values: "classical", "distance laplacian".}
+\cbb{aggregation: drop scheme}{string}{"classical"}{Connectivity dropping scheme for a graph used in aggregation. Possible values: "classical", "distance laplacian", "unsupported vector smoothing".}
+        
+\cbb{aggregation: number of random vectors}{int}{10}{Determines how many random vectors are smoothed when "unsupported vector smoothing" used.}
+        
+\cbb{aggregation: number of times to pre or post smooth}{int}{10}{Determines how many times presmoother (or postsmoother if no presmoother set) is invoked when "unsupported vector smoothing" used. Each invocation may include several smoother sweeps.}
+        
+\cbb{aggregation: penalty parameters}{Array(double)}{{12.,-.2,0,0,0} }{Defines a polynomial coef[0] + coef[1]*i + coef[2]*i^2 + coef[3]*i^3 + coef[4]*i^4 that models the cost of having i nonzeros per row when  "unsupported vector smoothing" used.}
         
 \cbb{aggregation: distance laplacian algo}{string}{"default"}{Type of sub-algorithm for "distance laplacian" dropping. Possible values: "default", "unscaled cut", "scaled cut".}
         
@@ -78,6 +84,15 @@
         
 \cbb{aggregation: brick z size}{int}{2}{Number of points for z axis in "brick" aggregation (limited to 3).}
         
+\cbb{aggregation: brick x Dirichlet}{bool}{false}{Asserts that Dirichlet conditions are applied in
+        the x-direction and the Dirichlet DOFs are not aggregated.}
+        
+\cbb{aggregation: brick y Dirichlet}{bool}{false}{Asserts that Dirichlet conditions are applied in
+        the y-direction and the Dirichlet DOFs are not aggregated.}
+        
+\cbb{aggregation: brick z Dirichlet}{bool}{false}{Asserts that Dirichlet conditions are applied in
+        the z-direction and the Dirichlet DOFs are not aggregated.}
+        
 \cbb{aggregation: max selected neighbors}{int}{0}{Maximum number of neighbor nodes that are already aggregated. If a new aggregate has some neighbors that are already aggregated, this node probably can be added to one of these aggregates. We don't need a new one.}
         
 \cbb{aggregation: Dirichlet threshold}{double}{0.0}{Threshold for determining whether entries are zero during Dirichlet row detection.}
@@ -93,6 +108,8 @@
 \cbb{aggregation: enable phase 2b}{bool}{true}{Turn on/off phase 2b of aggregation}
         
 \cbb{aggregation: enable phase 3}{bool}{true}{Turn on/off phase 3 of aggregation}
+        
+\cbb{aggregation: phase2a include root}{bool}{true}{Whether the root node should be included in the aggregates formed in phase 2a.}
         
 \cbb{aggregation: error on nodes with no on-rank neighbors}{bool}{false}{Causes phase 3 aggregation to throw an error for
       non-Dirichlet nodes that have no on-rank neighbors.  This only
@@ -250,6 +267,8 @@
 \cba{repartition: params}{\parameterlist}{Partitioner parameters. \muelu passes them directly to the appropriate package library. In particular, this allows to choose a partitioning algorithm from \zoltan{} or \zoltan2{} or from external packages such as \parmetis{}.}
         
 \cbb{repartition: start level}{int}{2}{Minimum level to run partitioner. \muelu does not rebalance levels finer than this one.}
+        
+\cbb{repartition: use map}{bool}{false}{Instead of using a matrix, use a map to determine rebalancing heuristics. Obviously, this cannot evaluate nonzero imbalance.}
         
 \cbb{repartition: node repartition level}{int}{-1}{Level on which to run node-level repartitioning (negative means don't).}
         
