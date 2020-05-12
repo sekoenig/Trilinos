@@ -19,11 +19,18 @@ void MvScale(MV A, ScalarType alpha);
 void MvScale(MV & A, const std::vector<ScalarType> & alpha);
 void MvTransMv( const ScalarType alpha, const MV & A, const MV & mv, Teuchos::SerialDenseMatrix<int, ScalarType> &B);
 void MvPrint(MV A);
-void MvPrint(Kokkos::View<ScalarType*> A);
 void SetBlock (const MV &A, const std::vector< int > &index, MV &mv);
 void Assign(const MV &A, MV &mv);
 void MvRandom(MV &mv);
 void MvInit(MV &A, ScalarType alpha);
+
+template<class ST>
+void MvPrint(Kokkos::View<ST*> A){
+  for(int i = 0; i < A.extent(0); i++){
+      std::cout << A(i) << std::endl;
+  } 
+  std::cout << std::endl;
+}
 
 int main(int argc, char* argv[]) {
    Kokkos::initialize();
@@ -37,8 +44,8 @@ int main(int argc, char* argv[]) {
    MV A2("A2",M,N);
    Kokkos::View<ScalarType*> x("X",N);
    Kokkos::View<ScalarType*> y("Y",N);
-   Kokkos::deep_copy(A,1.0);
-   Kokkos::deep_copy(A2,1.0);
+   Kokkos::deep_copy(A,4.0);
+   Kokkos::deep_copy(A2,-2.1);
    Kokkos::deep_copy(x,-1.0);
    ScalarType alpha = 1.0;
    ScalarType beta  = 1.0;
@@ -58,6 +65,9 @@ int main(int argc, char* argv[]) {
    std::cout << "Print random A:" << std::endl;
    MvPrint(A);
 
+    KokkosBlas::axpy(-4.0,x,y);
+    std::cout << "MV print -4.0*(-2.1) plus 0 1 2 3 4:" << std::endl;
+    MvPrint(y);
 
 
    int numVecs = GetNumberVecs(A);
@@ -76,15 +86,22 @@ int main(int argc, char* argv[]) {
   MvPrint(B);
 
   //Test a few complex things:
-  //
-  //This should go bad somewhere:
-  Kokkos::View<std::complex<double>**> cmat("Cmat",M,N);
 
-  std::complex<double> myVal = (1,2); //1+2i apparently??
-  Kokkos::deep_copy(cmat,myVal);
-
-  //MvPrint(cmat);
-
+  typedef Kokkos::complex<double> Kcomplex;
+  Kokkos::View<Kcomplex*> x2("X2",N);
+  Kokkos::View<Kcomplex*> y2("Y2",N);
+  Kokkos::View<Kcomplex> z2("Z2");
+  Kcomplex a,b;
+  a.imag() = -2.0; a.real() = 1.0;
+  b.imag() = 3.0; b.real() = -1.2;
+  Kokkos::deep_copy(x2,a);
+  Kokkos::deep_copy(y2,b);
+  std::cout << "Here is complex x and y: " << std::endl;
+  MvPrint(x2);
+  MvPrint(y2);
+  KokkosBlas::dot(z2,x2,y2);
+  std::cout << "Here is the dot prod: " << std::endl;
+  std::cout << z2() << std::endl;
   }
    Kokkos::finalize();
 }
@@ -248,13 +265,6 @@ void MvPrint(MV A){
       std::cout << A(i , j) << "  ";
       }
     std::cout << std::endl;
-  } 
-  std::cout << std::endl;
-}
-
-void MvPrint(Kokkos::View<ScalarType*> A){
-  for(int i = 0; i < A.extent(0); i++){
-      std::cout << A(i) << std::endl;
   } 
   std::cout << std::endl;
 }

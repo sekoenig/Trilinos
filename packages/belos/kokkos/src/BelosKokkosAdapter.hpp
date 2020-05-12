@@ -25,8 +25,10 @@
   /// implements Belos::MultiVec by extending Kokkos_MultiVector.
   template<class ScalarType >
   class KokkosMultiVec : public MultiVec<ScalarType> {
-    //template<ScalarType, class OrdinalType, class Device>
-   // friend class KokkosOperator;
+    //Think it is okay for ScalarType to not match ScalarType2 b/c eventually we might want
+    //MV and OP to have different precisions
+ //   template<class ScalarType2, class OrdinalType, class Device>
+ //   friend class KokkosOperator; 
   public:
     // constructors
     KokkosMultiVec<ScalarType> (const std::string label, const int numrows, const int numvecs) 
@@ -314,7 +316,7 @@
     os << std::endl;
     }
 
- // private: //This var should be private, but I can't get friend class templaty stuff to work, so...
+  //private: //This var should be private, but I can't get friend class templaty stuff to work, so...
     //static int rand_seed; //C++ initializes to zero.  Need this so new MVs in program will have different 
                           // results with MVRandom. 
     Kokkos::View<ScalarType**> myView;
@@ -355,7 +357,7 @@
     KokkosOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> mat) 
      : myMatrix(mat)
     {}
-
+    //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
     void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...
       char mode[] = "X";
