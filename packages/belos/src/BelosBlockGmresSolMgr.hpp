@@ -917,6 +917,22 @@ ReturnType BlockGmresSolMgr<ScalarType,MV,OP>::solve() {
   int numRHS2Solve = MVT::GetNumberVecs( *(problem_->getRHS()) );
   int numCurrRHS = ( numRHS2Solve < blockSize_) ? numRHS2Solve : blockSize_;
 
+  int numRHS = numRHS2Solve; 
+  std::vector< MagnitudeType > normvec(numRHS2Solve); 
+  MVT::MvNorm(*(problem_->getRHS()), normvec);
+  std::cout << "DEBUG: Norm of RHS's are: " << std::endl;
+  for(int i=0; i<normvec.size(); i++)
+    std::cout << normvec[i] << "  " ;
+
+  std::cout << std::endl;
+  MVT::MvNorm(*(problem_->getLHS()), normvec);
+  std::cout << "DEBUG:Norm of LHS's (soln X) are: " << std::endl;
+  for(int i=0; i<normvec.size(); i++)
+    std::cout << normvec[i] << "  " ;
+  std::cout << std::endl;
+
+
+
   std::vector<int> currIdx;
   //  If an adaptive block size is allowed then only the linear systems that need to be solved are solved.
   //  Otherwise, the index set is generated that informs the linear problem that some linear systems are augmented.
@@ -1272,6 +1288,33 @@ ReturnType BlockGmresSolMgr<ScalarType,MV,OP>::solve() {
     // just for the vectors from the last deflation?
     achievedTol_ = *std::max_element (pTestValues->begin(), pTestValues->end());
   }
+  //Jennifer DEBUG:
+  MVT::MvNorm(*(problem_->getRHS()), normvec);
+  std::cout << "DEBUG:End of solve Norm of RHS's are: " << std::endl;
+  for(int i=0; i<normvec.size(); i++)
+    std::cout << normvec[i] << "  " ;
+  std::cout << std::endl;
+  MVT::MvNorm(*(problem_->getLHS()), normvec);
+  std::cout << "DEBUG:End of solve Norm of LHS's (soln X) are: " << std::endl;
+  for(int i=0; i<normvec.size(); i++)
+    std::cout << normvec[i] << "  " ;
+  std::cout << std::endl;
+
+  std::vector<MagnitudeType> actual_resids( numRHS );
+  std::vector<MagnitudeType> rhs_norm( numRHS );
+  Teuchos::RCP<MV> resid = MVT::Clone(*(problem_->getLHS()),numRHS);
+  OPT::Apply( *(problem_->getOperator()), *(problem_->getLHS()), *resid );
+  MVT::MvAddMv( -1.0, *resid, 1.0, *(problem_->getRHS()), *resid );
+  std::cout << "did MvAddMv" << std::endl;
+  MVT::MvNorm( *resid, actual_resids );
+  MVT::MvNorm( *(problem_->getRHS()), rhs_norm );
+    std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
+    for ( int i=0; i<numRHS; i++) {
+      double actRes = actual_resids[i]/rhs_norm[i];
+      std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
+    }   
+  std::cout << std::endl;
+
 
   if (!isConverged || loaDetected_) {
     return Unconverged; // return from BlockGmresSolMgr::solve()

@@ -101,10 +101,12 @@ int main(int argc, char *argv[]) {
     int maxiters = -1;         // maximum number of iterations allowed per linear system
     int maxsubspace = 25;      // maximum number of blocks the solver can use for the subspace
     std::string filename("orsirr1.hb");
+    std::string orthog("ICGS");
     MT tol = 1.0e-5;           // relative residual tolerance
 
     Teuchos::CommandLineProcessor cmdp(false,true);
     cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
+    cmdp.setOption("orthog",&orthog,"Orthogonalization type. ICGS, IMGS, or DGKS. ");
     cmdp.setOption("left-prec","right-prec",&leftprec,"Left preconditioning or right.");
     cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
     cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -154,8 +156,8 @@ int main(int argc, char *argv[]) {
 
     // create the preconditioner. For valid PrecType values,
     // please check the documentation
-    std::string PrecType = "ILU"; // incomplete LU
-    int OverlapLevel = 1; // must be >= 0. If Comm.NumProc() == 1,
+    std::string PrecType = "ILUT"; // incomplete LU
+    int OverlapLevel = 2; // must be >= 0. If Comm.NumProc() == 1,
     // it is ignored.
 
     RCP<Ifpack_Preconditioner> Prec = Teuchos::rcp( Factory.Create(PrecType, &*A, OverlapLevel) );
@@ -168,7 +170,7 @@ int main(int argc, char *argv[]) {
     // Their meaning is as defined in file Epetra_CombineMode.h
     ifpackList.set("schwarz: combine mode", "Add");
     // sets the parameters
-    IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
+    //IFPACK_CHK_ERR(Prec->SetParameters(ifpackList));
 
     // initialize the preconditioner. At this point the matrix must
     // have been FillComplete()'d, but actual values are ignored.
@@ -193,6 +195,7 @@ int main(int argc, char *argv[]) {
     ParameterList belosList;
     belosList.set( "Num Blocks", maxsubspace );               // Maximum number of blocks in Krylov factorization
     belosList.set( "Block Size", blocksize );              // Blocksize to be used by iterative solver
+    belosList.set( "Orthogonalization", orthog );          // Orthogonalization type for solver
     belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
     belosList.set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
     belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested

@@ -100,12 +100,14 @@ bool debug = false;
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 15;      // number of restarts allowed
   std::string filename("orsirr1.hb");
+  std::string orthog("ICGS");
   MT tol = 1.0e-5;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("debug","nondebug",&debug,"Print debugging information from solver.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
+  cmdp.setOption("orthog",&orthog,"Orthogonalization type. ICGS, IMGS, or DGKS. ");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
   cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
   cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
@@ -152,6 +154,7 @@ bool debug = false;
   ParameterList belosList;
   belosList.set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
   belosList.set( "Block Size", blocksize );              // Blocksize to be used by iterative solver
+  belosList.set( "Orthogonalization", orthog );          // Orthogonalization type for solver
   belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
   belosList.set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
   belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested

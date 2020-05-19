@@ -49,6 +49,8 @@
 #include "Teuchos_GlobalMPISession.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
 
+#include "BelosTypes.hpp"
+
 
 int main(int argc, char* argv[])
 {
@@ -85,11 +87,13 @@ int main(int argc, char* argv[])
     double          maxSolutionError       = 1e-6;
     bool            showAllTests           = false;
     bool            dumpAll                = false;
+    std::string     orthog                 = "ICGS";
 
     CommandLineProcessor  clp;
     clp.throwExceptions(false);
     clp.addOutputSetupOptions(true);
     clp.setOption( "matrix-file", &matrixFile, "Matrix input file [Required]." );
+    clp.setOption( "orthog", &orthog, "Orthogonalization Type." );
     clp.setOption( "test-transpose", "no-test-transpose", &testTranspose, "Test the transpose solve or not." );
     clp.setOption( "use-preconditioner", "no-use-preconditioner", &usePreconditioner, "Use the preconditioner or not." );
     clp.setOption( "num-rhs", &numRhs, "Number of RHS in linear solve." );
@@ -121,12 +125,17 @@ int main(int argc, char* argv[])
     Teuchos::ParameterList& belosLOWSFPL_gmres =
       belosLOWSFPL_solver.sublist("Block GMRES");
 
+    int verbLevel = Belos::Errors + Belos::Warnings;
+    verbLevel += Belos::TimingDetails + Belos::FinalSummary + Belos::StatusTestDetails;
+    belosLOWSFPL_gmres.set( "Verbosity", verbLevel );
+
     belosLOWSFPL_gmres.set("Maximum Iterations",int(maxIterations));
     belosLOWSFPL_gmres.set("Convergence Tolerance",double(maxResid));
     belosLOWSFPL_gmres.set("Maximum Restarts",int(maxRestarts));
     belosLOWSFPL_gmres.set("Block Size",int(blockSize));
     belosLOWSFPL_gmres.set("Num Blocks",int(gmresKrylovLength));
     belosLOWSFPL_gmres.set("Output Frequency",int(outputFrequency));
+    belosLOWSFPL_gmres.set("Orthogonalization",orthog);
     belosLOWSFPL_gmres.set("Show Maximum Residual Norm Only",bool(outputMaxResOnly));
 
     Teuchos::ParameterList precPL("Ifpack");

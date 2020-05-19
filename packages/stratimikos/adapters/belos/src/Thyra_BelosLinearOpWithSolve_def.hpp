@@ -653,15 +653,18 @@ BelosLinearOpWithSolve<Scalar>::solveImpl(
     if (nonnull(generalSolveCriteriaBelosStatusTest)) {
       iterativeSolver_->setUserConvStatusTest(generalSolveCriteriaBelosStatusTest);
     }
-    try {
+  //  try {
       belosSolveStatus = iterativeSolver_->solve();
-    }
-    catch (Belos::BelosError& ex) {
-      TEUCHOS_TEST_FOR_EXCEPTION( true,
-                                  CatastrophicSolveFailure,
-                                  ex.what() );
-    }
+  //  }
+  //  catch (Belos::BelosError& ex) {
+  //    TEUCHOS_TEST_FOR_EXCEPTION( true,
+  //                                CatastrophicSolveFailure,
+  //                                ex.what() );
+  //  }
   }
+
+  //Jennifer DEBUG
+
 
   //
   // Report the solve status
@@ -681,13 +684,13 @@ BelosLinearOpWithSolve<Scalar>::solveImpl(
       // computing bounds.  It's also helpful for estimating whether a
       // small increase in the maximum iteration count might be
       // helpful next time.
-      try {
+    //  try {
         // Some solvers might not have implemented achievedTol().
         // The default implementation throws std::runtime_error.
         solveStatus.achievedTol = iterativeSolver_->achievedTol();
-      } catch (std::runtime_error&) {
+    //  } catch (std::runtime_error&) {
         // Do nothing; use the default value of achievedTol.
-      }
+    //  }
       break;
     }
     case Belos::Converged: {
@@ -705,15 +708,15 @@ BelosLinearOpWithSolve<Scalar>::solveImpl(
         }
       }
       else {
-        try {
+     //   try {
           // Some solvers might not have implemented achievedTol().
           // The default implementation throws std::runtime_error.
           solveStatus.achievedTol = iterativeSolver_->achievedTol();
-        } catch (std::runtime_error&) {
+     //   } catch (std::runtime_error&) {
           // Use the default convergence tolerance.  This is a correct
           // upper bound, since we did actually converge.
           solveStatus.achievedTol = tmpPL->get("Convergence Tolerance", defaultTol_);
-        }
+     //   }
       }
       break;
     }
