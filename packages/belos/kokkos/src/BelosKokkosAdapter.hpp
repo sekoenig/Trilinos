@@ -324,7 +324,7 @@
   /// \class KokkosOperator
   /// \brief Implementation of Belos::Operator using Kokkos::Crs matrix.
   ///
-  template<class ScalarType, class OrdinalType, class Device>
+  template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace>
   class KokkosOperator : public Operator<ScalarType> {
   private:
     KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> myMatrix;

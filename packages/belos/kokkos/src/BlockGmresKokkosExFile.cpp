@@ -64,10 +64,11 @@ int main(int argc, char *argv[]) {
 
   typedef double                            ST;
   typedef int                               OT;
+  typedef Kokkos::DefaultExecutionSpace     EXSP;
   typedef Teuchos::ScalarTraits<ST>        SCT;
   typedef SCT::magnitudeType                MT;
   typedef Belos::KokkosMultiVec<ST>         MV;
-  typedef Belos::KokkosOperator<ST, OT, Kokkos::OpenMP>       OP;
+  typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; // unused
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
@@ -106,10 +107,10 @@ bool proc_verbose = false;
     frequency = -1;  // reset frequency if test is not verbose
   
   // Read in a matrix Market file and use it to test the Kokkos Operator.
-  KokkosSparse::CrsMatrix<ST, OT, Kokkos::OpenMP> crsMat = 
-            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST, OT, Kokkos::OpenMP>>(filename.c_str()); 
-  RCP<Belos::KokkosOperator<ST, OT, Kokkos::OpenMP>> A = 
-            rcp(new Belos::KokkosOperator<ST,OT,Kokkos::OpenMP>(crsMat));
+  KokkosSparse::CrsMatrix<ST, OT, EXSP> crsMat = 
+            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST, OT, EXSP>>(filename.c_str()); 
+  RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
+            rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
   
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );

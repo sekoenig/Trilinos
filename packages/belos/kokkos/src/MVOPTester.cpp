@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
     // Issue several useful typedefs;
     typedef Belos::MultiVec<double> KMV;
     typedef Belos::Operator<double> KOP; // unused
+    typedef Kokkos::DefaultExecutionSpace     EXSP;
 
     // Create a Kokkos MultiVec for an initial std::vector to start the solver.
     // Note that this needs to have the same number of columns as the blocksize.
@@ -124,10 +125,10 @@ int main(int argc, char *argv[])
 
 
     // Read in a matrix Market file and use it to test the Kokkos Operator.
-    KokkosSparse::CrsMatrix<double, int, Kokkos::OpenMP> crsMat = 
-            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<double, int, Kokkos::OpenMP>>("bcsstk13.mtx"); 
-    Teuchos::RCP<Belos::KokkosOperator<double, int, Kokkos::OpenMP>> myOp = 
-            Teuchos::rcp(new Belos::KokkosOperator<double,int,Kokkos::OpenMP>(crsMat));
+    KokkosSparse::CrsMatrix<double, int, EXSP> crsMat = 
+            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<double, int, EXSP>>("bcsstk13.mtx"); 
+    Teuchos::RCP<Belos::KokkosOperator<double, int, EXSP>> myOp = 
+            Teuchos::rcp(new Belos::KokkosOperator<double,int,EXSP>(crsMat));
     
     Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec3 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 2) );
     Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec4 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 1) );
