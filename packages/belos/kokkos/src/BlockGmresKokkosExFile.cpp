@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
   Kokkos::initialize();
 
   typedef double                            ST;
+  //typedef double                           ST2;
   typedef int                               OT;
   typedef Kokkos::DefaultExecutionSpace     EXSP;
   typedef Teuchos::ScalarTraits<ST>        SCT;
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
   typedef Belos::KokkosMultiVec<ST>         MV;
   typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
-  typedef Belos::Operator<ST> KOP; // unused
+  typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
   typedef Belos::OperatorTraits<ST,KMV,KOP>  OPT;
 
@@ -180,8 +181,8 @@ bool proc_verbose = false;
   // Compute actual residuals.
   //
   bool badRes = false;
-  std::vector<double> actual_resids( numrhs );
-  std::vector<double> rhs_norm( numrhs );
+  std::vector<ST> actual_resids( numrhs );
+  std::vector<ST> rhs_norm( numrhs );
   Belos::KokkosMultiVec<ST> resid(numRows, numrhs);
   OPT::Apply( *A, *X, resid );
   MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
@@ -190,7 +191,7 @@ bool proc_verbose = false;
   if (proc_verbose) {
     std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
     for ( int i=0; i<numrhs; i++) {
-      double actRes = actual_resids[i]/rhs_norm[i];
+      ST actRes = actual_resids[i]/rhs_norm[i];
       std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
       if (actRes > tol) badRes = true;
     }

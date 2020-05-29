@@ -25,13 +25,12 @@
   /// implements Belos::MultiVec by extending Kokkos_MultiVector.
   template<class ScalarType >
   class KokkosMultiVec : public MultiVec<ScalarType> {
-    //template<ScalarType, class OrdinalType, class Device>
-   // friend class KokkosOperator;
+    //Think it is okay for ScalarType to not match ScalarType2 b/c eventually we might want
+    //MV and OP to have different precisions
+ //   template<class ScalarType2, class OrdinalType, class Device>
+ //   friend class KokkosOperator; 
   public:
     // constructors
-//    KokkosMultiVec(const Kokkos_BlockMap& Map_in, double * array, const int numvecs, const int stride=0);
-//    KokkosMultiVec(const Kokkos_BlockMap& Map_in, const int numvecs, bool zeroOut=true);
-//    KokkosMultiVec(Kokkos_DataAccess CV_in, const Kokkos_MultiVector& P_vec, const std::vector<int>& index);
     KokkosMultiVec<ScalarType> (const std::string label, const int numrows, const int numvecs) 
      : myView (label,numrows,numvecs)
     {}
@@ -82,9 +81,9 @@
       int numvecs = index.size();
       KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>("B",myView.extent(0),numvecs);
       //KokkosMultiVec<ScalarType> B("B", this->extent(0), numvecs);
-      bool isAscending = true;
+      bool isAscending = true;//Also checks if is contiguous.
       for(unsigned int i=0; i< (index.size()-1); i++){
-        if( index[i+1] <= index[i] ){
+        if( index[i+1] != index[i]+1 ){
           isAscending = false;
         }
       }
@@ -119,16 +118,40 @@
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
     MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){ //TODO this won't work for non-contiguous!
-      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
-      return B; 
+      bool isAscending = true;//Also checks if is contiguous.
+      for(unsigned int i=0; i< (index.size()-1); i++){
+        if( index[i+1] != index[i]+1 ){
+          isAscending = false;
+        }
+      }
+      if(isAscending ){ //Copy entire multivec.
+      KokkosMultiVec<ScalarType> * B = 
+          new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
+        return B; 
+      }
+      else{
+        throw std::runtime_error("CloneViewNonConst asked for non-contiguous subset. \n This feature is not supported in Belos for Kokkos.");
+      }
     }
 
     /// A virtual view constructor returning a pointer to the pure
     /// virtual class.  This vector's entries are shared and hence no
     /// memory is allocated for the columns.
     const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const { //TODO implement this!! This isn't const!!
-      KokkosMultiVec<ScalarType> * B = new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
-      return B; 
+      bool isAscending = true;//Also checks if is contiguous.
+      for(unsigned int i=0; i< (index.size()-1); i++){
+        if( index[i+1] != index[i]+1 ){
+          isAscending = false;
+        }
+      }
+      if(isAscending ){ //Copy entire multivec.
+      const KokkosMultiVec<ScalarType> * B = 
+          new KokkosMultiVec<ScalarType>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
+        return B; 
+      }
+      else{
+        throw std::runtime_error("CloneView asked for non-contiguous subset. \n This feature is not supported in Belos for Kokkos.");
+      }
     }
 
 
@@ -137,9 +160,9 @@
     void SetBlock ( const MultiVec<ScalarType>& A, const std::vector<int>& index ){
       //TODO check bounds of index?? 
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      bool isAscending = true;
+      bool isAscending = true;// Also checks for contiguous
       for(unsigned int i=0; i< (index.size()-1); i++){
-        if( index[i+1] <= index[i] ){
+        if( index[i+1] != index[i]+1 ){
           isAscending = false;
         }
       }
@@ -171,7 +194,7 @@
     //! *this <- alpha * A * B + beta * (*this)
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
-      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       Kokkos::View<ScalarType**> mat("mat", A_vec->myView.extent(1), myView.extent(1));
       Teuchos2KokkosMat(B,mat);
       KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat, beta, myView);
@@ -180,8 +203,8 @@
     //! *this <- alpha * A + beta * B
     void MvAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, const ScalarType beta,
                    const MultiVec<ScalarType>& B){
-      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
-      KokkosMultiVec<ScalarType> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(B));
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
+      KokkosMultiVec<ScalarType> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(B));
     //  std::cout << "myView before deep_copy" << std::endl;
    //   this->MvPrint(std::cout);
       KokkosMultiVec<ScalarType> temp(myView.extent(0),myView.extent(1));
@@ -225,7 +248,7 @@
 
     //! B <- alpha * A^T * (*this)
     void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
-      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       Kokkos::View<ScalarType**> soln("soln", A_vec->myView.extent(1), myView.extent(1));
       KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln);
       Kokkos2TeuchosMat(soln, B);
@@ -235,7 +258,7 @@
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
       Kokkos::View<ScalarType*> dotView("Dot",myView.extent(1));
-      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<double> &>(A));
+      KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
       for(unsigned int i=0; i < myView.extent(1); i++){
         b[i] = dotView(i); //Is there a better way to do this?
@@ -273,6 +296,7 @@
       int rand_seed = std::rand();
       Kokkos::Random_XorShift64_Pool<> pool(rand_seed); //initially used seed 12371
       Kokkos::fill_random(myView, pool, -1,1);
+      //TODO: check that this random matches the scalar type...
      // rand_seed += 5;
     }
 
@@ -292,7 +316,7 @@
     os << std::endl;
     }
 
- // private: //This var should be private, but I can't get friend class templaty stuff to work, so...
+  //private: //This var should be private, but I can't get friend class templaty stuff to work, so...
     //static int rand_seed; //C++ initializes to zero.  Need this so new MVs in program will have different 
                           // results with MVRandom. 
     Kokkos::View<ScalarType**> myView;
@@ -333,7 +357,7 @@
     KokkosOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> mat) 
      : myMatrix(mat)
     {}
-
+    //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
     void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...
       char mode[] = "X";

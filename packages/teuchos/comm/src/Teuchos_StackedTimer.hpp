@@ -660,9 +660,27 @@ public:
   void reportXML(std::ostream &os, const std::string& datestamp, const std::string& timestamp, Teuchos::RCP<const Teuchos::Comm<int> > comm);
 
   /**
-   * Dump all the data from all the MPI ranks to <code>$WATCHR_PERF_DIR/name_$DATESTAMP.xml</code>,
-   *  if the environment variable WATCHR_PERF_DIR is defined and non-empty (otherwise, do nothing).
-   *  DATESTAMP is calculated from the current UTC time, in the format YYYY_MM_DD.
+   * Dump all the data from all the MPI ranks to an XML file. This function
+   * calls reportXML and is intended to be used directly by performance tests.
+   *
+   * In the XML report, the top-level timer name (representing the total) will be replaced with
+   * \c name (the name of the test). This becomes the top-level chart name in Watchr.
+   *
+   * The output filename is controlled by two environment variables: \c $WATCHR_PERF_DIR (required for output)
+   * and \c $WATCHR_BUILD_NAME (optional). \c $WATCHR_PERF_DIR is the directory where the output file
+   * will be created. If it is not set or is empty, no output will be produced and the function returns an empty
+   * string on all ranks.
+   *
+   * If \c $WATCHR_BUILD_NAME is set, the filename is
+   * \c $WATCHR_BUILD_NAME-name_$DATESTAMP.xml. Additionally, the build name is prepended
+   * (verbatim) to the the top-level chart name,
+   * so that Watchr knows it is a different data series than runs of the same test from other builds.
+   *
+   * If \c $WATCHR_BUILD_NAME is not set or is empty, the filename is just \c name_$DATESTAMP.xml .
+   * DATESTAMP is calculated from the current UTC time, in the format YYYY_MM_DD.
+   *
+   * In the filename, all spaces in will be replaced by underscores.
+   *
    * @param [in] name - Name of performance test
    * @param [in] comm - Teuchos comm pointer
    * @return If on rank 0 and output was produced, the complete output filename. Otherwise the empty string.
@@ -759,8 +777,9 @@ protected:
 
    /**
     * Recursive call to print a level of timer data, in Watchr XML format.
+    * If non-empty, rootName will replace the root level's timer name in the output. If empty or level > 0, it has no effect.
     */
-  double printLevelXML(std::string prefix, int level, std::ostream &os, std::vector<bool> &printed, double parent_time);
+  double printLevelXML(std::string prefix, int level, std::ostream &os, std::vector<bool> &printed, double parent_time, const std::string& rootName = "");
 
 };  //StackedTimer
 

@@ -74,22 +74,23 @@ int main(int argc, char *argv[])
     //Teuchos::RCP<Epetra_CrsMatrix> A = Teuchos::rcp( new Epetra_CrsMatrix(Epetra_DataAccess::Copy, *Map, &NumNz[0]) );
 
     // Issue several useful typedefs;
-    typedef Belos::MultiVec<double> KMV;
-    typedef Belos::Operator<double> KOP; // unused
+    typedef double ScalarType;
+    typedef Belos::MultiVec<ScalarType> KMV;
+    typedef Belos::Operator<ScalarType> KOP; // unused
     typedef Kokkos::DefaultExecutionSpace     EXSP;
 
     // Create a Kokkos MultiVec for an initial std::vector to start the solver.
     // Note that this needs to have the same number of columns as the blocksize.
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(dim, blockSize) );
     ivec->MvRandom();
     std::cout << "Printing the random multivec:" << std::endl;
     //ivec->MvPrint(std::cout);
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec2 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(dim, blockSize) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec2 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(dim, blockSize) );
     ivec2->MvRandom();
     std::cout << "Printing the random multivec 2:" << std::endl;
     //ivec2->MvPrint(std::cout);
-    std::vector<double> norm1;
-    std::vector<double> norm2;
+    std::vector<ScalarType> norm1;
+    std::vector<ScalarType> norm2;
     for(int i = 0; i<blockSize; i++){
       norm1.push_back(-10.0);
       norm2.push_back(-10.0);
@@ -109,13 +110,13 @@ int main(int argc, char *argv[])
 
 
     // Create an output manager to handle the I/O from the solver
-    Teuchos::RCP<Belos::OutputManager<double> > MyOM = Teuchos::rcp( new Belos::OutputManager<double>() );
+    Teuchos::RCP<Belos::OutputManager<ScalarType> > MyOM = Teuchos::rcp( new Belos::OutputManager<ScalarType>() );
     if (verbose) {
       MyOM->setVerbosity( Belos::Warnings );
     }
 
     // test the Epetra adapter multivector
-    ierr = Belos::TestMultiVecTraits<double,KMV>(MyOM,ivec);
+    ierr = Belos::TestMultiVecTraits<ScalarType,KMV>(MyOM,ivec);
     if (ierr) {
       MyOM->print(Belos::Warnings,"*** KokkosAdapter PASSED TestMultiVecTraits()\n");
     }
@@ -125,15 +126,15 @@ int main(int argc, char *argv[])
 
 
     // Read in a matrix Market file and use it to test the Kokkos Operator.
-    KokkosSparse::CrsMatrix<double, int, EXSP> crsMat = 
-            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<double, int, EXSP>>("bcsstk13.mtx"); 
-    Teuchos::RCP<Belos::KokkosOperator<double, int, EXSP>> myOp = 
-            Teuchos::rcp(new Belos::KokkosOperator<double,int,EXSP>(crsMat));
+    KokkosSparse::CrsMatrix<ScalarType, int, EXSP> crsMat = 
+            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ScalarType, int, EXSP>>("bcsstk13.mtx"); 
+    Teuchos::RCP<Belos::KokkosOperator<ScalarType, int, EXSP>> myOp = 
+            Teuchos::rcp(new Belos::KokkosOperator<ScalarType,int,EXSP>(crsMat));
     
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec3 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 2) );
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec4 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 1) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec3 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(2003, 2) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec4 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(2003, 1) );
       ivec4->MvInit(1.0);
-    Teuchos::RCP<Belos::KokkosMultiVec<double>> ivec5 = Teuchos::rcp( new Belos::KokkosMultiVec<double>(2003, 1) );
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec5 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(2003, 1) );
 
     std::cout << "Testing first op apply:" << std::endl;
     myOp->Apply(*ivec4, *ivec5);
@@ -144,7 +145,7 @@ int main(int argc, char *argv[])
     std::cout << "Op apply 2 resut: " << std::endl;
     //ivec4->MvPrint(std::cout);   
 
-    ierr = Belos::TestOperatorTraits<double,KMV,KOP>(MyOM,ivec3,myOp);
+    ierr = Belos::TestOperatorTraits<ScalarType,KMV,KOP>(MyOM,ivec3,myOp);
     if (ierr) {
       MyOM->print(Belos::Warnings,"*** KokkosAdapter PASSED TestOperatorTraits()\n");
     }
