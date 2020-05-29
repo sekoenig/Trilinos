@@ -93,7 +93,7 @@
       //  if(debug){ std::cout << "copy entire MV" << std::endl; } //TODO remove debug stuff
       }
       else if (isAscending){ //Copy contiguous subset
-        Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::View<ScalarType**, Kokkos::LayoutLeft> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
         Kokkos::deep_copy(B->myView,ThisSub);
      //   if(debug){ std::cout << "copy contiguous subset of  MV" << std::endl; }
       } 
@@ -170,14 +170,14 @@
         Kokkos::deep_copy(myView,A_vec->myView);
       }
       else if (isAscending){ //Copy contiguous subset
-        Kokkos::View<ScalarType**> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
-        Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::View<ScalarType**, Kokkos::LayoutLeft> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        Kokkos::View<ScalarType**, Kokkos::LayoutLeft> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
         Kokkos::deep_copy(ThisSub, Asub);
       } 
       else{ //Copy columns one by one
         for(unsigned int i=0; i<index.size(); i++){
-          Kokkos::View<ScalarType**> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(i, i+1));
-          Kokkos::View<ScalarType**> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
+          Kokkos::View<ScalarType**, Kokkos::LayoutLeft> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(i, i+1));
+          Kokkos::View<ScalarType**, Kokkos::LayoutLeft> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
           Kokkos::deep_copy(ThisSub, Asub);
         }
       }
@@ -195,7 +195,7 @@
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      Kokkos::View<ScalarType**> mat("mat", A_vec->myView.extent(1), myView.extent(1));
+      Kokkos::View<ScalarType**, Kokkos::LayoutLeft> mat("mat", A_vec->myView.extent(1), myView.extent(1));
       Teuchos2KokkosMat(B,mat);
       KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat, beta, myView);
     }
@@ -238,7 +238,7 @@
       //Later- Can we do this better with less copying?  TODO
       //KokkosMultiVec<ScalarType> * temp = Clone(this->extent(1));
       KokkosMultiVec<ScalarType> temp(myView.extent(0),myView.extent(1));
-      Kokkos::View<ScalarType*> scalars("alpha", alpha.size());
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft> scalars("alpha", alpha.size());
       for(unsigned int i = 0 ; i < alpha.size(); i++){
         scalars(i) = alpha.at(i);
       } 
@@ -249,7 +249,7 @@
     //! B <- alpha * A^T * (*this)
     void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      Kokkos::View<ScalarType**> soln("soln", A_vec->myView.extent(1), myView.extent(1));
+      Kokkos::View<ScalarType**, Kokkos::LayoutLeft> soln("soln", A_vec->myView.extent(1), myView.extent(1));
       KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln);
       Kokkos2TeuchosMat(soln, B);
     }
@@ -257,7 +257,7 @@
 
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
-      Kokkos::View<ScalarType*> dotView("Dot",myView.extent(1));
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft> dotView("Dot",myView.extent(1));
       KokkosMultiVec<ScalarType> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
       for(unsigned int i=0; i < myView.extent(1); i++){
@@ -268,7 +268,7 @@
 
     //! alpha[i] = norm of i-th column of (*this)
     void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
-      Kokkos::View<ScalarType*> normView("Norm",myView.extent(1));
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft> normView("Norm",myView.extent(1));
       switch( norm_type ) { 
         case ( OneNorm ) : 
           KokkosBlas::nrm1(normView, myView);
@@ -319,7 +319,7 @@
   //private: //This var should be private, but I can't get friend class templaty stuff to work, so...
     //static int rand_seed; //C++ initializes to zero.  Need this so new MVs in program will have different 
                           // results with MVRandom. 
-    Kokkos::View<ScalarType**> myView;
+    Kokkos::View<ScalarType**, Kokkos::LayoutLeft> myView;
     bool debug = true; 
  private:
     void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
