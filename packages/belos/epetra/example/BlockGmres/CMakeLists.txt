@@ -17,6 +17,12 @@ IF (${PACKAGE_NAME}_ENABLE_Triutils AND ${PACKAGE_NAME}_ENABLE_EpetraExt)
     COMM serial mpi
     )
 
+  TRIBITS_ADD_EXECUTABLE(
+    OrthoTest
+    SOURCES OrthoTest.cpp
+    COMM serial mpi
+    )
+
   TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyExampleBlockGmresFiles
     SOURCE_DIR ${Belos_SOURCE_DIR}/epetra/example/BlockGmres
     SOURCE_FILES orsirr1.hb identity.mtx

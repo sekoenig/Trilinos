@@ -66,6 +66,8 @@ namespace Belos {
 template<class SC, class MV, class OP>
 class GenericSolverFactory : public Impl::SolverFactoryParent<SC, MV, OP>
 {
+//Note: The GmresPolySolMgr is not registered here in order to avoid compilation problems
+//with recursive include paths. 
   public:
     GenericSolverFactory() {
       Impl::registerSolverSubclassForTypes<BiCGStabSolMgr<SC,MV,OP>, SC, MV, OP> ("BICGSTAB");
