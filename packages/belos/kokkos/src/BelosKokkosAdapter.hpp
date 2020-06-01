@@ -41,7 +41,7 @@
      : myView("MV",numrows,1)
     {}
     //KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
-    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**> & sourceView) : myView(sourceView){} 
+    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft> & sourceView) : myView(sourceView){} 
     //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
     ~KokkosMultiVec<ScalarType>(){}
 
@@ -322,7 +322,7 @@
     Kokkos::View<ScalarType**, Kokkos::LayoutLeft> myView;
     bool debug = true; 
  private:
-    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
+    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**, Kokkos::LayoutLeft> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
   //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(unsigned int i = 0; i < K.extent(0); i++){
@@ -332,7 +332,7 @@
       } 
     }
 
-    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**> & K) const {
+    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**, Kokkos::LayoutLeft> & K) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
       //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(unsigned int i = 0; i < K.extent(0); i++){

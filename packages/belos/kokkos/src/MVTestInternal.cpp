@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
     std::cout << "Print ivec2, should be 3's." << std::endl;
     ivec2->MvPrint(cout);
     ivec->MvAddMv(-5.0,*ivec,7.0,*ivec2);
-    std::cout << "Print ivec, should be 4's." << std::endl;
+    std::cout << "Print ivec, should be 26's." << std::endl;
     ivec->MvPrint(cout);
 
     // Create an output manager to handle the I/O from the solver
