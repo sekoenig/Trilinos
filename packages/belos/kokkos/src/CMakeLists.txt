@@ -76,6 +76,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  MultiGmresKokkosEx
+  SOURCES MultiGmresKokkosEx.cpp 
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   PseudoBlockCGEpetraEx
   SOURCES PseudoBlockCGEpetraExFile.cpp
   COMM serial mpi
@@ -101,6 +107,6 @@ TRIBITS_ADD_EXECUTABLE(
 
 TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyKokkosMatrixMarketFiles
   SOURCE_DIR ${Belos_SOURCE_DIR}/kokkos/src/
-  SOURCE_FILES bcsstk13.mtx
+  SOURCE_FILES bcsstk13.mtx bcsstk12.mtx orsirr_1.mtx
   EXEDEPS KokkosMVOPTester
   ) 

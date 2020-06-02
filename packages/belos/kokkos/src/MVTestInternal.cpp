@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
   }*/
 
   bool success = true;
-  try {
+//  try {
     // number of global elements
     int dim = 10;
     int blockSize = 5;
@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
 
     // Issue several useful typedefs;
     typedef double ScalarType;
+    typedef float ScalarType2;
     typedef Belos::MultiVec<ScalarType> KMV;
     //typedef Belos::Operator<ScalarType> EOP; // unused
 
@@ -109,6 +110,32 @@ int main(int argc, char *argv[])
     }
     std::cout << std::endl;
 
+    std::cout << "Print ivec2, double." << std::endl;
+    ivec2->MvPrint(cout);
+
+    
+    Kokkos::View<double**,Kokkos::LayoutLeft> mv("test",4,2);
+    Kokkos::Random_XorShift64_Pool<> pool(12371);
+    Kokkos::fill_random(mv, pool, -1,1);
+    Belos::KokkosMultiVec<ScalarType2> ivecfloat(mv);
+    std::cout << "Print ivec, float." << std::endl;
+    ivecfloat.MvPrint(cout);
+
+    //Teuchos::RCP<Belos::KokkosMultiVec<ScalarType2>> ivec2float 
+    //      = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType2>(ivec2->myView()) );
+    Belos::KokkosMultiVec<ScalarType2> ivec2float(ivec2->myView);
+    std::cout << "Print ivec2, float." << std::endl;
+    ivec2float.MvPrint(cout);
+
+    cout << "Testing the MV copy construtor: " << endl;
+    Belos::KokkosMultiVec<ScalarType> copyvec(*ivec2);
+    cout << "Here is the copied MV:" << endl;
+    copyvec.MvPrint(cout);
+    cout << "Changing orig vec..." << endl;
+    ivec2->MvInit(3445.0);
+    cout << "Did copyvec change? " << endl;
+    copyvec.MvPrint(cout);
+
     int numvecs2 = 5;
     std::vector<int> ind(numvecs2);
     ind[0] = 0; 
@@ -120,17 +147,17 @@ int main(int argc, char *argv[])
     Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec3 = 
         Teuchos::rcp(dynamic_cast<Belos::KokkosMultiVec<ScalarType> *>(ivec2->CloneCopy(ind)));
     std::cout << "Print cols 0 4 2 2 3 of vec 2:" << std::endl;
-    ivec3->MvPrint(cout);
+    //ivec3->MvPrint(cout);
 
     ivec->MvInit(-1.0);
     std::cout << "Print ivec, should be -1's." << std::endl;
-    ivec->MvPrint(cout);
+    //ivec->MvPrint(cout);
     ivec2->MvInit(3.0);
     std::cout << "Print ivec2, should be 3's." << std::endl;
-    ivec2->MvPrint(cout);
+    //ivec2->MvPrint(cout);
     ivec->MvAddMv(-5.0,*ivec,7.0,*ivec2);
     std::cout << "Print ivec, should be 26's." << std::endl;
-    ivec->MvPrint(cout);
+    //ivec->MvPrint(cout);
 
     // Create an output manager to handle the I/O from the solver
     Teuchos::RCP<Belos::OutputManager<ScalarType> > MyOM = Teuchos::rcp( new Belos::OutputManager<ScalarType>() );
@@ -154,10 +181,10 @@ int main(int argc, char *argv[])
       success = true;
       MyOM->print(Belos::Warnings,"End Result: TEST PASSED\n");
     }
-  }
+ // }
 
 
-  TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose,std::cerr,success);
+  //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose,std::cerr,success);
   Kokkos::finalize();
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

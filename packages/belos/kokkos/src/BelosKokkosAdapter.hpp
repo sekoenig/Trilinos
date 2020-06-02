@@ -40,8 +40,35 @@
     KokkosMultiVec<ScalarType> (const int numrows) 
      : myView("MV",numrows,1)
     {}
+
+
+    // Make so that copy constructor of MV gives deep copy.  
+    template < class ScalarType2 >
+    //KokkosMultiVec<ScalarType> (const KokkosMultiVec<ScalarType> &sourceVec) : 
+    KokkosMultiVec<ScalarType> (const KokkosMultiVec<ScalarType2> &sourceVec) : 
+        myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs()) 
+        {Kokkos::deep_copy(myView,sourceVec.myView);}
+
+    //Need this explicitly, else compiler makes its own with shallow copy. 
+    KokkosMultiVec<ScalarType> (const KokkosMultiVec<ScalarType> &sourceVec) : 
+        myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs()) 
+        {Kokkos::deep_copy(myView,sourceVec.myView);}
+
+    //TODO: Do we need to implement this operator?  Like this??
+    // Compiler default should give shallow copy.
     //KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
+    //
+    // New plan: shallow hold on view if same scalar type.  Else, deep copy. 
     KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft> & sourceView) : myView(sourceView){} 
+    //
+    // This version allows us to make exclusive changes to the view and convert between scalar types:
+    template < class ScalarType2 >
+    KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType2**,Kokkos::LayoutLeft> & sourceView) : 
+        myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1)) {Kokkos::deep_copy(myView,sourceView);}
+
+    //This function specialization makes things compile...else compiler can't deduce template type?
+    //KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft> & sourceView) : 
+    //    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1)) {Kokkos::deep_copy(myView,sourceView);}
     //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
     ~KokkosMultiVec<ScalarType>(){}
 
@@ -354,9 +381,16 @@
     KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> myMatrix;
 
   public:
+  // Shallow copy for mat of same scalar type:
     KokkosOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> mat) 
-     : myMatrix(mat)
-    {}
+     : myMatrix(mat) {}
+
+  //This doesn't work yet!! That is view notation!
+  // Deep copy for changing scalar types: 
+  //  template <class ScalarType2 > 
+  //  KokkosOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType2, OrdinalType, Device> mat) 
+  //   : myMatrix(Kokkos::ViewAllocateWithoutInitializing("Mat"),mat.extent(0),mat.extent(1)) {Kokkos::deep_copy(myMatrix,mat);}
+
     //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
     void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...

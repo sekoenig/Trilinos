@@ -8,6 +8,7 @@
 
 using ScalarType = double;
 using MV = Kokkos::View<ScalarType**>;
+using ScalarType2 = float;
 
 void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T);
 MV Clone(const MV &mv, const int numvecs);
@@ -56,6 +57,9 @@ int main(int argc, char* argv[]) {
    MvPrint(A);
 
    MvPrint(x);
+
+   Kokkos::View<ScalarType2*> xfloat;
+   Kokkos::deep_copy(xfloat, x);
 
   KokkosBlas::scal(A2,y,A);
   std::cout << "Scaled matrix:" << std::endl;
