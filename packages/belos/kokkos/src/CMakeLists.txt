@@ -76,6 +76,18 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  FLOATBlockGmresKokkosEx
+  SOURCES FLOATBlockGmresKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  LabelEpetraTest
+  SOURCES LabelEpetraTest.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   MultiGmresKokkosEx
   SOURCES MultiGmresKokkosEx.cpp 
   COMM serial mpi

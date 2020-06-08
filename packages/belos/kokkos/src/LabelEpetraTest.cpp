@@ -48,32 +48,41 @@
 //
 #include "BelosConfigDefs.hpp"
 #include "BelosLinearProblem.hpp"
+#include "BelosEpetraAdapter.hpp"
 #include "BelosBlockGmresSolMgr.hpp"
-#include "BelosOutputManager.hpp"
+
+#include "EpetraExt_readEpetraLinearSystem.h"
+#include "Epetra_Map.h"
+#ifdef EPETRA_MPI
+  #include "Epetra_MpiComm.h"
+#else
+  #include "Epetra_SerialComm.h"
+#endif
+#include "Epetra_CrsMatrix.h"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
 
-#include "BelosKokkosAdapter.hpp"
-#include "KokkosKernels_IOUtils.hpp"
-
 int main(int argc, char *argv[]) {
-
-  Kokkos::initialize();
-
+  //
+  int MyPID = 0;
+#ifdef EPETRA_MPI
+  // Initialize MPI
+  MPI_Init(&argc,&argv);
+  Epetra_MpiComm Comm(MPI_COMM_WORLD);
+  MyPID = Comm.MyPID();
+#else
+  Epetra_SerialComm Comm;
+#endif
+  //
   typedef double                            ST;
-  //typedef double                           ST2;
-  typedef int                               OT;
-  typedef Kokkos::DefaultExecutionSpace     EXSP;
   typedef Teuchos::ScalarTraits<ST>        SCT;
   typedef SCT::magnitudeType                MT;
-  typedef Belos::KokkosMultiVec<ST>         MV;
-  typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
-  typedef Belos::MultiVec<ST> KMV;
-  typedef Belos::Operator<ST> KOP; 
-  typedef Belos::MultiVecTraits<ST,KMV>     MVT;
-  typedef Belos::OperatorTraits<ST,KMV,KOP>  OPT;
+  typedef Epetra_MultiVector                MV;
+  typedef Epetra_Operator                   OP;
+  typedef Belos::MultiVecTraits<ST,MV>     MVT;
+  typedef Belos::OperatorTraits<ST,MV,OP>  OPT;
 
   using Teuchos::ParameterList;
   using Teuchos::RCP;
@@ -81,75 +90,86 @@ int main(int argc, char *argv[]) {
 
 bool verbose = true;
 bool success = true;
-//try {
+try {
 bool proc_verbose = false;
+bool debug = false;
   int frequency = 10;        // frequency of status test output.
+  int blocksize = 1;         // blocksize
   int numrhs = 1;            // number of right-hand sides to solve for
   int maxiters = -1;         // maximum number of iterations allowed per linear system
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 25;      // number of restarts allowed
-  bool expresidual = false; // use explicit residual
-  std::string filename("bcsstk13.mtx"); // example matrix
+  std::string filename("bcsstk13.mtx");
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
-  cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
+  cmdp.setOption("debug","nondebug",&debug,"Print debugging information from solver.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
-  cmdp.setOption("tol",&tol,"Relative residual tolerance used by Gmres solver.");
+  cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
   cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
+  cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
   cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
   cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
   cmdp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
-
   if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
     return -1;
   }
   if (!verbose)
     frequency = -1;  // reset frequency if test is not verbose
-  
-  // Read in a matrix Market file and use it to test the Kokkos Operator.
-  KokkosSparse::CrsMatrix<ST, OT, EXSP> crsMat = 
-            KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST, OT, EXSP>>(filename.c_str()); 
-  RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
-            rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
-  OT numRows = crsMat.numRows();
-  
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
-  X->MvInit(0.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> B = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
-  B->MvInit(1.0);
+  //
+  // Get the problem
+  //
+  RCP<Epetra_Map> Map;
+  RCP<Epetra_CrsMatrix> A;
+  RCP<Epetra_MultiVector> B, X;
+  RCP<Epetra_Vector> vecB, vecX;
+  EpetraExt::readEpetraLinearSystem(filename, Comm, &A, &Map, &vecX, &vecB);
+  A->OptimizeStorage();
+  proc_verbose = verbose && (MyPID==0);  /* Only print on the zero processor */
 
-  proc_verbose = verbose;  /* Only print on the zero processor */
-
+  // Check to see if the number of right-hand sides is the same as requested.
+//  if (numrhs>1) {
+    X = rcp( new Epetra_MultiVector( *Map, numrhs ) );
+    B = rcp( new Epetra_MultiVector( *Map, numrhs ) );
+    X->Random();
+    OPT::Apply( *A, *X, *B );
+    X->PutScalar( 0.0 );
+    B->PutScalar( 1.0 );
+/*  }
+  else {
+    X = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecX);
+    B = Teuchos::rcp_implicit_cast<Epetra_MultiVector>(vecB);
+  }*/
   //
   // ********Other information used by block solver***********
   // *****************(can be user specified)******************
   //
-  const int NumGlobalElements = B->GetGlobalLength();
+  const int NumGlobalElements = B->GlobalLength();
   if (maxiters == -1)
-    maxiters = NumGlobalElements - 1; // maximum number of iterations to run
+    maxiters = NumGlobalElements/blocksize - 1; // maximum number of iterations to run
   //
   ParameterList belosList;
-  belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
-  belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested
   belosList.set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
+  belosList.set( "Block Size", blocksize );              // Blocksize to be used by iterative solver
+  belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
   belosList.set( "Maximum Restarts", maxrestarts );      // Maximum number of restarts allowed
-  belosList.set( "Explicit Residual Test", expresidual);      // use explicit residual
-
+  belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested
+  int verbosity = Belos::Errors + Belos::Warnings;
   if (verbose) {
-    belosList.set( "Verbosity", Belos::Errors + Belos::Warnings +
-		   Belos::TimingDetails + Belos::StatusTestDetails + Belos::FinalSummary);
+    verbosity += Belos::TimingDetails + Belos::StatusTestDetails;
     if (frequency > 0)
       belosList.set( "Output Frequency", frequency );
   }
-  else
-    belosList.set( "Verbosity", Belos::Errors + Belos::Warnings );
+  if (debug) {
+    verbosity += Belos::Debug;
+  }
+  belosList.set( "Verbosity", verbosity );
   //
   // Construct an unpreconditioned linear problem instance.
   //
-  Belos::LinearProblem<ST,KMV,KOP> problem( A, X, B );
+  Belos::LinearProblem<double,MV,OP> problem( A, X, B );
   bool set = problem.setProblem();
   if (set == false) {
     if (proc_verbose)
@@ -158,12 +178,12 @@ bool proc_verbose = false;
   }
   //
   // *******************************************************************
-  // **************Start the block Gmres iteration*************************
+  // *************Start the block Gmres iteration*************************
   // *******************************************************************
   //
   // Create an iterative solver manager.
-  RCP< Belos::SolverManager<ST,KMV,KOP> > newSolver
-    = rcp( new Belos::BlockGmresSolMgr<ST,KMV,KOP>(rcp(&problem,false), rcp(&belosList,false)) );
+  RCP< Belos::SolverManager<double,MV,OP> > Solver
+    = rcp( new Belos::BlockGmresSolMgr<double,MV,OP>(rcp(&problem,false), rcp(&belosList,false)));
 
   //
   // **********Print out information about problem*******************
@@ -172,21 +192,48 @@ bool proc_verbose = false;
     std::cout << std::endl << std::endl;
     std::cout << "Dimension of matrix: " << NumGlobalElements << std::endl;
     std::cout << "Number of right-hand sides: " << numrhs << std::endl;
-    std::cout << "Max number of Gmres iterations: " << maxiters << std::endl;
+    std::cout << "Block size used by solver: " << blocksize << std::endl;
+    std::cout << "Max number of restarts allowed: " << maxrestarts << std::endl;
+    std::cout << "Max number of Gmres iterations per linear system: " << maxiters << std::endl;
     std::cout << "Relative residual tolerance: " << tol << std::endl;
     std::cout << std::endl;
   }
   //
   // Perform solve
   //
-  Belos::ReturnType ret = newSolver->solve();
+  Belos::ReturnType ret = Solver->solve();
+  //
+  // Get the number of iterations for this solve.
+  //
+  int numIters = Solver->getNumIters();
+  if (proc_verbose)
+    std::cout << "Number of iterations performed for this solve: " << numIters << std::endl;
+
+
+  // ********************************************************************
+  // Solve the problem again with a new solver manager:
+  // *******************************************************************
+  X->PutScalar( 0.0 );
+  Belos::LinearProblem<double,MV,OP> problem2( A, X, B );
+  set = problem2.setProblem();
+  if (set == false) {
+    if (proc_verbose)
+      std::cout << std::endl << "ERROR:  Belos::LinearProblem failed to set up correctly!" << std::endl;
+    return -1;
+  }
+  belosList.set("Timer Label", "Solve2: "); //Set new label for 2nd solve.
+  RCP< Belos::SolverManager<double,MV,OP> > newSolver
+    = rcp( new Belos::BlockGmresSolMgr<double,MV,OP>(rcp(&problem2,false), rcp(&belosList,false)));
+  ret = newSolver->solve();
+
+
   //
   // Compute actual residuals.
   //
   bool badRes = false;
-  std::vector<ST> actual_resids( numrhs );
-  std::vector<ST> rhs_norm( numrhs );
-  Belos::KokkosMultiVec<ST> resid(numRows, numrhs);
+  std::vector<double> actual_resids( numrhs );
+  std::vector<double> rhs_norm( numrhs );
+  Epetra_MultiVector resid(*Map, numrhs);
   OPT::Apply( *A, *X, resid );
   MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
   MVT::MvNorm( resid, actual_resids );
@@ -194,7 +241,7 @@ bool proc_verbose = false;
   if (proc_verbose) {
     std::cout<< "---------- Actual Residuals (normalized) ----------"<<std::endl<<std::endl;
     for ( int i=0; i<numrhs; i++) {
-      ST actRes = actual_resids[i]/rhs_norm[i];
+      double actRes = actual_resids[i]/rhs_norm[i];
       std::cout<<"Problem "<<i<<" : \t"<< actRes <<std::endl;
       if (actRes > tol) badRes = true;
     }
@@ -209,9 +256,12 @@ if (ret!=Belos::Converged || badRes) {
   if (proc_verbose)
     std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
 }
-//}
-//TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
+}
+TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
 
-Kokkos::finalize();
+#ifdef EPETRA_MPI
+MPI_Finalize();
+#endif
+
 return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
