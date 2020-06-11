@@ -1,1 +1,1 @@
-../packages/belos/tpetra/test/BlockGmres/hybrid_gmres_galeri_multi.cpp
+../packages/ifpack2/test/belos/hybrid_gmres_galeri_multi.cpp

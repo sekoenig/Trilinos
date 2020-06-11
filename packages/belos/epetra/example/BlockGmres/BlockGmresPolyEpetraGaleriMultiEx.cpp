@@ -493,7 +493,8 @@ int main(int argc, char *argv[]) {
     for( unsigned int i=0; i < degreeVector.size(); i++){
       maxdegree = degreeVector[i];
       polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
-      std::cout << "Next poly degree is: " << maxdegree << std::endl;
+      if (proc_verbose){
+        std::cout << std::endl << "startend degree " << maxdegree  << std::endl;}
       // Create an iterative solver manager.
     RCP< Belos::SolverManager<double,MV,OP> > newSolver
       = rcp( new Belos::GmresPolySolMgr<double,MV,OP>(rcp(&problem,false), rcp(&polyList,false)));
@@ -545,8 +546,8 @@ int main(int argc, char *argv[]) {
           std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
       } else {
         success = true;
-        if (proc_verbose)
-          std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
+        if (proc_verbose){
+          std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;}
       }
       // Zero out previous timers
       Teuchos::TimeMonitor::zeroOutTimers();
@@ -554,6 +555,8 @@ int main(int argc, char *argv[]) {
       X->PutScalar( 0.0 );
       newSolver->reset( Belos::Problem );
       newSolver = Teuchos::null; //Delete old solver so we can start with new one. 
+      if (proc_verbose)
+        std::cout << std::endl << "startend degree " << maxdegree  << std::endl;
     }//end for loop over poly degrees
   }
   TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
