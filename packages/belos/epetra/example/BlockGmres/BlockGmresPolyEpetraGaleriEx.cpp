@@ -72,6 +72,7 @@
 #include <Ifpack_IlukGraph.h>
 #include <Ifpack_CrsRiluk.h>
 #include "Ifpack_Chebyshev.h"
+#include "Ifpack_PointRelaxation.h"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -125,6 +126,7 @@ int main(int argc, char *argv[]) {
     int OverlapLevel = 1;   //Overlap level for non-poly preconditioners must be >= 0. If Comm.NumProc() == 1,it is ignored.   
     int ilutFill_ = 1;      //Fill level for ILU factorization
     int nx = 10;               // number of discretization points in each direction
+    int chebyPowerIters = 10;
     double aThresh_ = 0.0001;
     double rThresh_ = 1.0001;
     double dropTol_ = 1e-3;
@@ -154,7 +156,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated.");
     cmdp.setOption("precond",&precond,"Preconditioning placement (none, left, right).");
-    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, Cheby, none).");
+    cmdp.setOption("prec-type",&PrecType,"Preconditioning type (Amesos, ILU, ILUT, ILUK2, Cheby, Diag, none).");
     cmdp.setOption("overlap",&OverlapLevel,"Overlap level for non-poly preconditioners.");
     cmdp.setOption("fill",&ilutFill_,"Fill level for ILU-type preconditioners.");
     cmdp.setOption("athresh",&aThresh_,"Absolute Threshold for ILU-type preconditioners.");
@@ -174,6 +176,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("matrix-type",&MatrixType,"Matrix type. See Galeri documentation. (Default: Laplace3D)");
     cmdp.setOption("diff",&diff,"Diffusion term.  Default: 1e-5");
     cmdp.setOption("conv",&conv,"Convection term.  Default: 1.0");
+    cmdp.setOption("cheby-iters",&chebyPowerIters,"Iterations of power method to estimate large eval for Cheby poly.  Default: 10");
 
     if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
       return -1;
@@ -185,7 +188,7 @@ int main(int argc, char *argv[]) {
       if(MyPID==0) std::cout << "Error: Invalid string for precond param." << std::endl;
       return -1; 
     }
-    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT" && PrecType != "ILUK2" && PrecType != "Cheby" && PrecType != "none")
+    if( PrecType != "Amesos" && PrecType!= "ILU" && PrecType != "ILUT" && PrecType != "ILUK2" && PrecType != "Cheby" && PrecType != "none"&& PrecType != "Diag")
     {
       if(MyPID==0) std::cout << "Error: Invalid string for prec-type param." << std::endl;
       return -1; 
@@ -351,6 +354,7 @@ int main(int argc, char *argv[]) {
 
         ParameterList ChebyList;
         ChebyList.set("chebyshev: degree", maxdegree); //Do NOT need to subtract 1 to make it correspond to our poly Ap(A).
+        ChebyList.set("chebyshev: eigenvalue max iterations", chebyPowerIters);
         maxdegree = 0; //Turn off our poly when using Cheby poly. 
 
         Teuchos::RCP<Ifpack_Chebyshev> Cheby = Teuchos::rcp( new Ifpack_Chebyshev(&*A) );
@@ -415,6 +419,11 @@ int main(int argc, char *argv[]) {
           ifpackList.set("fact: relative threshold", rThresh_);
           ifpackList.set("fact: level-of-fill", (int)ilutFill_);
           ifpackList.set("fact: drop tolerance", dropTol_);
+        }
+        else if (PrecType == "Diag")
+        {
+          ifpackList.set("relaxation: type", "Jacobi");
+          PrecType = "point relaxation";
         }
 
         if (OverlapLevel)
