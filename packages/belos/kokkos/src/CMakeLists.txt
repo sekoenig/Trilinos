@@ -94,6 +94,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  GmresIRKokkos
+  SOURCES GmresIRKokkos.cpp 
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   PseudoBlockCGEpetraEx
   SOURCES PseudoBlockCGEpetraExFile.cpp
   COMM serial mpi
