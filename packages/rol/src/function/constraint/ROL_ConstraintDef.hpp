@@ -329,7 +329,7 @@ std::vector<Real> Constraint<Real>::solveAugmentedSystem(Vector<Real> &v1,
     }
 
     // Evaluate special stopping condition.
-    tol = tol;
+    //tol = ???;
 
 //    std::cout << "  " << i+1 << ": " << res[i+1]/res[0] << std::endl;
     if (res[i+1] <= tol) {
@@ -592,6 +592,7 @@ Real Constraint<Real>::checkAdjointConsistencyJacobian(const Vector<Real> &w,
   ROL::Ptr<Vector<Real> > Jv = dualw.clone();
   ROL::Ptr<Vector<Real> > Jw = dualv.clone();
   
+  this->update(x);
   applyJacobian(*Jv,v,x,tol);
   applyAdjointJacobian(*Jw,w,x,tol);
 

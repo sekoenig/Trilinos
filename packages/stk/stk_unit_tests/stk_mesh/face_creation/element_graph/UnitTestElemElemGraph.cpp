@@ -39,11 +39,10 @@
 #include "stk_unit_test_utils/unittestMeshUtils.hpp"
 #include <stk_unit_test_utils/MeshFixture.hpp>
 
-#include <stk_unit_tests/stk_mesh/SetupKeyholeMesh.hpp>
-
-#include <stk_unit_tests/stk_mesh_fixtures/QuadFixture.hpp>  // for QuadFixture
-#include <stk_unit_tests/stk_mesh_fixtures/heterogeneous_mesh.hpp>
-#include <stk_unit_tests/stk_mesh_fixtures/degenerate_mesh.hpp>
+#include "SetupKeyholeMesh.hpp"
+#include <stk_unit_test_utils/stk_mesh_fixtures/QuadFixture.hpp>  // for QuadFixture
+#include <stk_unit_test_utils/stk_mesh_fixtures/degenerate_mesh.hpp>
+#include <stk_unit_test_utils/stk_mesh_fixtures/heterogeneous_mesh.hpp>
 
 #include "BulkDataElementGraphTester.hpp"
 #include "ElementGraphTester.hpp"
@@ -1141,8 +1140,6 @@ TEST(ElementGraph, create_faces_using_element_graph_parallel)
         unsigned num_faces = entity_counts[side_rank];
         EXPECT_EQ(21u, num_faces);
 
-        stk::io::write_mesh("out.exo", bulkData);
-
         if (stk::parallel_machine_rank(comm) == 0)
         {
             for(size_t i=0;i<wall_times.size();++i)
@@ -1299,8 +1296,6 @@ TEST(ElementGraph, compare_performance_create_faces)
 
             double elapsed_time = stk::wall_time() - wall_time_start;
 
- //           stk::io::write_mesh("out.exo", bulkData, bulkData.parallel());
-
             std::vector<size_t> counts;
             stk::mesh::comm_mesh_counts(bulkData, counts);
 
@@ -1411,7 +1406,6 @@ TEST(ElementGraph, test_element_death)
 
             stk::mesh::Part& active = meta.declare_part("active", stk::topology::ELEMENT_RANK);
             stk::io::fill_mesh(filename, bulkData);
-            stk::io::write_mesh("orig.exo", bulkData);
 
             double start_graph = stk::wall_time();
 
@@ -1471,9 +1465,6 @@ TEST(ElementGraph, test_element_death)
             }
 
             std::cerr << os.str();
-
-            stk::mesh::Selector activeSelector(active);
-            stk::io::write_mesh_subset("out.exo", bulkData, activeSelector);
         }
     }
 }
@@ -1734,6 +1725,7 @@ TEST(ElementDeath, test_element_death_with_restart)
             elementDeathTest.kill_element(2);
             elementDeathTest.verify_mesh_after_killing_element_2();
         }
+        stk::unit_test_util::delete_mesh("elemDeathRestartFile.exo");
     }
 }
 
@@ -4698,7 +4690,6 @@ TEST(ElemGraph, get_all_sides_sideset_including_ghosts)
         stk::mesh::BulkData bulk(meta, comm, stk::mesh::BulkData::AUTO_AURA);
         stk::io::fill_mesh("generated:1x1x2", bulk);
         add_elem3_on_proc_1(bulk);
- stk::io::write_mesh("gen1x1x2.g", bulk);
 
         bool includeAuraElementSides = true;
         std::vector<stk::mesh::SideSetEntry> sides = stk::mesh::SkinMeshUtil::get_all_sides_sideset(bulk, meta.universal_part(), includeAuraElementSides);

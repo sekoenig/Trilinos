@@ -1,34 +1,8 @@
-// Copyright(C) 1999-2017 National Technology & Engineering Solutions
+// Copyright(C) 1999-2020 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
-//
-//     * Redistributions in binary form must reproduce the above
-//       copyright notice, this list of conditions and the following
-//       disclaimer in the documentation and/or other materials provided
-//       with the distribution.
-//
-//     * Neither the name of NTESS nor the names of its
-//       contributors may be used to endorse or promote products derived
-//       from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// 
+// See packages/seacas/LICENSE for details
 
 #include <Ioss_BoundingBox.h>  // for AxisAlignedBoundingBox
 #include <Ioss_DatabaseIO.h>   // for DatabaseIO
@@ -45,6 +19,41 @@
 #include <numeric>
 #include <string> // for string
 #include <vector> // for vector
+
+namespace {
+  int64_t get_cell_count(int ni, int nj, int nk, int index_dim)
+  {
+    int64_t cell_count = 0;
+    if (index_dim == 1) {
+      cell_count = static_cast<int64_t>(ni);
+    }
+    else if (index_dim == 2) {
+      cell_count = static_cast<int64_t>(ni) * nj;
+    }
+    else if (index_dim == 3) {
+      cell_count = static_cast<int64_t>(ni) * nj * nk;
+    }
+    return cell_count;
+  }
+
+  int64_t get_node_count(int ni, int nj, int nk, int index_dim)
+  {
+    int64_t cell_count = get_cell_count(ni, nj, nk, index_dim);
+    int64_t node_count = 0;
+    if (cell_count > 0) {
+      if (index_dim == 1) {
+        node_count = static_cast<int64_t>(ni + 1);
+      }
+      else if (index_dim == 2) {
+        node_count = static_cast<int64_t>(ni + 1) * (nj + 1);
+      }
+      else if (index_dim == 3) {
+        node_count = static_cast<int64_t>(ni + 1) * (nj + 1) * (nk + 1);
+      }
+    }
+    return node_count;
+  }
+} // namespace
 
 namespace Ioss {
   class Field;
@@ -88,53 +97,30 @@ namespace Ioss {
   StructuredBlock::StructuredBlock(DatabaseIO *io_database, const std::string &my_name,
                                    int index_dim, int ni, int nj, int nk, int off_i, int off_j,
                                    int off_k, int glo_ni, int glo_nj, int glo_nk)
-      : EntityBlock(io_database, my_name, Ioss::Hex8::name,
-                    static_cast<int64_t>(ni) * (nj > 0 ? nj : 1) * (nk > 0 ? nk : 1)),
+      : EntityBlock(io_database, my_name, Ioss::Hex8::name, get_cell_count(ni, nj, nk, index_dim)),
         m_ni(ni), m_nj(nj), m_nk(nk), m_offsetI(off_i), m_offsetJ(off_j), m_offsetK(off_k),
         m_niGlobal(glo_ni == 0 ? m_ni : glo_ni), m_njGlobal(glo_nj == 0 ? m_nj : glo_nj),
         m_nkGlobal(glo_nk == 0 ? m_nk : glo_nk),
-        m_nodeBlock(io_database, my_name + "_nodes", (m_ni + 1) * (m_nj + 1) * (m_nk + 1),
+        m_nodeBlock(io_database, my_name + "_nodes", get_node_count(m_ni, m_nj, m_nk, index_dim),
                     index_dim)
   {
+    m_nodeBlock.property_add(Property("IOSS_INTERNAL_CONTAINED_IN", this));
+
     SMART_ASSERT(index_dim == 1 || index_dim == 2 || index_dim == 3)(index_dim);
 
-    int64_t cell_count        = 0;
-    int64_t node_count        = 0;
-    int64_t global_cell_count = 0;
-    int64_t global_node_count = 0;
-
-    if (index_dim == 1) {
-      cell_count = m_ni;
-      node_count = cell_count == 0 ? 0 : (m_ni + 1);
-
-      global_cell_count = m_niGlobal;
-      global_node_count = global_cell_count == 0 ? 0 : (m_niGlobal + 1);
-    }
-    else if (index_dim == 2) {
-      cell_count = static_cast<int64_t>(m_ni) * m_nj;
-      node_count = cell_count == 0 ? 0 : static_cast<int64_t>(m_ni + 1) * (m_nj + 1);
-
-      global_cell_count = static_cast<int64_t>(m_niGlobal) * m_njGlobal;
-      global_node_count =
-          global_cell_count == 0 ? 0 : static_cast<int64_t>(m_niGlobal + 1) * (m_njGlobal + 1);
-    }
-    else if (index_dim == 3) {
-      cell_count = static_cast<int64_t>(m_ni) * m_nj * m_nk;
-      node_count = cell_count == 0 ? 0 : static_cast<int64_t>(m_ni + 1) * (m_nj + 1) * (m_nk + 1);
-
-      global_cell_count = static_cast<int64_t>(m_niGlobal) * m_njGlobal * m_nkGlobal;
-      global_node_count = global_cell_count == 0 ? 0
-                                                 : static_cast<int64_t>(m_niGlobal + 1) *
-                                                       (m_njGlobal + 1) * (m_nkGlobal + 1);
-    }
+    int64_t cell_count        = get_cell_count(m_ni, m_nj, m_nk, index_dim);
+    int64_t node_count        = get_node_count(m_ni, m_nj, m_nk, index_dim);
+    int64_t global_cell_count = get_cell_count(m_niGlobal, m_njGlobal, m_nkGlobal, index_dim);
+    int64_t global_node_count = get_node_count(m_niGlobal, m_njGlobal, m_nkGlobal, index_dim);
 
     SMART_ASSERT(global_cell_count >= cell_count)(global_cell_count)(cell_count);
     SMART_ASSERT(global_node_count >= node_count)(global_node_count)(node_count);
     SMART_ASSERT(m_niGlobal >= m_ni)(m_niGlobal)(m_ni);
     SMART_ASSERT(m_njGlobal >= m_nj)(m_njGlobal)(m_nj);
     SMART_ASSERT(m_nkGlobal >= m_nk)(m_nkGlobal)(m_nk);
-
-    m_nodeBlock.property_add(Property("IOSS_INTERNAL_CONTAINED_IN", this, false));
+    SMART_ASSERT(m_niGlobal >= m_ni + m_offsetI)(m_niGlobal)(m_ni)(m_offsetI);
+    SMART_ASSERT(m_njGlobal >= m_nj + m_offsetJ)(m_njGlobal)(m_nj)(m_offsetJ);
+    SMART_ASSERT(m_nkGlobal >= m_nk + m_offsetK)(m_nkGlobal)(m_nk)(m_offsetK);
 
     properties.add(Property("component_degree", index_dim));
     properties.add(Property("node_count", node_count));
@@ -180,7 +166,6 @@ namespace Ioss {
       fields.add(Ioss::Field("mesh_model_coordinates_y", Ioss::Field::REAL, IOSS_SCALAR(),
                              Ioss::Field::MESH, node_count));
     }
-
     if (index_dim > 2) {
       fields.add(Ioss::Field("mesh_model_coordinates_z", Ioss::Field::REAL, IOSS_SCALAR(),
                              Ioss::Field::MESH, node_count));

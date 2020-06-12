@@ -241,7 +241,8 @@ int main(int argc, char *argv[]) {
 
     if( !Amesos2::query(solverName) ){
       std::cerr << solverName << " not enabled.  Exiting..." << endl;
-      return EXIT_FAILURE;
+      return EXIT_SUCCESS;        // Otherwise CTest will pick it up as
+                                  // failure, which it isn't really
     }
 
     RCP<Amesos2::Solver<MAT,MV> > solver = Amesos2::create<MAT,MV>(solverName, A, Xhat, RHS);
@@ -395,8 +396,7 @@ readCrsMatrixFromFile (const std::string& matrixFilename,
      "Failed to open file \"" << matrixFilename << "\" on Process 0.");
 
   using Teuchos::RCP;
-  //maxNumElementsPerRow as defined by the .mm files that go with this example
-  RCP<MAT> A (new MAT (rowMap, 2));
+  RCP<MAT> A;
 
   if (myRank == 0) 
   {
@@ -409,6 +409,10 @@ readCrsMatrixFromFile (const std::string& matrixFilename,
       std::getline (inFile, line);
     } 
 
+    std::map<GO, size_t> counts;
+    Teuchos::Array<Scalar> vals;
+    Teuchos::Array<GO> gblRowInds;
+    Teuchos::Array<GO> gblColInds;
     while (inFile) {
       std::getline (inFile, line);
       GO gblRowInd {};
@@ -421,8 +425,24 @@ readCrsMatrixFromFile (const std::string& matrixFilename,
           gblRowInd -= 1 ;
           gblColInd -= 1 ;
         }
-        A->insertGlobalValues (gblRowInd, LO (1), &val, &gblColInd);
+        counts[gblRowInd]++;
+        vals.push_back(val);
+        gblRowInds.push_back(gblRowInd);
+        gblColInds.push_back(gblColInd);
       }
+    }
+
+    // Max number of entries in any row
+    using pair_type = decltype(counts)::value_type;
+    auto pr = std::max_element(
+        std::begin(counts),
+        std::end(counts),
+        [] (pair_type const& p1, pair_type const& p2){ return p1.second < p2.second; }
+    );
+    size_t maxCount = (counts.empty()) ? size_t(0) : pr->second;
+    A = Teuchos::rcp(new MAT(rowMap, maxCount));
+    for (typename Teuchos::Array<GO>::size_type i=0; i<gblRowInds.size(); i++) {
+      A->insertGlobalValues (gblRowInds[i], gblColInds(i,1), vals(i,1));
     }
   }
 

@@ -53,7 +53,7 @@
 #include "Xpetra_Export.hpp"
 #include "Xpetra_Exceptions.hpp"
 
-#include "Xpetra_TpetraMap.hpp"
+#include "Xpetra_TpetraMap_decl.hpp"
 #include "Tpetra_Export.hpp"
 
 // Note: 'export' is a reserved keyword in C++. Do not use 'export' as a variable name.
@@ -153,6 +153,9 @@ class TpetraExport
 
     //! The target Map used to construct this Export.
     Teuchos::RCP<const Map<LocalOrdinal, GlobalOrdinal, Node>> getTargetMap() const;
+
+    //! Set distributor parameters.
+    void setDistributorParameters(const Teuchos::RCP<Teuchos::ParameterList> params) const;
 
 
     //@}

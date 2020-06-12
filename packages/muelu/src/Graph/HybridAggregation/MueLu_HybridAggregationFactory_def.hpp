@@ -109,6 +109,7 @@ namespace MueLu {
     SET_VALID_ENTRY("aggregation: preserve Dirichlet points");
     SET_VALID_ENTRY("aggregation: allow user-specified singletons");
     SET_VALID_ENTRY("aggregation: error on nodes with no on-rank neighbors");
+    SET_VALID_ENTRY("aggregation: phase2a include root");
     SET_VALID_ENTRY("aggregation: phase3 avoid singletons");
 
     // From StructuredAggregationFactory
@@ -301,7 +302,7 @@ namespace MueLu {
     Teuchos::Array<LO> coarseRate;
     try {
       coarseRate = Teuchos::fromStringToArray<LO>(coarseningRate);
-    } catch(const Teuchos::InvalidArrayStringRepresentation e) {
+    } catch(const Teuchos::InvalidArrayStringRepresentation& e) {
       GetOStream(Errors,-1) << " *** \"aggregation: coarsening rate\" must be a string convertible into an array! *** "
                             << std::endl;
       throw e;

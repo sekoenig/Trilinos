@@ -1,5 +1,16 @@
 
 TRIBITS_ADD_EXECUTABLE(
+ Utst_utils
+ SOURCES Utst_utils.C
+)
+
+TRIBITS_ADD_TEST(
+	Utst_utils
+	NAME Utst_utils
+	NUM_MPI_PROCS 1
+)
+
+TRIBITS_ADD_EXECUTABLE(
  Utst_ioel
  SOURCES Utst_ioel.C
 )
@@ -9,6 +20,17 @@ TRIBITS_ADD_TEST(
 	NAME Utst_ioel
 	NUM_MPI_PROCS 1
 )
+
+TRIBITS_ADD_EXECUTABLE(
+ Utst_blob_write_read
+ SOURCES Utst_blob_write_read.C
+)
+
+TRIBITS_ADD_TEST(
+        Utst_blob_write_read
+	NAME Utst_blob_write_read
+	NUM_MPI_PROCS 1
+  )
 
 TRIBITS_ADD_EXECUTABLE(
  Utst_sort

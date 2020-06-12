@@ -260,20 +260,118 @@ cores.
 
 These scripts support installing Trilinos as a byproduct of running the `ctest
 -S` driver scripts.  These installations are often done as the `jenkins`
-entity account from the `jenkins-srn.sandia.gov` site (but other setups are
-possible as well).  In order to protect installations of Trilinos, a strategy
-is implemented that performs the final install using the `atdm-devops-admin`
-account using a setuid program called `run-as-atdm-devops-admin` that in
-installed on each system.  The setup of that program under the
-`atdm-devops-admin` user account is described in:
-
-* https://gitlab.sandia.gov/atdm-devops-admin/run-as-atdm-devops-admin/blob/master/README.md
-
-This documentation assumes that the program 'run-as-atdm-devops-admin'
-correctly installed on each given system.
+entity account from the `jenkins-srn.sandia.gov` site or as the
+'atdm-devops-admin' entity account (e.g. from a cron job).  In order to
+properly set up installations of Trilinos on all of the supported systems such
+that the `atdm-devops-admin` entity account can edit and remote the installs,
+some features of TriBITS are used to run `chgrp` and `chmod` on the installed
+directories and files.  In addition, automatic `<date>/` subdirectories are
+created which for each testing day.
 
 The following (bash) environment variables determine the behavior of the ATDM
 `ctest -S` scripts for building and installing Trilinos using this scheme:
+
+* `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE=<install-prefix-base>`:
+  Defines the base directory installs of Trilinos under
+  `<install-prefix-base>/<date>/<system-build-name>`.  This directory
+  `<install-prefix-base>` must be owned by the user 'atdm-devops-admin', the
+  group 'wg-run-as-atdm-devops' and it should be world readable and group
+  read/writable.  (If `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE==""`
+  and `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT!=""` and
+  `ATDM_CONFIG_USE_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT=="1"`, then
+  `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE` is set to
+  `${ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT}`.)  (The var
+  `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE` is given a default value
+  in the file `cmake/std/atdm/atdm_devops_install_defaults.sh` if it is not
+  already set in `cmake/std/atdm/<system_name>/environment.sh`.)
+
+* `ATDM_CONFIG_SET_GROUP_AND_PERMISSIONS_ON_INSTALL_BASE_DIR=<base-dir>`:
+  Defines the base directory for setting the group and permissions.  If not
+  set in the env already and if
+  `${ATDM_CONFIG_USE_SET_GROUP_AND_PERMISSIONS_ON_INSTALL_BASE_DIR_DEFAULT}==1`,
+  then this will bet set to `<install-prefix-base>/<date>`.
+
+* `ATDM_CONFIG_MAKE_INSTALL_GROUP`: Defines the group that will get set on all
+  files and dirs under
+  `${ATDM_CONFIG_SET_GROUP_AND_PERMISSIONS_ON_INSTALL_BASE_DIR}`.  If not
+  already set in the env, then this will be set to
+  `${ATDM_CONFIG_MAKE_INSTALL_GROUP_DEFAULT}` if
+  `${ATDM_CONFIG_USE_MAKE_INSTALL_GROUP_DEFAULT}==1`.  (The var
+  `ATDM_CONFIG_MAKE_INSTALL_GROUP_DEFAULT` is given a default value in the
+  file `cmake/std/atdm/atdm_devops_install_defaults.sh` if it is not already
+  set in `cmake/std/atdm/<system_name>/environment.sh`.)
+
+* `ATDM_CONFIG_USE_JENKINS_INSTALL_DEFAULTS=[0|1]`: Set to '1' to use the
+  defaults for the variables that have defaults (i.e. this sets the
+  environment variables
+  `ATDM_CONFIG_USE_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT=1`,
+  `ATDM_CONFIG_USE_SET_GROUP_AND_PERMISSIONS_ON_INSTALL_BASE_DIR_DEFAULT=1`,
+  and `ATDM_CONFIG_USE_MAKE_INSTALL_GROUP_DEFAULT=1`.)
+
+The defaults for some of these can be set for all systems in the file
+`cmake/std/atdm/atdm_devops_install_defaults.sh`.  These defaults can then be
+overridden in the `cmake/std/atdm/<system_name>/environment.sh` for each
+system.
+
+Then the cron or jenkins driver jobs can activate the usage of these defaults
+and perform standard installs as a bi-product of the testing process as
+follows:
+
+```
+export ATDM_CONFIG_USE_JENKINS_INSTALL_DEFAULTS=1
+export CTEST_DO_INSTALL=ON
+${WORKSPACE}/Trilinos/cmake/ctest/drivers/atdm/smart-jenkins-driver.sh
+```
+
+That will result in the install of Trilinos under:
+
+```
+<install-prefix-base>/<date>/<system-build-name>/
+```
+
+where all of the files and directories `<install-prefix-base>/<date>` on down
+will be owned by the group `${ATDM_CONFIG_MAKE_INSTALL_GROUP}` and will be
+given group read/write and "other" read access.
+
+NOTE:
+
+* The `<date>` in the format `YYYY-MM-DD` is automatically determined to
+  correspond to the CDash `date=<date>` field for the given build of Trilinos
+  (assuming that `ctest_start()` is called almost immediately which it should
+  be within a second or less).
+
+* The build name `<system-build-name>` is taken from the full build name
+  stored in the environment variable `${JOB_NAME}` (with `Trilinos-atdm-`
+  removed from the beginning of the Jenkins job name).
+
+Internally, for each build, the environment variable
+`ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX` is set to this full install path
+(which then gets picked up in the `ATDMDevEnvSettings.cmake` file during the
+CMake configure step).
+
+**WARNING:** Do **NOT** directly set the environment variable
+`ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX`.  That would result in every Trilinos
+build getting installed on top of each other in the same installation
+directory!
+
+
+## Installing as the 'atdm-devops-admin' account using the 'jenkins' entity account
+
+In order to protect the installation Trilinos from other 'jenkins' jobs, a
+strategy has been implemented that allows performs the final install using the
+`atdm-devops-admin` account using a setuid program called
+`run-as-atdm-devops-admin` that in installed on each supported system.  The
+setup of that program under the `atdm-devops-admin` user account is described
+in:
+
+* https://gitlab.sandia.gov/atdm-devops-admin/run-as-atdm-devops-admin/blob/master/README.md
+
+This documentation below assumes that the program 'run-as-atdm-devops-admin'
+is correctly installed on each given system.
+
+The following additional (bash) environment variables determine the behavior
+of the ATDM `ctest -S` scripts for building and installing Trilinos using this
+scheme:
 
 * `ATDM_CONFIG_WORKSPACE_BASE=<workspace-base>`: Defines a different base
   workspace directory under which the subdir `SRC_AND_BUILD` is created and
@@ -299,36 +397,16 @@ The following (bash) environment variables determine the behavior of the ATDM
   `ATDM_CONFIG_INSTALL_PBP_RUNNER` is set to
   `${ATDM_CONFIG_INSTALL_PBP_RUNNER_DEFAULT}`)
 
-* `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE=<install-prefix-base>`:
-  Defines the base directory installs of Trilinos under
-  `<install-prefix-base>/<date>/<system-build-name>`.  This directory must be
-  owned by the 'atdm-devops-admin' user and should be world readable (but not
-  group or world writable).  (If
-  `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE==""` and
-  `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT!=""` and
-  `ATDM_CONFIG_USE_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT=="1"`, then
-  `ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE` is set to
-  `${ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT}`.)
-
-* `ATDM_CONFIG_USE_JENKINS_INSTALL_DEFAULTS=[0|1]`: Set to '1' to use the
-  defaults for the above three variables (i.e. this sets the environment variables
-  `ATDM_CONFIG_USE_WORKSPACE_BASE_DEFAULT=1`,
-  `ATDM_CONFIG_USE_INSTALL_PBP_RUNNER_DEFAULT=1`,
-  `ATDM_CONFIG_USE_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT=1`).
-
-The variables `ATDM_CONFIG_WORKSPACE_BASE_DEFAULT`,
-`ATDM_CONFIG_INSTALL_PBP_RUNNER_DEFAULT` and
-`ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT` are meant to be set
-in the `atdm/<system_name>/environment.sh` file as, for example:
+The variables `ATDM_CONFIG_WORKSPACE_BASE_DEFAULT` and
+`ATDM_CONFIG_INSTALL_PBP_RUNNER_DEFAULT` are meant to be set in the
+`atdm/<system_name>/environment.sh` file as, for example:
 
 ```
 export ATDM_CONFIG_WORKSPACE_BASE_DEFAULT=/home/atdm-devops-admin/jenkins
-export ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX_DATE_BASE_DEFAULT=/home/atdm-devops-admin/trilinos_installs
 export ATDM_CONFIG_INSTALL_PBP_RUNNER_DEFAULT=/home/atdm-devops-admin/tools/run-as-atdm-devops-admin
 ```
 
-Then the jenkins driver jobs can activate the usage of these defaults and
-perform installs as a bi-product by running:
+Running with:
 
 ```
 export ATDM_CONFIG_USE_JENKINS_INSTALL_DEFAULTS=1
@@ -336,10 +414,10 @@ export CTEST_DO_INSTALL=ON
 ${WORKSPACE}/Trilinos/cmake/ctest/drivers/atdm/smart-jenkins-driver.sh
 ```
 
-This will result in the alternate workspace directory being create as:
+will result in the alternate workspace directory being create as:
 
 ```
-export WORKSPACE=${ATDM_CONFIG_WORKSPACE_BASE}/${ATDM_CONFIG_KNOWN_SYSTEM_NAME}/${JOB_NAME}
+export WORKSPACE=${ATDM_CONFIG_WORKSPACE_BASE}/${ATDM_CONFIG_SYSTEM_NAME}/${JOB_NAME}
 ```
 
 The inner clone of Trilinos and the build of Trilinos will be performed under
@@ -351,27 +429,6 @@ under:
 ```
 <install-prefix-base>/<date>/<system-build-name>/
 ```
-
-where:
-
-* The `<date>` in the format `YYYY-MM-DD` is automatically determined to
-  correspond to the CDash `date=<date>` field for the given build of Trilinos
-  (assuming that `ctest_start()` is called almost immediately which it should
-  be within a second or less).
-
-* The build name `<system-build-name>` is taken from the full build name
-  stored in the environment variable `${JOB_NAME}` (with `Trilinos-atdm-`
-  removed from the beginning of the Jenkins job name).
-
-Internally, for each build, the environment variable
-`ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX` is set to this full install path
-(which then gets picked up in the `ATDMDevEnvSettings.cmake` file during the
-CMake configure step).
-
-**WARNING:** Do **NOT** directly set the environment variable
-`ATDM_CONFIG_TRIL_CMAKE_INSTALL_PREFIX`.  That would result in every Trilinos
-build getting installed on top of each other in the same installation
-directory!
 
 
 <a name="setup-jenkins-jobs"/>
@@ -411,8 +468,6 @@ The following `<system_name>` sub-directories exist (in alphabetical order):
 * `cee-rhel6/`: Contains files to drive builds on CEE LAnL RHEL6 machines with
   a SEMS environment.
 
-* `tlcc2/`: Contains files to drive builds on the SRN HPC tlcc2 machines.
-
 * `mutrino/`: Contains files to drive builds on SNL machine mutrino.
 
 * `ride/`: Contains the files to drive builds on the SRN test bed machine
@@ -432,6 +487,9 @@ The following `<system_name>` sub-directories exist (in alphabetical order):
 * `shiller/`: Contains the files to drive builds on the SRN test bed machine
   `shiller` which also can be run on the SON machine `hansen`.
 
+* `tlcc2/`: Contains files to drive builds on the SRN HPC TLCC-2 machines
+  (e.g. 'chama', 'skybridge', etc.).
+
 * `waterman/`: Contains files to drive builds on the SRN Test Bed machine
   `waterman`.
 
@@ -440,19 +498,32 @@ The following `<system_name>` sub-directories exist (in alphabetical order):
 
 ## How to add a new system
 
-To add a new system, first add a new `elseif` statement for the new system in
-the file:
+To add a new system, first update the file:
 
 ```
-  Trilinos/cmake/std/atdm/utils/get_known_system_name.sh
+  Trilinos/cmake/std/atdm/utils/get_known_system_info.sh
 ```
 
-Note that more than one `hostname` machine may map to the same
-`<new_system_name>` (e.g. both `white` and `ride` machines map to the system
-`ride`).
+First, add the new system name to the list variable:
+
+```
+ATDM_KNOWN_SYSTEM_NAMES_LIST=(
+  ...
+  )
+```
+
+Second, if the system selection is done by matching to the `hostname`, then
+add a new `elif` statement for that set of machines.  Note that more than one
+`hostname` machine may map to the same `<new_system_name>` (e.g. both `white`
+and `ride` machines map to the system env `ride`).
+
+However, if adding a new system type that will run on many machines and not
+looking at the `hostname` on the machine, then add a new `if` block to the
+section for the logic.  For an example, see how the system types `tlcc2`,
+`sems-rhel6`, and `cee-rhel6` are handled.
 
 The variable `ATDM_HOSTNAME` (set to exported variable
-`ATDM_CONFIG_KNOWN_HOSTNAME`) is used for the CDash site name.  This makes it
+`ATDM_CONFIG_CDASH_HOSTNAME`) is used for the CDash site name.  This makes it
 so that any node `white05`, `white12`, etc. just says `white` on CDash.  This
 is important for the CDash 'next' and 'previous' relationships to work.  (But
 for `CTEST_TEST_TYPE=Experimental` builds, the real `hostname` is used which
@@ -461,7 +532,7 @@ ensures that queries with `cdash/queryTests.php` don't accidentally pick up
 tests from "Experimental" builds.)
 
 The variable `ATDM_SYSTEM_NAME` (set to the exported variable
-`ATDM_CONFIG_KNOWN_SYSTEM_NAME`) must be set to `<new_system_name>` which is
+`ATDM_CONFIG_SYSTEM_NAME`) must be set to `<new_system_name>` which is
 selected for this new system type.
 
 Then, create a new directory for the new system called `<new_system_name>`:

@@ -87,6 +87,85 @@ correctDisplacement(Thyra::VectorBase<Scalar>& d,
 
 
 template<class Scalar>
+void StepperNewmarkImplicitAForm<Scalar>::setBeta(Scalar beta)
+{
+  if (schemeName_ != "User Defined") {
+    *out_ << "\nWARNING: schemeName != 'User Defined' (=" <<schemeName_<< ").\n"
+          << " Not setting beta, and leaving as beta = " << beta_ << "!\n";
+    return;
+  }
+
+  beta_ = beta;
+
+  if (beta_ == 0.0) {
+    *out_ << "\nWARNING: Running (implicit implementation of) Newmark "
+          << "Implicit a-Form Stepper with Beta = 0.0, which \n"
+          << "specifies an explicit scheme.  Mass lumping is not possible, "
+          << "so this will be slow!  To run explicit \n"
+          << "implementation of Newmark Implicit a-Form Stepper, please "
+          << "re-run with 'Stepper Type' = 'Newmark Explicit a-Form'.\n"
+          << "This stepper allows for mass lumping when called through "
+          << "Piro::TempusSolver.\n";
+  }
+
+  TEUCHOS_TEST_FOR_EXCEPTION( (beta_ > 1.0) || (beta_ < 0.0),
+    std::logic_error,
+    "\nError in 'Newmark Implicit a-Form' stepper: invalid value of Beta = "
+    << beta_ << ".  Please select Beta >= 0 and <= 1. \n");
+}
+
+
+template<class Scalar>
+void StepperNewmarkImplicitAForm<Scalar>::setGamma(Scalar gamma)
+{
+  if (schemeName_ != "User Defined") {
+    *out_ << "\nWARNING: schemeName != 'User Defined' (=" <<schemeName_<< ").\n"
+          << " Not setting gamma, and leaving as gamma = " << gamma_ << "!\n";
+    return;
+  }
+
+  gamma_ = gamma;
+
+  TEUCHOS_TEST_FOR_EXCEPTION( (gamma_ > 1.0) || (gamma_ < 0.0),
+    std::logic_error,
+    "\nError in 'Newmark Implicit a-Form' stepper: invalid value of Gamma ="
+    <<gamma_ << ".  Please select Gamma >= 0 and <= 1. \n");
+}
+
+
+template<class Scalar>
+void StepperNewmarkImplicitAForm<Scalar>::setSchemeName(
+  std::string schemeName)
+{
+  schemeName_ = schemeName;
+
+  if (schemeName_ == "Average Acceleration") {
+    beta_= 0.25; gamma_ = 0.5;
+  }
+  else if (schemeName_ == "Linear Acceleration") {
+    beta_= 0.25; gamma_ = 1.0/6.0;
+  }
+  else if (schemeName_ == "Central Difference") {
+    beta_=  0.0; gamma_ = 0.5;
+  }
+  else if (schemeName_ == "User Defined") {
+    beta_= 0.25; gamma_ = 0.5; // Use defaults until setBeta and setGamma calls.
+  }
+  else {
+    TEUCHOS_TEST_FOR_EXCEPTION(true,
+       std::logic_error,
+       "\nError in Tempus::StepperNewmarkImplicitAForm!  "
+       <<"Invalid Scheme Name = " << schemeName_ <<".  \n"
+       <<"Valid Scheme Names are: 'Average Acceleration', "
+       <<"'Linear Acceleration', \n"
+       <<"'Central Difference' and 'User Defined'.\n");
+  }
+
+  this->isInitialized_ = false;
+}
+
+
+template<class Scalar>
 StepperNewmarkImplicitAForm<Scalar>::StepperNewmarkImplicitAForm() :
   out_(Teuchos::VerboseObjectBase::getDefaultOStream())
 {
@@ -94,27 +173,46 @@ StepperNewmarkImplicitAForm<Scalar>::StepperNewmarkImplicitAForm() :
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
 
-  this->setParameterList(Teuchos::null);
-  this->modelWarning();
+  this->setStepperType(        "Newmark Implicit a-Form");
+  this->setUseFSAL(            this->getUseFSALDefault());
+  this->setICConsistency(      this->getICConsistencyDefault());
+  this->setICConsistencyCheck( this->getICConsistencyCheckDefault());
+  this->setZeroInitialGuess(   false);
+  this->setSchemeName(         "Average Acceleration");
+
+  this->setObserver();
+  this->setDefaultSolver();
 }
 
 
 template<class Scalar>
 StepperNewmarkImplicitAForm<Scalar>::StepperNewmarkImplicitAForm(
   const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-  Teuchos::RCP<Teuchos::ParameterList> pList) :
-  out_(Teuchos::VerboseObjectBase::getDefaultOStream())
+  const Teuchos::RCP<StepperObserver<Scalar> >& obs,
+  const Teuchos::RCP<Thyra::NonlinearSolverBase<Scalar> >& solver,
+  bool useFSAL,
+  std::string ICConsistency,
+  bool ICConsistencyCheck,
+  bool zeroInitialGuess,
+  std::string schemeName,
+  Scalar beta,
+  Scalar gamma)
+  : out_(Teuchos::VerboseObjectBase::getDefaultOStream())
 {
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
+  this->setStepperType(        "Newmark Implicit a-Form");
+  this->setUseFSAL(            useFSAL);
+  this->setICConsistency(      ICConsistency);
+  this->setICConsistencyCheck( ICConsistencyCheck);
+  this->setZeroInitialGuess(   zeroInitialGuess);
+  this->setSchemeName(         schemeName);
+  this->setBeta(               beta);
+  this->setGamma(              gamma);
 
-  this->setParameterList(pList);
+  this->setObserver(obs);
+  this->setSolver(solver);
 
-  if (appModel == Teuchos::null) {
-    this->modelWarning();
-  }
-  else {
+  if (appModel != Teuchos::null) {
+
     this->setModel(appModel);
     this->initialize();
   }
@@ -128,27 +226,13 @@ void StepperNewmarkImplicitAForm<Scalar>::setModel(
 #ifdef VERBOSE_DEBUG_OUTPUT
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
-  this->validSecondOrderODE_DAE(appModel);
+  validSecondOrderODE_DAE(appModel);
   auto wrapperModel =
     Teuchos::rcp(new WrapperModelEvaluatorSecondOrder<Scalar>(appModel,
                                               "Newmark Implicit a-Form"));
   this->wrapperModel_ = wrapperModel;
-}
 
-
-template<class Scalar>
-void StepperNewmarkImplicitAForm<Scalar>::initialize()
-{
-  TEUCHOS_TEST_FOR_EXCEPTION( this->wrapperModel_ == Teuchos::null,
-    std::logic_error,
-    "Error - Need to set the model, setModel(), before calling "
-    "StepperNewmarkImplicitAForm::initialize()\n");
-
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  this->setParameterList(this->stepperPL_);
-  this->setSolver();
+  this->isInitialized_ = false;
 }
 
 
@@ -232,13 +316,13 @@ void StepperNewmarkImplicitAForm<Scalar>::setInitialConditions(
 
     // Compute initial acceleration using initial displacement
     // and initial velocity.
-    if (this->initial_guess_ != Teuchos::null) {
+    if (this->initialGuess_ != Teuchos::null) {
       TEUCHOS_TEST_FOR_EXCEPTION(
-        !((xDotDot->space())->isCompatible(*this->initial_guess_->space())),
+        !((xDotDot->space())->isCompatible(*this->initialGuess_->space())),
         std::logic_error,
         "Error - User-provided initial guess for Newton is not compatible\n"
         "        with solution vector!\n");
-      Thyra::copy(*this->initial_guess_, xDotDot.ptr());
+      Thyra::copy(*this->initialGuess_, xDotDot.ptr());
     }
     else {
       Thyra::put_scalar(0.0, xDotDot.ptr());
@@ -290,11 +374,11 @@ void StepperNewmarkImplicitAForm<Scalar>::setInitialConditions(
     appInArgs.set_t        (initialState->getTime()    );
 
     this->wrapperModel_->getAppModel()->evalModel(appInArgs, appOutArgs);
- 
+
     Scalar reldiff = Thyra::norm(*f);
-    Scalar normx = Thyra::norm(*x); 
+    Scalar normx = Thyra::norm(*x);
     Scalar eps = Scalar(100.0)*std::abs(Teuchos::ScalarTraits<Scalar>::eps());
-    if (normx > eps*reldiff) reldiff /= normx; 
+    if (normx > eps*reldiff) reldiff /= normx;
 
     if (reldiff > eps) {
       RCP<Teuchos::FancyOStream> out = this->getOStream();
@@ -327,6 +411,8 @@ void StepperNewmarkImplicitAForm<Scalar>::takeStep(
 #ifdef VERBOSE_DEBUG_OUTPUT
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
+  this->checkInitialized();
+
   using Teuchos::RCP;
 
   TEMPUS_FUNC_TIME_MONITOR("Tempus::StepperNewmarkImplicitAForm::takeStep()");
@@ -387,6 +473,7 @@ void StepperNewmarkImplicitAForm<Scalar>::takeStep(
 
     workingState->setSolutionStatus(sStatus);  // Converged --> pass.
     workingState->setOrder(this->getOrder());
+    workingState->computeNorms(currentState);
   }
   return;
 }
@@ -408,122 +495,56 @@ getDefaultStepperState()
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
   Teuchos::RCP<Tempus::StepperState<Scalar> > stepperState =
-    rcp(new StepperState<Scalar>(description()));
+    rcp(new StepperState<Scalar>(this->getStepperType()));
   return stepperState;
 }
 
 
 template<class Scalar>
-std::string StepperNewmarkImplicitAForm<Scalar>::description() const
+void StepperNewmarkImplicitAForm<Scalar>::describe(
+  Teuchos::FancyOStream               &out,
+  const Teuchos::EVerbosityLevel      verbLevel) const
 {
 #ifdef VERBOSE_DEBUG_OUTPUT
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
-  std::string name = "Newmark Implicit a-Form";
-  return(name);
+
+  out << std::endl;
+  Stepper<Scalar>::describe(out, verbLevel);
+  StepperImplicit<Scalar>::describe(out, verbLevel);
+
+  out << "--- StepperNewmarkImplicitAForm ---\n";
+  out << "  schemeName_ = " << schemeName_ << std::endl;
+  out << "  beta_       = " << beta_       << std::endl;
+  out << "  gamma_      = " << gamma_      << std::endl;
+  out << "-----------------------------------" << std::endl;
 }
 
 
 template<class Scalar>
-void StepperNewmarkImplicitAForm<Scalar>::describe(
-   Teuchos::FancyOStream               &out,
-   const Teuchos::EVerbosityLevel      /* verbLevel */) const
+bool StepperNewmarkImplicitAForm<Scalar>::isValidSetup(Teuchos::FancyOStream & out) const
 {
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  out << description() << "::describe:" << std::endl
-      << "wrapperModel = " << this->wrapperModel_->description() << std::endl;
-}
+  bool isValidSetup = true;
 
+  if ( !Stepper<Scalar>::isValidSetup(out) ) isValidSetup = false;
 
-template <class Scalar>
-void StepperNewmarkImplicitAForm<Scalar>::setParameterList(
-  Teuchos::RCP<Teuchos::ParameterList> const& pList)
-{
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  if (pList == Teuchos::null) {
-    // Create default parameters if null, otherwise keep current parameters.
-    if (this->stepperPL_ == Teuchos::null) this->stepperPL_ = this->getDefaultParameters();
-  } else {
-    this->stepperPL_ = pList;
+  //if ( !StepperImplicit<Scalar>::isValidSetup(out) ) isValidSetup = false;
+  if (this->wrapperModel_->getAppModel() == Teuchos::null) {
+    isValidSetup = false;
+    out << "The application ModelEvaluator is not set!\n";
   }
-  // Can not validate because of optional Parameters.
-  //stepperPL_->validateParametersAndSetDefaults(*this->getValidParameters());
-  //Get beta and gamma from parameter list
-  //IKT, FIXME: does parameter list get validated somewhere?  validateParameters above is commented out...
 
-  Teuchos::RCP<Teuchos::ParameterList> stepperPL = this->stepperPL_;
-  std::string stepperType = stepperPL->get<std::string>("Stepper Type");
-  TEUCHOS_TEST_FOR_EXCEPTION( stepperType != "Newmark Implicit a-Form",
-    std::logic_error,
-       "Error - Stepper Type is not 'Newmark Implicit a-Form'!\n"
-       << "  Stepper Type = "<< stepperPL->get<std::string>("Stepper Type")
-       << "\n");
-  beta_ = 0.25; //default value
-  gamma_ = 0.5; //default value
-    Teuchos::VerboseObjectBase::getDefaultOStream();
-  if (this->stepperPL_->isSublist("Newmark Parameters")) {
-    Teuchos::ParameterList &newmarkPL =
-      this->stepperPL_->sublist("Newmark Parameters", true);
-    std::string scheme_name = newmarkPL.get("Scheme Name", "Not Specified");
-    if (scheme_name == "Not Specified") {
-      beta_ = newmarkPL.get("Beta", 0.25);
-      gamma_ = newmarkPL.get("Gamma", 0.5);
-      TEUCHOS_TEST_FOR_EXCEPTION( (beta_ > 1.0) || (beta_ < 0.0),
-        std::logic_error,
-        "\nError in 'Newmark Implicit a-Form' stepper: invalid value of Beta = "
-        << beta_ << ".  Please select Beta >= 0 and <= 1. \n");
-      TEUCHOS_TEST_FOR_EXCEPTION( (gamma_ > 1.0) || (gamma_ < 0.0),
-        std::logic_error,
-        "\nError in 'Newmark Implicit a-Form' stepper: invalid value of Gamma ="
-        <<gamma_ << ".  Please select Gamma >= 0 and <= 1. \n");
-      *out_ << "\nSetting Beta = " << beta_ << " and Gamma = " << gamma_
-            << " from Newmark Parameters in input file.\n";
-    }
-    else {
-      *out_ << "\nScheme Name = " << scheme_name << ".  Using values \n"
-            << "of Beta and Gamma for this scheme (ignoring values of "
-            << "Beta and Gamma \n"
-            << "in input file, if provided).\n";
-       if (scheme_name == "Average Acceleration") {
-         beta_ = 0.25; gamma_ = 0.5;
-       }
-       else if (scheme_name == "Linear Acceleration") {
-         beta_ = 0.25; gamma_ = 1.0/6.0;
-       }
-       else if (scheme_name == "Central Difference") {
-         beta_ = 0.0; gamma_ = 0.5;
-       }
-       else {
-         TEUCHOS_TEST_FOR_EXCEPTION(true,
-            std::logic_error,
-            "\nError in Tempus::StepperNewmarkImplicitAForm!  "
-            <<"Invalid Scheme Name = " << scheme_name <<".  \n"
-            <<"Valid Scheme Names are: 'Average Acceleration', "
-            <<"'Linear Acceleration', \n"
-            <<"'Central Difference' and 'Not Specified'.\n");
-       }
-       *out_ << "===> Beta = " << beta_ << ", Gamma = " << gamma_ << "\n";
-    }
-    if (beta_ == 0.0) {
-      *out_ << "\nWARNING: Running (implicit implementation of) Newmark "
-            << "Implicit a-Form Stepper with Beta = 0.0, which \n"
-            << "specifies an explicit scheme.  Mass lumping is not possible, "
-            << "so this will be slow!  To run explicit \n"
-            << "implementation of Newmark Implicit a-Form Stepper, please "
-            << "re-run with 'Stepper Type' = 'Newmark Explicit a-Form'.\n"
-            << "This stepper allows for mass lumping when called through "
-            << "Piro::TempusSolver.\n";
-    }
+  if (this->wrapperModel_ == Teuchos::null) {
+    isValidSetup = false;
+    out << "The wrapper ModelEvaluator is not set!\n";
   }
-  else {
-    *out_ << "\nNo Newmark Parameters sublist found in input file; using "
-          << "default values of Beta = "
-          << beta_ << " and Gamma = " << gamma_ << ".\n";
+
+  if (this->solver_ == Teuchos::null) {
+    isValidSetup = false;
+    out << "The solver is not set!\n";
   }
+
+  return isValidSetup;
 }
 
 
@@ -535,60 +556,19 @@ StepperNewmarkImplicitAForm<Scalar>::getValidParameters() const
   *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
 #endif
   Teuchos::RCP<Teuchos::ParameterList> pl = Teuchos::parameterList();
-  pl->setName("Default Stepper - " + this->description());
-  pl->set<std::string>("Stepper Type", this->description());
-  this->getValidParametersBasic(pl);
-  pl->set<bool>       ("Use FSAL", true);
-  pl->set<std::string>("Initial Condition Consistency", "Consistent");
-  pl->set<bool>       ("Zero Initial Guess", false);
-  pl->set<std::string>("Solver Name", "",
-    "Name of ParameterList containing the solver specifications.");
-
-  return pl;
-}
-template<class Scalar>
-Teuchos::RCP<Teuchos::ParameterList>
-StepperNewmarkImplicitAForm<Scalar>::getDefaultParameters() const
-{
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  using Teuchos::RCP;
-  using Teuchos::ParameterList;
-  using Teuchos::rcp_const_cast;
-
-  RCP<ParameterList> pl =
-    rcp_const_cast<ParameterList>(this->getValidParameters());
-
+  getValidParametersBasic(pl, this->getStepperType());
+  pl->set<std::string>("Scheme Name", "Average Acceleration");
+  pl->set<double>     ("Beta" , 0.25);
+  pl->set<double>     ("Gamma", 0.5 );
+  pl->set<bool>       ("Use FSAL", this->getUseFSALDefault());
+  pl->set<std::string>("Initial Condition Consistency",
+                       this->getICConsistencyDefault());
   pl->set<std::string>("Solver Name", "Default Solver");
-  RCP<ParameterList> solverPL = this->defaultSolverParameters();
+  pl->set<bool>       ("Zero Initial Guess", false);
+  Teuchos::RCP<Teuchos::ParameterList> solverPL = defaultSolverParameters();
   pl->set("Default Solver", *solverPL);
 
   return pl;
-}
-
-
-template <class Scalar>
-Teuchos::RCP<Teuchos::ParameterList>
-StepperNewmarkImplicitAForm<Scalar>::getNonconstParameterList()
-{
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  return(this->stepperPL_);
-}
-
-
-template <class Scalar>
-Teuchos::RCP<Teuchos::ParameterList>
-StepperNewmarkImplicitAForm<Scalar>::unsetParameterList()
-{
-#ifdef VERBOSE_DEBUG_OUTPUT
-  *out_ << "DEBUG: " << __PRETTY_FUNCTION__ << "\n";
-#endif
-  Teuchos::RCP<Teuchos::ParameterList> temp_plist = this->stepperPL_;
-  this->stepperPL_ = Teuchos::null;
-  return(temp_plist);
 }
 
 

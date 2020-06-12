@@ -13,6 +13,7 @@
 #include "Thyra_VectorStdOps.hpp"
 
 #include "Tempus_IntegratorBasic.hpp"
+#include "Tempus_StepperFactory.hpp"
 #include "Tempus_StepperOperatorSplit.hpp"
 #include "Tempus_StepperForwardEuler.hpp"
 #include "Tempus_StepperBackwardEuler.hpp"
@@ -37,12 +38,7 @@ using Tempus::IntegratorBasic;
 using Tempus::SolutionHistory;
 using Tempus::SolutionState;
 
-// Comment out any of the following tests to exclude from build/run.
-#define TEST_CONSTRUCTING_FROM_DEFAULTS
-#define TEST_VANDERPOL
 
-
-#ifdef TEST_CONSTRUCTING_FROM_DEFAULTS
 // ************************************************************
 // ************************************************************
 TEUCHOS_UNIT_TEST(OperatorSplit, ConstructingFromDefaults)
@@ -65,8 +61,14 @@ TEUCHOS_UNIT_TEST(OperatorSplit, ConstructingFromDefaults)
   // Setup Stepper for field solve ----------------------------
   auto stepper = rcp(new Tempus::StepperOperatorSplit<double>());
 
-  auto subStepper1 = rcp(new Tempus::StepperForwardEuler<double>(explicitModel));
-  auto subStepper2 = rcp(new Tempus::StepperBackwardEuler<double>(implicitModel));
+  RCP<Tempus::StepperFactory<double> > sf =
+    Teuchos::rcp(new Tempus::StepperFactory<double>());
+
+  auto subStepper1 =
+    sf->createStepperForwardEuler(explicitModel, Teuchos::null);
+
+  auto subStepper2 =
+    sf->createStepperBackwardEuler(implicitModel, Teuchos::null);
 
   stepper->addStepper(subStepper1);
   stepper->addStepper(subStepper2);
@@ -86,9 +88,10 @@ TEUCHOS_UNIT_TEST(OperatorSplit, ConstructingFromDefaults)
 
   // Setup initial condition SolutionState --------------------
   Thyra::ModelEvaluatorBase::InArgs<double> inArgsIC =
-    stepper->getModel()->getNominalValues();
-  auto icSolution = rcp_const_cast<Thyra::VectorBase<double> > (inArgsIC.get_x());
-  auto icState = rcp(new Tempus::SolutionState<double>(icSolution));
+  stepper->getModel()->getNominalValues();
+  auto icX    = rcp_const_cast<Thyra::VectorBase<double> > (inArgsIC.get_x());
+  auto icXDot = rcp_const_cast<Thyra::VectorBase<double> > (inArgsIC.get_x_dot());
+  auto icState = Tempus::createSolutionStateX(icX, icXDot);
   icState->setTime    (timeStepControl->getInitTime());
   icState->setIndex   (timeStepControl->getInitIndex());
   icState->setTimeStep(0.0);
@@ -135,10 +138,8 @@ TEUCHOS_UNIT_TEST(OperatorSplit, ConstructingFromDefaults)
   TEST_FLOATING_EQUALITY(get_ele(*(x), 0), -2.223910, 1.0e-4);
   TEST_FLOATING_EQUALITY(get_ele(*(x), 1),  0.565441, 1.0e-4);
 }
-#endif // TEST_CONSTRUCTING_FROM_DEFAULTS
 
 
-#ifdef TEST_VANDERPOL
 // ************************************************************
 // ************************************************************
 TEUCHOS_UNIT_TEST(OperatorSplit, VanDerPol)
@@ -229,6 +230,6 @@ TEUCHOS_UNIT_TEST(OperatorSplit, VanDerPol)
 
   Teuchos::TimeMonitor::summarize();
 }
-#endif // TEST_VANDERPOL
+
 
 } // namespace Tempus_Test

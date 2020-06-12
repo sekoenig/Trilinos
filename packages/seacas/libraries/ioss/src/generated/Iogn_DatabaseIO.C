@@ -1,42 +1,18 @@
-// Copyright(C) 1999-2017 National Technology & Engineering Solutions
+// Copyright(C) 1999-2020 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
-//
-//     * Redistributions in binary form must reproduce the above
-//       copyright notice, this list of conditions and the following
-//       disclaimer in the documentation and/or other materials provided
-//       with the distribution.
-//
-//     * Neither the name of NTESS nor the names of its
-//       contributors may be used to endorse or promote products derived
-//       from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// 
+// See packages/seacas/LICENSE for details
 
-#include "Ioss_CommSet.h"         // for CommSet
-#include "Ioss_DBUsage.h"         // for DatabaseUsage
-#include "Ioss_DatabaseIO.h"      // for DatabaseIO
-#include "Ioss_ElementBlock.h"    // for ElementBlock
-#include "Ioss_EntityType.h"      // for EntityType, etc
-#include "Ioss_Field.h"           // for Field, etc
-#include "Ioss_GroupingEntity.h"  // for GroupingEntity
+#include "Ioss_CommSet.h"      // for CommSet
+#include "Ioss_DBUsage.h"      // for DatabaseUsage
+#include "Ioss_DatabaseIO.h"   // for DatabaseIO
+#include "Ioss_ElementBlock.h" // for ElementBlock
+#include "Ioss_ElementTopology.h"
+#include "Ioss_EntityType.h"     // for EntityType, etc
+#include "Ioss_Field.h"          // for Field, etc
+#include "Ioss_GroupingEntity.h" // for GroupingEntity
+#include "Ioss_Hex8.h"
 #include "Ioss_IOFactory.h"       // for IOFactory
 #include "Ioss_Map.h"             // for Map, MapContainer
 #include "Ioss_NodeBlock.h"       // for NodeBlock
@@ -104,9 +80,9 @@ namespace {
 
   void fill_constant_data(const Ioss::Field &field, void *data, double value)
   {
-    double *rdata           = reinterpret_cast<double *>(data);
-    size_t  count           = field.raw_count();
-    size_t  component_count = field.raw_storage()->component_count();
+    auto * rdata           = reinterpret_cast<double *>(data);
+    size_t count           = field.raw_count();
+    size_t component_count = field.raw_storage()->component_count();
     for (size_t i = 0; i < count * component_count; i++) {
       rdata[i] = value;
     }
@@ -228,8 +204,23 @@ namespace Iogn {
     if (role == Ioss::Field::MESH) {
       if (field.get_name() == "mesh_model_coordinates") {
         // Cast 'data' to correct size -- double
-        double *rdata = static_cast<double *>(data);
+        auto *rdata = static_cast<double *>(data);
         m_generatedMesh->coordinates(rdata);
+      }
+      else if (field.get_name() == "mesh_model_coordinates_x") {
+        // Cast 'data' to correct size -- double
+        auto *rdata = static_cast<double *>(data);
+        m_generatedMesh->coordinates(1, rdata);
+      }
+      else if (field.get_name() == "mesh_model_coordinates_y") {
+        // Cast 'data' to correct size -- double
+        auto *rdata = static_cast<double *>(data);
+        m_generatedMesh->coordinates(2, rdata);
+      }
+      else if (field.get_name() == "mesh_model_coordinates_z") {
+        // Cast 'data' to correct size -- double
+        auto *rdata = static_cast<double *>(data);
+        m_generatedMesh->coordinates(3, rdata);
       }
 
       // NOTE: The implicit_ids field is ONLY provided for backward-
@@ -323,7 +314,7 @@ namespace Iogn {
       if (element_count > 0) {
         int attribute_count = eb->get_property("attribute_count").get_int();
         if (attribute_count > 0) {
-          double *attr = static_cast<double *>(data);
+          auto *attr = static_cast<double *>(data);
           for (size_t i = 0; i < num_to_get; i++) {
             attr[i] = 1.0;
           }
@@ -453,7 +444,14 @@ namespace Iogn {
 
         if (field.is_type(Ioss::Field::INTEGER)) {
           int *ids = static_cast<int *>(data);
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244)
+#endif
           std::copy(nodes.begin(), nodes.end(), ids);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
         }
         else {
           int64_t *ids = static_cast<int64_t *>(data);
@@ -730,9 +728,8 @@ namespace Iogn {
           Ioss::Property("global_entity_count", m_generatedMesh->element_count(i + 1)));
 
       if (type == "shell4" || type == "tri3") {
-        block->field_add(Ioss::Field("thickness", Ioss::Field::REAL, "scalar",
-                                     Ioss::Field::ATTRIBUTE,
-                                     m_generatedMesh->element_count_proc(i + 1)));
+        block->field_add(
+            Ioss::Field("thickness", Ioss::Field::REAL, "scalar", Ioss::Field::ATTRIBUTE));
       }
 
       get_region()->add(block);
@@ -767,8 +764,15 @@ namespace Iogn {
     }
   }
 
+  std::string DatabaseIO::get_sideset_topology() const
+  {
+    return m_generatedMesh->get_sideset_topology();
+  }
+
   void DatabaseIO::get_sidesets()
   {
+    const std::string face_topo = get_sideset_topology();
+
     m_sideset_names.reserve(sidesetCount);
     for (int ifs = 0; ifs < sidesetCount; ifs++) {
       std::string name = Ioss::Utils::encode_entity_name("surface", ifs + 1);
@@ -780,8 +784,8 @@ namespace Iogn {
 
       std::vector<std::string> touching_blocks = m_generatedMesh->sideset_touching_blocks(ifs + 1);
       if (touching_blocks.size() == 1) {
-        std::string ef_block_name  = name + "_quad4";
-        std::string side_topo_name = "quad4";
+        std::string ef_block_name  = name + "_" + face_topo;
+        std::string side_topo_name = face_topo;
         std::string elem_topo_name = "unknown";
         int64_t     number_faces   = m_generatedMesh->sideset_side_count_proc(ifs + 1);
 
@@ -792,10 +796,10 @@ namespace Iogn {
         ef_block->property_add(Ioss::Property("guid", util().generate_guid(ifs + 1)));
 
         std::string storage = "Real[";
-        storage += std::to_string(4);
+        storage += face_topo == "quad4" ? std::to_string(4) : std::to_string(3);
         storage += "]";
-        ef_block->field_add(Ioss::Field("distribution_factors", Ioss::Field::REAL, storage,
-                                        Ioss::Field::MESH, number_faces));
+        ef_block->field_add(
+            Ioss::Field("distribution_factors", Ioss::Field::REAL, storage, Ioss::Field::MESH));
 
         Ioss::ElementBlock *el_block = get_region()->get_element_block(touching_blocks[0]);
         ef_block->set_parent_element_block(el_block);
@@ -805,7 +809,7 @@ namespace Iogn {
         for (auto &touching_block : touching_blocks) {
           std::string ef_block_name =
               "surface_" + touching_block + "_edge2_" + std::to_string(ifs + 1);
-          std::string side_topo_name = "quad4";
+          std::string side_topo_name = face_topo;
           std::string elem_topo_name = "unknown";
           int64_t     number_faces   = m_generatedMesh->sideset_side_count_proc(ifs + 1);
 
@@ -816,10 +820,10 @@ namespace Iogn {
           ef_block->property_add(Ioss::Property("guid", util().generate_guid(ifs + 1)));
 
           std::string storage = "Real[";
-          storage += std::to_string(4);
+          storage += face_topo == "quad4" ? std::to_string(4) : std::to_string(3);
           storage += "]";
-          ef_block->field_add(Ioss::Field("distribution_factors", Ioss::Field::REAL, storage,
-                                          Ioss::Field::MESH, number_faces));
+          ef_block->field_add(
+              Ioss::Field("distribution_factors", Ioss::Field::REAL, storage, Ioss::Field::MESH));
 
           Ioss::ElementBlock *el_block = get_region()->get_element_block(touching_block);
           ef_block->set_parent_element_block(el_block);
@@ -850,13 +854,11 @@ namespace Iogn {
 
   void DatabaseIO::add_transient_fields(Ioss::GroupingEntity *entity)
   {
-    Ioss::EntityType type         = entity->type();
-    size_t           entity_count = entity->entity_count();
-    size_t           var_count    = m_generatedMesh->get_variable_count(type);
+    Ioss::EntityType type      = entity->type();
+    size_t           var_count = m_generatedMesh->get_variable_count(type);
     for (size_t i = 0; i < var_count; i++) {
       std::string var_name = entity->type_string() + "_" + std::to_string(i + 1);
-      entity->field_add(
-          Ioss::Field(var_name, Ioss::Field::REAL, "scalar", Ioss::Field::TRANSIENT, entity_count));
+      entity->field_add(Ioss::Field(var_name, Ioss::Field::REAL, "scalar", Ioss::Field::TRANSIENT));
     }
   }
 } // namespace Iogn

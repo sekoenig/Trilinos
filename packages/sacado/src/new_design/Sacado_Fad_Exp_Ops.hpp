@@ -39,6 +39,8 @@
 #include "Sacado_Fad_Exp_Ops_Fwd.hpp"
 #include "Sacado_cmath.hpp"
 
+#include "Sacado_mpl_has_equal_to.hpp"
+
 #if defined(HAVE_SACADO_KOKKOSCORE)
 #include "Kokkos_Atomic.hpp"
 #include "impl/Kokkos_Error.hpp"
@@ -64,7 +66,7 @@ namespace Sacado {                                                      \
       typedef ExprSpecDefault expr_spec_type;                           \
                                                                         \
       KOKKOS_INLINE_FUNCTION                                            \
-      OP(const T& expr_) : expr(expr_)  {}                              \
+      explicit OP(const T& expr_) : expr(expr_)  {}                     \
                                                                         \
       KOKKOS_INLINE_FUNCTION                                            \
       int size() const { return expr.size(); }                          \
@@ -230,11 +232,10 @@ FAD_UNARYOP_MACRO(sinh,
                   expr.fastAccessDx(i)* cosh(expr.val()))
 FAD_UNARYOP_MACRO(tanh,
                   TanhOp,
-                  using std::tanh; using std::cosh;,
+                  using std::tanh;,
                   tanh(expr.val()),
-                  expr.dx(i)/( cosh(expr.val())* cosh(expr.val())),
-                  expr.fastAccessDx(i) /
-                    ( cosh(expr.val())* cosh(expr.val())))
+                  expr.dx(i)*(value_type(1)-tanh(expr.val())*tanh(expr.val())),
+                  expr.fastAccessDx(i)*(value_type(1)-tanh(expr.val())*tanh(expr.val())))
 FAD_UNARYOP_MACRO(acosh,
                   ACoshOp,
                   using std::acosh; using std::sqrt;,
@@ -275,6 +276,162 @@ FAD_UNARYOP_MACRO(cbrt,
                   cbrt(expr.val()),
                   expr.dx(i)/(value_type(3)*cbrt(expr.val()*expr.val())),
                   expr.fastAccessDx(i)/(value_type(3)*cbrt(expr.val()*expr.val())))
+
+// Special handling for safe_sqrt() to provide specializations of SafeSqrtOp for
+// "simd" value types that use if_then_else(). The only reason for not using
+// if_then_else() always is to avoid evaluating the derivative if the value is
+// zero to avoid throwing FPEs.
+namespace Sacado {
+  namespace Fad {
+  namespace Exp {
+
+    template <typename T, typename ExprSpec, bool is_simd>
+    class SafeSqrtOp {};
+
+    //
+    // Implementation for simd type using if_then_else()
+    //
+    template <typename T>
+    class SafeSqrtOp< T,ExprSpecDefault,true > :
+      public Expr< SafeSqrtOp<T,ExprSpecDefault> > {
+    public:
+
+      typedef typename std::remove_cv<T>::type ExprT;
+      typedef typename ExprT::value_type value_type;
+      typedef typename ExprT::scalar_type scalar_type;
+
+      typedef ExprSpecDefault expr_spec_type;
+
+      KOKKOS_INLINE_FUNCTION
+      explicit SafeSqrtOp(const T& expr_) : expr(expr_)  {}
+
+      KOKKOS_INLINE_FUNCTION
+      int size() const { return expr.size(); }
+
+      KOKKOS_INLINE_FUNCTION
+      bool hasFastAccess() const {
+        return expr.hasFastAccess();
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type val() const {
+        using std::sqrt;
+        return sqrt(expr.val());
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type dx(int i) const {
+        using std::sqrt;
+        return if_then_else(
+          expr.val() == value_type(0.0), value_type(0.0),
+          value_type(expr.dx(i)/(value_type(2)*sqrt(expr.val()))));
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type fastAccessDx(int i) const {
+        using std::sqrt;
+        return if_then_else(
+          expr.val() == value_type(0.0), value_type(0.0),
+          value_type(expr.fastAccessDx(i)/(value_type(2)*sqrt(expr.val()))));
+      }
+
+    protected:
+
+      const T& expr;
+    };
+
+    //
+    // Specialization for scalar types using ternary operator
+    //
+    template <typename T>
+    class SafeSqrtOp< T,ExprSpecDefault,false > :
+      public Expr< SafeSqrtOp<T,ExprSpecDefault> > {
+    public:
+
+      typedef typename std::remove_cv<T>::type ExprT;
+      typedef typename ExprT::value_type value_type;
+      typedef typename ExprT::scalar_type scalar_type;
+
+      typedef ExprSpecDefault expr_spec_type;
+
+      KOKKOS_INLINE_FUNCTION
+      explicit SafeSqrtOp(const T& expr_) : expr(expr_)  {}
+
+      KOKKOS_INLINE_FUNCTION
+      int size() const { return expr.size(); }
+
+      KOKKOS_INLINE_FUNCTION
+      bool hasFastAccess() const {
+        return expr.hasFastAccess();
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type val() const {
+        using std::sqrt;
+        return sqrt(expr.val());
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type dx(int i) const {
+        using std::sqrt;
+        return expr.val() == value_type(0.0) ? value_type(0.0) :
+          value_type(expr.dx(i)/(value_type(2)*sqrt(expr.val())));
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      value_type fastAccessDx(int i) const {
+        using std::sqrt;
+        return expr.val() == value_type(0.0) ? value_type(0.0) :
+          value_type(expr.fastAccessDx(i)/(value_type(2)*sqrt(expr.val())));
+      }
+
+    protected:
+
+      const T& expr;
+    };
+
+    template <typename T>
+    KOKKOS_INLINE_FUNCTION
+    SafeSqrtOp< typename Expr<T>::derived_type,
+                typename T::expr_spec_type >
+    safe_sqrt (const Expr<T>& expr)
+    {
+      typedef SafeSqrtOp< typename Expr<T>::derived_type,
+                          typename T::expr_spec_type > expr_t;
+
+      return expr_t(expr.derived());
+    }
+
+    template <typename T, typename E>
+    struct ExprLevel< SafeSqrtOp< T,E > > {
+      static const unsigned value = ExprLevel<T>::value;
+    };
+
+    template <typename T, typename E>
+    struct IsFadExpr< SafeSqrtOp< T,E > > {
+      static const unsigned value = true;
+    };
+
+  }
+  }
+
+  template <typename T, typename E>
+  struct IsExpr< Fad::Exp::SafeSqrtOp< T,E > > {
+    static const bool value = true;
+  };
+
+  template <typename T, typename E>
+  struct BaseExprType< Fad::Exp::SafeSqrtOp< T,E > > {
+    typedef typename BaseExprType<T>::type type;
+  };
+
+  template <typename T, typename E>
+  struct IsSimdType< Fad::Exp::SafeSqrtOp< T,E > > {
+    static const bool value =
+      IsSimdType< typename Fad::Exp::SafeSqrtOp< T,E >::scalar_type >::value;
+  };
+
+}
 
 #undef FAD_UNARYOP_MACRO
 
@@ -1439,10 +1596,21 @@ namespace Sacado {
 namespace Sacado {
   namespace Fad {
   namespace Exp {
-    template <typename T1, typename T2 = T1>
-    struct ConditionalReturnType {
+  namespace Impl {
+    // Helper trait to determine return type of logical comparison operations
+    // (==, !=, ...), usually bool but maybe something else for SIMD types.
+    // Need to use SFINAE to restrict to types that define == operator in the
+    // conditional overloads below, otherwise instantiating ConditionaReturnType
+    // may fail during overload resolution.
+    template <typename T1, typename T2 = T1,
+              bool = mpl::has_equal_to<T1,T2>::value>
+    struct ConditionalReturnType {};
+
+    template <typename T1, typename T2>
+    struct ConditionalReturnType<T1,T2,true> {
       typedef decltype( std::declval<T1>() == std::declval<T2>() ) type;
     };
+  }
   }
   }
 }
@@ -1456,8 +1624,8 @@ namespace Sacado {                                                      \
     typename mpl::enable_if_c<                                          \
        IsFadExpr<T1>::value && IsFadExpr<T2>::value &&                  \
        ExprLevel<T1>::value == ExprLevel<T2>::value,                    \
-       typename ConditionalReturnType<typename T1::value_type,          \
-                                      typename T2::value_type>::type    \
+       typename Impl::ConditionalReturnType<typename T1::value_type,    \
+                                            typename T2::value_type>::type \
        >::type                                                          \
     operator OP (const T1& expr1, const T2& expr2)                      \
     {                                                                   \
@@ -1466,7 +1634,7 @@ namespace Sacado {                                                      \
                                                                         \
     template <typename T2>                                              \
     KOKKOS_INLINE_FUNCTION                                              \
-    typename ConditionalReturnType<typename T2::value_type>::type       \
+    typename Impl::ConditionalReturnType<typename T2::value_type>::type \
     operator OP (const typename T2::value_type& a,                      \
                  const Expr<T2>& expr2)                                 \
     {                                                                   \
@@ -1475,7 +1643,7 @@ namespace Sacado {                                                      \
                                                                         \
     template <typename T1>                                              \
     KOKKOS_INLINE_FUNCTION                                              \
-    typename ConditionalReturnType<typename T1::value_type>::type       \
+    typename Impl::ConditionalReturnType<typename T1::value_type>::type \
     operator OP (const Expr<T1>& expr1,                                 \
                  const typename T1::value_type& b)                      \
     {                                                                   \

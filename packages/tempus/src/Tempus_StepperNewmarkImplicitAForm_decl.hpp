@@ -77,17 +77,23 @@ public:
 
   /** \brief Default constructor.
    *
-   *  - Constructs with a default ParameterList.
-   *  - Can reset ParameterList with setParameterList().
-   *  - Requires subsequent setModel() and initialize() calls before calling
-   *    takeStep().
+   *  Requires subsequent setModel(), setSolver() and initialize()
+   *  calls before calling takeStep().
   */
   StepperNewmarkImplicitAForm();
 
   /// Constructor
   StepperNewmarkImplicitAForm(
     const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    Teuchos::RCP<Teuchos::ParameterList> pList = Teuchos::null);
+    const Teuchos::RCP<StepperObserver<Scalar> >& obs,
+    const Teuchos::RCP<Thyra::NonlinearSolverBase<Scalar> >& solver,
+    bool useFSAL,
+    std::string ICConsistency,
+    bool ICConsistencyCheck,
+    bool zeroInitialGuess,
+    std::string schemeName,
+    Scalar beta,
+    Scalar gamma);
 
   /// \name Basic stepper methods
   //@{
@@ -97,8 +103,8 @@ public:
     virtual void setObserver(
       Teuchos::RCP<StepperObserver<Scalar> > /* obs */ = Teuchos::null){}
 
-    /// Initialize during construction and after changing input parameters.
-    virtual void initialize();
+    virtual Teuchos::RCP<StepperObserver<Scalar> > getObserver() const
+    { return Teuchos::null; }
 
     /// Set the initial conditions and make them consistent.
     virtual void setInitialConditions (
@@ -135,44 +141,47 @@ public:
   /// Return beta  = d(x)/d(xDotDot).
   virtual Scalar getBeta (const Scalar dt) const { return beta_*dt*dt; }
 
-  /// \name ParameterList methods
-  //@{
-    void setParameterList(const Teuchos::RCP<Teuchos::ParameterList> & pl);
-    Teuchos::RCP<Teuchos::ParameterList> getNonconstParameterList();
-    Teuchos::RCP<Teuchos::ParameterList> unsetParameterList();
-    Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
-    Teuchos::RCP<Teuchos::ParameterList> getDefaultParameters() const;
-  //@}
+  Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
 
   /// \name Overridden from Teuchos::Describable
   //@{
-    virtual std::string description() const;
     virtual void describe(Teuchos::FancyOStream        & out,
                           const Teuchos::EVerbosityLevel verbLevel) const;
   //@}
 
-    void predictVelocity(Thyra::VectorBase<Scalar>& vPred,
+  virtual bool isValidSetup(Teuchos::FancyOStream & out) const;
+
+  void predictVelocity(Thyra::VectorBase<Scalar>& vPred,
+                           const Thyra::VectorBase<Scalar>& v,
+                           const Thyra::VectorBase<Scalar>& a,
+                           const Scalar dt) const;
+
+  void predictDisplacement(Thyra::VectorBase<Scalar>& dPred,
+                             const Thyra::VectorBase<Scalar>& d,
                              const Thyra::VectorBase<Scalar>& v,
                              const Thyra::VectorBase<Scalar>& a,
                              const Scalar dt) const;
 
-    void predictDisplacement(Thyra::VectorBase<Scalar>& dPred,
-                               const Thyra::VectorBase<Scalar>& d,
-                               const Thyra::VectorBase<Scalar>& v,
-                               const Thyra::VectorBase<Scalar>& a,
-                               const Scalar dt) const;
+  void correctVelocity(Thyra::VectorBase<Scalar>& v,
+                           const Thyra::VectorBase<Scalar>& vPred,
+                           const Thyra::VectorBase<Scalar>& a,
+                           const Scalar dt) const;
 
-    void correctVelocity(Thyra::VectorBase<Scalar>& v,
-                             const Thyra::VectorBase<Scalar>& vPred,
+  void correctDisplacement(Thyra::VectorBase<Scalar>& d,
+                             const Thyra::VectorBase<Scalar>& dPred,
                              const Thyra::VectorBase<Scalar>& a,
                              const Scalar dt) const;
 
-    void correctDisplacement(Thyra::VectorBase<Scalar>& d,
-                               const Thyra::VectorBase<Scalar>& dPred,
-                               const Thyra::VectorBase<Scalar>& a,
-                               const Scalar dt) const;
+  void setSchemeName(std::string schemeName);
+  void setBeta(Scalar beta);
+  void setGamma(Scalar gamma);
+
+  virtual bool getUseFSALDefault() const { return true; }
+  virtual std::string getICConsistencyDefault() const { return "Consistent"; }
+
 private:
 
+  std::string schemeName_;
   Scalar beta_;
   Scalar gamma_;
 

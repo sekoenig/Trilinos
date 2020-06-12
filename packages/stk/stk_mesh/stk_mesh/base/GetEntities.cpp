@@ -95,7 +95,8 @@ unsigned count_selected_entities(
 
 void get_selected_entities( const Selector & selector ,
                             const BucketVector & input_buckets ,
-                            std::vector< Entity> & entities )
+                            std::vector< Entity> & entities ,
+                            bool sortByGlobalId )
 {
   size_t count = count_selected_entities(selector,input_buckets);
 
@@ -114,7 +115,7 @@ void get_selected_entities( const Selector & selector ,
     }
   }
 
-  if (input_buckets.size() > 0) {
+  if (input_buckets.size() > 0 && sortByGlobalId) {
     std::sort(entities.begin(), entities.end(), EntityLess(input_buckets[0]->mesh()));
   }
 }
@@ -126,7 +127,7 @@ void count_entities(
   const BulkData & mesh ,
   std::vector<size_t> & count )
 {
-  const size_t nranks = MetaData::get(mesh).entity_rank_count();
+  const size_t nranks = mesh.mesh_meta_data().entity_rank_count();
 
   count.resize( nranks );
 

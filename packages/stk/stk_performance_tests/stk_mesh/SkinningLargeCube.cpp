@@ -41,7 +41,6 @@
 #include <stk_util/parallel/ParallelReduce.hpp>
 #include <stk_util/environment/perf_util.hpp>
 
-#include <stk_unit_tests/stk_mesh_fixtures/HexFixture.hpp>
 #include <stk_mesh/base/BulkModification.hpp>
 #include <stk_mesh/base/MetaData.hpp>
 #include <stk_mesh/base/BulkData.hpp>
@@ -52,6 +51,7 @@
 #include <stk_mesh/base/GetBuckets.hpp>
 #include <stk_mesh/base/EntityCommDatabase.hpp>
 
+#include "stk_unit_test_utils/stk_mesh_fixtures/HexFixture.hpp"
 #include <stk_mesh/base/BoundaryAnalysis.hpp>
 #include <stk_mesh/base/SkinMesh.hpp>
 
@@ -63,7 +63,7 @@ static const stk::mesh::EntityRank NODE_RANK = stk::topology::NODE_RANK;
 
 size_t count_skin_entities( stk::mesh::BulkData & mesh, stk::mesh::Part & skin_part, EntityRank skin_rank ) {
 
-  const stk::mesh::MetaData & fem_meta = stk::mesh::MetaData::get(mesh);
+  const stk::mesh::MetaData & fem_meta = mesh.mesh_meta_data();
 
   stk::mesh::Selector select_skin = skin_part & fem_meta.locally_owned_part()  ;
 
@@ -74,7 +74,7 @@ size_t count_skin_entities( stk::mesh::BulkData & mesh, stk::mesh::Part & skin_p
 
 void delete_skin( stk::mesh::BulkData & mesh, stk::mesh::Part & skin_part, EntityRank skin_rank ) {
 
-  const stk::mesh::MetaData & fem_meta = stk::mesh::MetaData::get(mesh);
+  const stk::mesh::MetaData & fem_meta = mesh.mesh_meta_data();
 
   stk::mesh::Selector select_skin = skin_part & fem_meta.locally_owned_part()  ;
 
@@ -98,7 +98,7 @@ void update_skin( stk::mesh::BulkData & mesh, stk::mesh::Part *skin_part, Entity
   stk::mesh::EntityVector owned_elements, modified_elements;
 
   // select owned
-  const stk::mesh::MetaData & fem_meta = stk::mesh::MetaData::get(mesh);
+  const stk::mesh::MetaData & fem_meta = mesh.mesh_meta_data();
   stk::mesh::Selector owned = fem_meta.locally_owned_part();
   stk::mesh::get_selected_entities( owned,
                          mesh.buckets(element_rank),

@@ -41,13 +41,13 @@
 #include <stk_mesh/base/GetBuckets.hpp>
 #include <stk_mesh/base/FEMHelpers.hpp>
 
-#include <stk_unit_tests/stk_mesh_fixtures/HexFixture.hpp>
+#include "stk_unit_test_utils/stk_mesh_fixtures/HexFixture.hpp"
 
 #include <stk_util/environment/CPUTime.hpp>
 #include <stk_util/environment/perf_util.hpp>
 
-#include <stk_performance_test_includes/calculate_centroid.hpp>
-#include <stk_performance_test_includes/hex_refine_info.hpp>
+#include <stk_performance_tests/stk_mesh/calculate_centroid.hpp>
+#include <stk_performance_tests/stk_mesh/hex_refine_info.hpp>
 
 #include <iostream>
 

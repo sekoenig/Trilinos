@@ -53,7 +53,7 @@
 #include "Xpetra_Import.hpp"
 #include "Xpetra_Exceptions.hpp"
 
-#include "Xpetra_TpetraMap.hpp"
+#include "Xpetra_TpetraMap_decl.hpp"
 #include "Tpetra_Import.hpp"
 
 namespace Xpetra {
@@ -107,6 +107,9 @@ namespace Xpetra {
 
     //! List of entries in the target Map to receive from other processes.
     ArrayView< const LocalOrdinal > getRemoteLIDs() const;
+
+    //! Set parameters on distributor
+    void setDistributorParameters(const Teuchos::RCP<Teuchos::ParameterList> params) const;
 
     //! Number of entries that must be sent by the calling process to other processes.
     size_t getNumExportIDs() const;

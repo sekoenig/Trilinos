@@ -93,7 +93,7 @@ TEST(StkIo, write_stk_mesh_to_file)
         {
             stk::mesh::Part * const part = *i;
 
-            if(NULL != part->attribute<Ioss::GroupingEntity>()) // this means it is an io_part
+            if(stk::io::is_part_io_part(*part)) // this means it is an io_part
             {
                 if(part->primary_entity_rank() == stk::topology::NODE_RANK)
                 {
@@ -170,7 +170,7 @@ TEST(StkIo, write_stk_mesh_to_file)
         {
             stk::mesh::Part * const part = *i;
 
-            if(NULL != part->attribute<Ioss::GroupingEntity>()) // this means it is an io_part
+            if(stk::io::is_part_io_part(*part)) // this means it is an io_part
             {
                 if(part->primary_entity_rank() == stk::topology::ELEMENT_RANK)
                 {
@@ -262,7 +262,8 @@ TEST(StkIo, check_memory)
         size_t current_usage3 = 0, hwm_usage3 = 0;
         current_usage3 = stk::get_memory_usage_now();
         print_memory(current_usage3, hwm_usage3);
-        EXPECT_LE(current_usage2, current_usage3);
+        size_t padDueToMemNoise = 8192;
+        EXPECT_LE(current_usage2, (current_usage3+padDueToMemNoise));
     }
 }
 

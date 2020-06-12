@@ -56,7 +56,7 @@ class Partition
 {
 public:
   Partition(BulkData& mesh, BucketRepository *repo, EntityRank rank,
-            const std::vector<PartOrdinal> &key);
+            const PartOrdinal* keyBegin, const PartOrdinal* keyEnd);
 
   virtual ~Partition();
 
@@ -88,6 +88,8 @@ public:
   void sort(const EntitySorterBase& sorter);
 
   void set_flag_needs_to_be_sorted(bool flag) { m_updated_since_sort = flag; }
+
+  bool needs_to_be_sorted() const { return m_updated_since_sort; }
 
   size_t field_data_footprint(const FieldBase &f) const;
 
@@ -209,8 +211,15 @@ struct PartitionLess {
 inline
 bool partition_key_less( const unsigned * lhs , const unsigned * rhs )
 {
-  const unsigned * const last_lhs = lhs + ( *lhs < *rhs ? *lhs : *rhs );
-  while ( last_lhs != lhs && *lhs == *rhs ) { ++lhs ; ++rhs ; }
+//  const unsigned * const last_lhs = lhs + ( *lhs < *rhs ? *lhs : *rhs );
+//  while ( last_lhs != lhs && *lhs == *rhs ) { ++lhs ; ++rhs ; }
+
+  if (*lhs == *rhs) {
+    const unsigned * const last_lhs = lhs + *lhs;
+    do {
+      ++lhs ; ++rhs ;
+    } while ( last_lhs != lhs && *lhs == *rhs );
+  }
   return *lhs < *rhs ;
 }
 

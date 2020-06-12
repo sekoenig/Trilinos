@@ -69,6 +69,7 @@
 #include "MueLu_FilteredAFactory_fwd.hpp"
 #include "MueLu_GenericRFactory_fwd.hpp"
 #include "MueLu_LineDetectionFactory_fwd.hpp"
+#include "MueLu_NotayAggregationFactory_fwd.hpp"
 #include "MueLu_NullspaceFactory_fwd.hpp"
 #include "MueLu_PatternFactory_fwd.hpp"
 #include "MueLu_PgPFactory_fwd.hpp"
@@ -193,6 +194,7 @@ namespace MueLu {
 
     int       blockSize_;     ///< block size of matrix (fixed block size)
     CycleType Cycle_;         ///< multigrid cycle type (V-cycle or W-cycle)
+    int       WCycleStartLevel_; ///< in case of W-cycle, level on which cycle should start
     double    scalingFactor_; ///< prolongator scaling factor
     GlobalOrdinal dofOffset_; ///< global offset variable describing offset of DOFs in operator
 
@@ -216,7 +218,7 @@ namespace MueLu {
     void UpdateFactoryManager_Aggregation_TentativeP(Teuchos::ParameterList& paramList, const Teuchos::ParameterList& defaultList, FactoryManager& manager,
                                                      int levelID, std::vector<keep_pair>& keeps) const;
     void UpdateFactoryManager_Restriction(Teuchos::ParameterList& paramList, const Teuchos::ParameterList& defaultList, FactoryManager& manager,
-                                        int levelID, std::vector<keep_pair>& keeps) const;
+                                          int levelID, std::vector<keep_pair>& keeps) const;
     void UpdateFactoryManager_RAP(Teuchos::ParameterList& paramList, const Teuchos::ParameterList& defaultList, FactoryManager& manager,
                                   int levelID, std::vector<keep_pair>& keeps) const;
     void UpdateFactoryManager_Coordinates(Teuchos::ParameterList& paramList, const Teuchos::ParameterList& defaultList, FactoryManager& manager,

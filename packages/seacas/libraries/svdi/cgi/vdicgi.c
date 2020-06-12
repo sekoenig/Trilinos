@@ -1,36 +1,9 @@
 /*
- * Copyright (C) 2009-2017 National Technology & Engineering Solutions
+ * Copyright(C) 1999-2020 National Technology & Engineering Solutions
  * of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
  * NTESS, the U.S. Government retains certain rights in this software.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials provided
- *       with the distribution.
- *
- *     * Neither the name of NTESS nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ * 
+ * See packages/seacas/LICENSE for details
  */
 /*
  SVDI  CGI driver
@@ -788,7 +761,7 @@ void vdbell_() {}
 void vdwait_()
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   /*  make picture current - flush output buffers */
   vflush(); /*  flush polyline buffer  */
@@ -797,9 +770,9 @@ void vdwait_()
   /*  do read waiting for viewing for interactive devices only */
   /*  mod### changed from 0(erasibility) to 12(input)          */
   if (dev_cap[12] != 0.) {
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat != CVAL) {
       vdicgi_errh(" SVDI Shell (VDWAIT) invalid request for crqlc ");
     }
@@ -1288,13 +1261,13 @@ void vdstcs_(float *y_size)
 void vdaabu_(int *button)
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   if (dev_cap[0] != 0.) {
     vflush(); /*  flush polyline buffer  */
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat == CVAL) {
       *button = trigger;
     }
@@ -1307,13 +1280,13 @@ void vdaabu_(int *button)
 void vdaloc_(float *x, float *y)
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   if (dev_cap[0] != 0.) {
     vflush(); /*  flush polyline buffer  */
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat == CVAL) {
       *x = ndc_map_x(xpos);
       *y = ndc_map_y(ypos);
@@ -1327,13 +1300,13 @@ void vdaloc_(float *x, float *y)
 void vdabgl_(int *button, float *x, float *y)
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   if (dev_cap[0] != 0.) {
     vflush(); /*  flush polyline buffer  */
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat == CVAL) {
       *x      = ndc_map_x(xpos);
       *y      = ndc_map_y(ypos);
@@ -1348,13 +1321,13 @@ void vdabgl_(int *button, float *x, float *y)
 void vdakgl_(int *charac, float *x, float *y)
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   if (dev_cap[0] != 0.) {
     vflush(); /*  flush polyline buffer  */
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat == CVAL) {
       *x      = ndc_map_x(xpos);
       *y      = ndc_map_y(ypos);
@@ -1369,13 +1342,13 @@ void vdakgl_(int *charac, float *x, float *y)
 void vdstla_(float *x, float *y)
 {
   int   temp, vstat, rstat, mvalid, trigger;
-  float xpos, ypos, timout;
+  float xpos, ypos, timeout;
 
   if (dev_cap[0] != 0.) {
     vflush(); /*  flush polyline buffer  */
-    temp   = 1;
-    timout = 1.;
-    crqlc_(&temp, &timout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
+    temp    = 1;
+    timeout = 1.;
+    crqlc_(&temp, &timeout, &vstat, &rstat, &mvalid, &trigger, &xpos, &ypos);
     if (vstat == CVAL) {
       *x = ndc_map_x(xpos);
       *y = ndc_map_y(ypos);

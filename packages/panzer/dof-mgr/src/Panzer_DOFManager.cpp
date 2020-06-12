@@ -70,10 +70,6 @@
 
 #include <unordered_set> // a hash table
 
-#ifdef PHX_KOKKOS_DEVICE_TYPE_CUDA
-#define PANZER_DOFMGR_REQUIRE_CUDA
-#endif
-
 /*
 #define HAVE_ZOLTAN2
 #ifdef HAVE_ZOLTAN2
@@ -749,13 +745,6 @@ DOFManager::buildGlobalUnknowns_GUN(const Tpetra::MultiVector<panzer::GlobalOrdi
 
     exp = rcp(new Export(overlap_map,non_overlap_map));
 
-#ifdef PANZER_DOFMGR_REQUIRE_CUDA
-    // Note:  ETP 04/26/16  Temporarily create an importer for all of the
-    // doImport() calls below.  This works around mysterious failures when
-    // using the exporter for Cuda builds.
-    imp = rcp(new Import(non_overlap_map,overlap_map));
-#endif
-
     /* 9.  Export data using ABSMAX.
       */
     tagged_non_overlap_mv->doExport(tagged_overlap_mv,*exp,Tpetra::ABSMAX);
@@ -806,6 +795,8 @@ DOFManager::buildGlobalUnknowns_GUN(const Tpetra::MultiVector<panzer::GlobalOrdi
   {
     PANZER_FUNC_TIME_MONITOR_DIFF("panzer::DOFManager::buildGlobalUnknowns_GUN::line_13-21 gid_assignment",GUN13_21);
     int which_id=0;
+    if (non_overlap_mv->need_sync_host())
+      non_overlap_mv->sync_host();
     auto editnonoverlap = non_overlap_mv->getLocalViewHost();
     for(size_t i=0; i<non_overlap_mv->getLocalLength(); ++i){
       for(int j=0; j<numFields_; ++j){
@@ -837,12 +828,8 @@ DOFManager::buildGlobalUnknowns_GUN(const Tpetra::MultiVector<panzer::GlobalOrdi
   {
     PANZER_FUNC_TIME_MONITOR_DIFF("panzer::DOFManager::buildGlobalUnknowns_GUN::line_23 final_import",GUN23);
 
-#ifdef PANZER_DOFMGR_REQUIRE_CUDA
-    overlap_mv.doImport(*non_overlap_mv,*imp,Tpetra::REPLACE);
-#else
     // use exporter to save on communication setup costs
     overlap_mv.doImport(*non_overlap_mv,*exp,Tpetra::REPLACE);
-#endif
   }
 
   //std::cout << Teuchos::describe(*non_overlap_mv,Teuchos::VERB_EXTREME)  << std::endl;

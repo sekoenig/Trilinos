@@ -82,7 +82,7 @@ GatherTangent_Epetra(
 {
   using panzer::PureBasis;
   using PHX::MDField;
-  using PHX::typeAsString;
+  using PHX::print;
   using std::size_t;
   using std::string;
   using std::vector;
@@ -110,6 +110,11 @@ GatherTangent_Epetra(
     gatherFields_[fd] =
       MDField<ScalarT, Cell, NODE>(names[fd], basis->functional);
     this->addEvaluatedField(gatherFields_[fd]);
+
+    // This fixes the case of dxdpEvRoGed_ being null and no
+    // operations performed during evalaute. Keeps the field with
+    // initial zero state.
+    this->addUnsharedField(gatherFields_[fd].fieldTag().clone());
   } // end loop over names
 
   // Figure out what the first active name is.
@@ -117,7 +122,7 @@ GatherTangent_Epetra(
   if (numFields > 0)
     firstName = names[0];
   string n("GatherTangent (Epetra):  " + firstName + " (" +
-    typeAsString<EvalT>() + ")");
+    print<EvalT>() + ")");
   this->setName(n);
 } // end of Initializing Constructor
 

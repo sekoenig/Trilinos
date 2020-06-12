@@ -1,35 +1,8 @@
-C Copyright (C) 2009-2017 National Technology & Engineering Solutions
+C Copyright(C) 1999-2020 National Technology & Engineering Solutions
 C of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 C NTESS, the U.S. Government retains certain rights in this software.
-C
-C Redistribution and use in source and binary forms, with or without
-C modification, are permitted provided that the following conditions are
-C met:
-C
-C     * Redistributions of source code must retain the above copyright
-C       notice, this list of conditions and the following disclaimer.
-C
-C     * Redistributions in binary form must reproduce the above
-C       copyright notice, this list of conditions and the following
-C       disclaimer in the documentation and/or other materials provided
-C       with the distribution.
-C
-C     * Neither the name of NTESS nor the names of its
-C       contributors may be used to endorse or promote products derived
-C       from this software without specific prior written permission.
-C
-C THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-C "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-C LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-C A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-C OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-C SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-C LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-C DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-C THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-C (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-C OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-C
+C 
+C See packages/seacas/LICENSE for details
 
 C
 C VDMOVA VDMONI VDGNAM VBIQDV VBIQPK VDLINA VDTEXT VDPNTA VDPOLY VDIQCP VDSTOS
@@ -1033,7 +1006,7 @@ C                   buffers if necessary.  Also prepare the device to
 C                   operate in alphanumeric (as opposed to graphic)
 C                   mode.  This is necessary on some devices so that
 C                   alphanumeric data from FORTRAN I/O won't be
-C                   misinterpretted as graphic data.
+C                   misinterpreted as graphic data.
 C
 C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C
 C
@@ -1707,7 +1680,7 @@ C                   attribute values, the color table, and current
 C                   position are set to appropriate defaults for the
 C                   device.  All necessary input device initialization
 C                   is done.  The screen is cleared or paper advanced
-C                   if necessary to guarentee a blank view surface for
+C                   if necessary to guarantee a blank view surface for
 C                   drawing on.
 C
 C                   ASPECT specifies the ratio of the X dimension to the
@@ -1882,8 +1855,8 @@ C FIGURE MAXIMUM NDC VALUES XNDCMX AND YNDCMX.
       END IF
 C
 C SET SCALE FACTORS FOR NDC-TO-DEVICE MAPPING.
-      XSCALE=FLOAT(XDEVIC)/XNDCMX
-      YSCALE=FLOAT(YDEVIC)/YNDCMX
+      XSCALE=DBLE(XDEVIC)/XNDCMX
+      YSCALE=DBLE(YDEVIC)/YNDCMX
       IF (PGFORM .GT. 0) THEN
          YPAD = YPAD+280.
          XPAD = XPAD+360.
@@ -2166,7 +2139,7 @@ C
       REAL VECTOR(7)
       COMMON /WPST03/ VECTOR
 C
-c  stroke the path in case there are any vectore and show text
+c  stroke the path in case there are any vector and show text
          CALL WPST15(2,'s ')
          IVECT=0
 c
@@ -2666,7 +2639,7 @@ C                   only to text primitives.
 C                   All devices must support at least a single device
 C                   dependent value that is the default.  If an
 C                   unsupported value is specified, set to the largest
-C                   suported character size that does not exceed the
+C                   supported character size that does not exceed the
 C                   specified size.
 C
 C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C
@@ -2753,7 +2726,7 @@ C
 C CONVERT LINE-WIDTH TO NDC
       LW=LINWTH*.01
 C
-C CONVERT WIDTH TO DEVICE COORDINATES AND ADD A DIGIT; NEED IT; TO HUNDRETHS
+C CONVERT WIDTH TO DEVICE COORDINATES AND ADD A DIGIT; NEED IT; TO HUNDREDTHS
       ILW=NINT(XSCALE*LW*10.)
 C     A LINEWIDTH OF ZERO WORKS ONLY PART OF THE TIME
       IF(ILW.LT.10) ILW=10

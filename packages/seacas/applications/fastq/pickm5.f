@@ -1,35 +1,8 @@
-C    Copyright(C) 2014-2017 National Technology & Engineering Solutions of
-C    Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
+C    Copyright(C) 1999-2020 National Technology & Engineering Solutions
+C    of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 C    NTESS, the U.S. Government retains certain rights in this software.
-C
-C    Redistribution and use in source and binary forms, with or without
-C    modification, are permitted provided that the following conditions are
-C    met:
-C
-C    * Redistributions of source code must retain the above copyright
-C       notice, this list of conditions and the following disclaimer.
-C
-C    * Redistributions in binary form must reproduce the above
-C      copyright notice, this list of conditions and the following
-C      disclaimer in the documentation and/or other materials provided
-C      with the distribution.
-C
-C    * Neither the name of NTESS nor the names of its
-C      contributors may be used to endorse or promote products derived
-C      from this software without specific prior written permission.
-C
-C    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-C    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-C    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-C    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-C    OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-C    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-C    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-C    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-C    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-C    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-C    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-C
+C    
+C    See packages/seacas/LICENSE for details
 
 C $Id: pickm5.f,v 1.2 1991/03/21 15:45:03 gdsjaar Exp $
 C $Log: pickm5.f,v $
@@ -119,7 +92,7 @@ C
       IF (NN1 .GT. N) NN1 = NN1 - N
       CALL SORTST (N, ANGLE, MM1, NN1, IRANGE, INDST)
 C
-C---PUSH ANGLE INDEX ON SECOND STACK IN DECENDING ORDER
+C---PUSH ANGLE INDEX ON SECOND STACK IN DESCENDING ORDER
 C
       CALL SKINIT (IST2, N, N - 2, IERROR)
       DO 120 I = MIN (MAXTRY, IRANGE), 1, -1
@@ -144,7 +117,7 @@ C
       IF (NN2 .GT. N) NN2 = NN2 - N
       CALL SORTST (N, ANGLE, MM2, NN2, IRANGE, INDST)
 C
-C---PUSH ANGLE INDEX ON THIRD STACK IN DECENDING ORDER
+C---PUSH ANGLE INDEX ON THIRD STACK IN DESCENDING ORDER
 C
       CALL SKINIT (IST3, N, N - 2, IERROR)
       DO 140 I = MIN (MAXTRY, IRANGE), 1, -1
@@ -170,7 +143,7 @@ C
       IF (NN3 .GT. N) NN3 = NN3 - N
       CALL SORTST (N, ANGLE, MM3, NN3, IRANGE, INDST)
 C
-C---PUSH ANGLE INDEX ON FOURTH STACK IN DECENDING ORDER
+C---PUSH ANGLE INDEX ON FOURTH STACK IN DESCENDING ORDER
 C
       CALL SKINIT (IST4, N, N - 2, IERROR)
       DO 160 I = MIN (MAXTRY, IRANGE), 1, -1
@@ -196,7 +169,7 @@ C
       IF (NN4 .GT. N) NN4 = NN4 - N
       CALL SORTST (N, ANGLE, MM4, NN4, IRANGE, INDST)
 C
-C---PUSH ANGLE INDEX ON FIFTH STACK IN DECENDING ORDER
+C---PUSH ANGLE INDEX ON FIFTH STACK IN DESCENDING ORDER
 C
       CALL SKINIT (IST5, N, N - 2, IERROR)
       DO 180 I = MIN (MAXTRY, IRANGE), 1, -1

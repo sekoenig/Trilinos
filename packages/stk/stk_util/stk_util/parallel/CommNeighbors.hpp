@@ -37,8 +37,58 @@
 
 #include <cstddef>                      // for size_t, ptrdiff_t
 #include <vector>
+#include <stk_util/stk_config.h>
 #include <stk_util/parallel/Parallel.hpp>  // for ParallelMachine
 #include <stk_util/parallel/CommBufferV.hpp>
+
+//------------------------------------------------------------------------
+//
+#if defined( STK_HAS_MPI )
+
+#ifdef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#if MPI_VERSION >= 3
+#define STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#ifdef OMPI_MAJOR_VERSION
+//OpenMPI 3.1.x seems to have a bug in the MPI_Neighbor* functions.
+#if OMPI_MAJOR_VERSION == 3 && OMPI_MINOR_VERSION == 1
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+//OpenMPI 2.x.y doesn't seem to support MPI_Neighbor* functions either...
+#if OMPI_MAJOR_VERSION == 2
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#endif
+
+//the MPI_Neighbor functions seem to be unacceptably slow with intel mpi
+#ifdef I_MPI_VERSION
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#ifdef __INTEL_COMPILER
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+#define STK_MPI_SUPPORTS_NEIGHBOR_COMM
+
+//Finally: if the user explicitly enables or disables mpi-neighbor-comm
+//by defining one of the following macros (e.g., with cmake option or with
+//-D on compile line etc), then they take precedence over anything that
+//happened in the ifdef logic above.
+//
+#ifdef STK_DISABLE_MPI_NEIGHBOR_COMM
+#undef STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#ifdef STK_ENABLE_MPI_NEIGHBOR_COMM
+#define STK_MPI_SUPPORTS_NEIGHBOR_COMM
+#endif
+
+#endif
 
 //------------------------------------------------------------------------
 
@@ -92,7 +142,7 @@ public:
    */
   void reset_buffers();
 
-  ~CommNeighbors();
+  virtual ~CommNeighbors();
 
   const std::vector<int>& send_procs() const { return m_send_procs; }
   const std::vector<int>& recv_procs() const { return m_recv_procs; }

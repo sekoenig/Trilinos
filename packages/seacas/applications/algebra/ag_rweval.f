@@ -1,35 +1,8 @@
-C    Copyright(C) 2008-2017 National Technology & Engineering Solutions of
-C    Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
+C    Copyright(C) 1999-2020 National Technology & Engineering Solutions
+C    of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 C    NTESS, the U.S. Government retains certain rights in this software.
-C
-C    Redistribution and use in source and binary forms, with or without
-C    modification, are permitted provided that the following conditions are
-C    met:
-C
-C    * Redistributions of source code must retain the above copyright
-C       notice, this list of conditions and the following disclaimer.
-C
-C    * Redistributions in binary form must reproduce the above
-C      copyright notice, this list of conditions and the following
-C      disclaimer in the documentation and/or other materials provided
-C      with the distribution.
-C
-C    * Neither the name of NTESS nor the names of its
-C      contributors may be used to endorse or promote products derived
-C      from this software without specific prior written permission.
-C
-C    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-C    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-C    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-C    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-C    OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-C    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-C    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-C    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-C    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-C    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-C    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-C
+C    
+C    See packages/seacas/LICENSE for details
 C=======================================================================
       SUBROUTINE RWEVAL (NDBIN, NDBOUT, A, ia, C, NPTIMS, NUMSTO,
      &  LTMENT, MAXSTK, NWRIT, IOERR, MERR)
@@ -145,7 +118,7 @@ C     Check for errors
 
 C ****************************************************************
 C     Calculate the zoom mesh, if any
-C     numeql - count number of occurrances of logical in a list
+C     numeql - count number of occurrences of logical in a list
 C ****************************************************************
 
       IF ((NUMEQL (.TRUE., NELBLK, A(KVISEB)) .LT. NELBLK)
@@ -187,7 +160,7 @@ C        Indices of the zoomed elements
         END IF
 
         CALL NUM2IX (NELBLK, A(KNELB), A(KIXELB))
-C        A(KIXELB) - stores a cummulative count of the number of elements
+C        A(KIXELB) - stores a cumulative count of the number of elements
 C                    in each element block
 C        A(KIXELB+0)= 0
 C        A(KIXELB+1)= num_elem_blk1
@@ -301,7 +274,7 @@ C                    are the location of the 1st dist factor for each set
 C           KLTNNS -  Returned array containing the nodes for all node sets
 C                     Internal node IDs
           CALL MDRSRV ('LTNNPS', KLTNNS, LNPSNL)
-C           KFACNS - Returned array containing the distribtion factors
+C           KFACNS - Returned array containing the distribution factors
 C                    for all node sets
           CALL MDRSRV ('FACNPS', KFACNS, LNPSNL)
           CALL MDSTAT(NERR,MEM)
@@ -386,7 +359,7 @@ C                    sets. Internal element IDS are used in this list
           CALL MDRSRV ('LTEESS', KLTESS, LESSEL)
 C           LTSESS - Returned array containing the sides for all side sets
           CALL MDRSRV ('LTSESS', KLTSSS, LESSEL)
-C           FACESS - Returned aray containing dist factors for all side sets
+C           FACESS - Returned array containing dist factors for all side sets
           CALL MDRSRV ('FACESS', KFACSS, LESSDF)
 C           LTNNN - array of number of nodes for each side in a side set
           CALL MDRSRV ('LTNNN', KLTNNN, LESSEL)
@@ -556,7 +529,7 @@ C                    are the location of the 1st dist factor for each set
 C           KLTNNS -  Returned array containing the nodes for all node sets
 C                     Internal node IDs
           CALL MDRSRV ('LTNNPS', KLTNNS, LNPSNL)
-C           KFACNS - Returned array containing the distribtion factors
+C           KFACNS - Returned array containing the distribution factors
 C                    for all node sets
           CALL MDRSRV ('FACNPS', KFACNS, LNPSNL)
           CALL MDSTAT (NERR, MEM)
@@ -566,14 +539,14 @@ C                    for all node sets
             RETURN
           END IF
 
-          CALL EXGCNS(ndbin, a(kidns), a(knnns), a(kndnps),
-     &      a(kixnns), a(kdisns), a(kltnns), a(kfacns), ierr)
+          CALL EXGCNS(ndbin, ia(kidns), ia(knnns), ia(kndnps),
+     &      ia(kixnns), ia(kdisns), ia(kltnns), a(kfacns), ierr)
         END IF
       END IF
 C     Write the node set information
       if ((numnps .gt. 0) .AND. (nnpso .gt. 0)) then
-        CALL EXPCNS(ndbout, a(kidns), a(knnns), a(kndnps),
-     &    a(kixnns), a(kdisns), a(kltnns), a(kfacns), ierr)
+        CALL EXPCNS(ndbout, ia(kidns), ia(knnns), ia(kndnps),
+     &    ia(kixnns), ia(kdisns), ia(kltnns), a(kfacns), ierr)
 
 C       Delete unneeded dynamic memory
         CALL MDDEL ('IDNPS')
@@ -618,7 +591,7 @@ C              sets. Internal element IDS are used in this list
           CALL MDRSRV ('LTEESS', KLTESS, LESSEL)
 C          LTSESS - Returned array containing the sides for all side sets
           CALL MDRSRV ('LTSESS', KLTSSS, LESSEL)
-C          FACESS - Returned aray containing dist factors for all side sets
+C          FACESS - Returned array containing dist factors for all side sets
           CALL MDRSRV ('FACESS', KFACSS, LESSDF)
           CALL MDSTAT (NERR, MEM)
           IF (NERR .GT. 0) THEN

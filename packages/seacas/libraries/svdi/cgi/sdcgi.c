@@ -1,36 +1,9 @@
 /*
- * Copyright (C) 2009-2017 National Technology & Engineering Solutions
+ * Copyright(C) 1999-2020 National Technology & Engineering Solutions
  * of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
  * NTESS, the U.S. Government retains certain rights in this software.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials provided
- *       with the distribution.
- *
- *     * Neither the name of NTESS nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ * 
+ * See packages/seacas/LICENSE for details
  */
 /* sdcgi - standard single device cgi routines
  * 27 Oct 1989 - last date modified
@@ -1841,7 +1814,7 @@ void cili_(f_integer *iclass, f_integer *idev)
 /*      crqlc - request locator                                               */
 /*                                                                            */
 /******************************************************************************/
-void crqlc_(f_integer *idev, f_real *timout, f_integer *vstat, f_integer *rstat, f_integer *mvalid,
+void crqlc_(f_integer *idev, f_real *timeout, f_integer *vstat, f_integer *rstat, f_integer *mvalid,
             f_integer *triggr, f_real *x, f_real *y)
 {
   short     dev;       /* which device to look at now */
@@ -1854,7 +1827,7 @@ void crqlc_(f_integer *idev, f_real *timout, f_integer *vstat, f_integer *rstat,
   /* set up parameter array */
   in_params[0] = (anything *)&func_id;
   in_params[1] = (anything *)idev;
-  in_params[2] = (anything *)timout;
+  in_params[2] = (anything *)timeout;
   in_params[3] = (anything *)vstat;
   in_params[4] = (anything *)rstat;
   in_params[5] = (anything *)mvalid;

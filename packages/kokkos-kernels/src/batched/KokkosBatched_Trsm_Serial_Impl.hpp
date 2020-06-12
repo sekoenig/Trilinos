@@ -33,8 +33,8 @@ namespace KokkosBatched {
       //typedef typename vector_type::value_type value_type;
         
       const int
-        m = B.dimension(0),
-        n = B.dimension(1);
+        m = B.extent(0),
+        n = B.extent(1);
 
       static_assert(is_vector<vector_type>::value, "value type is not vector type");      
       static_assert(vector_type::vector_length == 4 || vector_type::vector_length == 8, 
@@ -128,8 +128,8 @@ namespace KokkosBatched {
       //typedef typename vector_type::value_type value_type;
         
       const int
-        m = B.dimension(0),
-        n = B.dimension(1);
+        m = B.extent(0),
+        n = B.extent(1);
 
       static_assert(is_vector<vector_type>::value, "value type is not vector type");      
       static_assert(vector_type::vector_length == 4 || vector_type::vector_length == 8, 
@@ -223,8 +223,8 @@ namespace KokkosBatched {
       //typedef typename vector_type::value_type value_type;
         
       const int
-        m = B.dimension(0),
-        n = B.dimension(1);
+        m = B.extent(0),
+        n = B.extent(1);
 
       static_assert(is_vector<vector_type>::value, "value type is not vector type");      
       static_assert(vector_type::vector_length == 4 || vector_type::vector_length == 8, 
@@ -319,8 +319,8 @@ namespace KokkosBatched {
       //typedef typename vector_type::value_type value_type;
         
       const int
-        m = B.dimension(0),
-        n = B.dimension(1);
+        m = B.extent(0),
+        n = B.extent(1);
 
       static_assert(is_vector<vector_type>::value, "value type is not vector type");      
       static_assert(vector_type::vector_length == 4 || vector_type::vector_length == 8, 
@@ -365,7 +365,7 @@ namespace KokkosBatched {
     invoke(const ScalarType alpha,
            const AViewType &A,
            const BViewType &B) {
-      return SerialTrsmInternalLeftLower<Algo::Trsm::Unblocked>::invoke(ArgDiag::use_unit_diag,
+      return SerialTrsmInternalLeftUpper<Algo::Trsm::Unblocked>::invoke(ArgDiag::use_unit_diag,
                                                                         B.extent(0), B.extent(1),
                                                                         alpha, 
                                                                         A.data(), A.stride_1(), A.stride_0(),
@@ -383,7 +383,7 @@ namespace KokkosBatched {
     invoke(const ScalarType alpha,
            const AViewType &A,
            const BViewType &B) {
-      return SerialTrsmInternalLeftLower<Algo::Trsm::Blocked>::invoke(ArgDiag::use_unit_diag,
+      return SerialTrsmInternalLeftUpper<Algo::Trsm::Blocked>::invoke(ArgDiag::use_unit_diag,
                                                                       B.extent(0), B.extent(1),
                                                                       alpha, 
                                                                       A.data(), A.stride_1(), A.stride_0(),
@@ -413,8 +413,8 @@ namespace KokkosBatched {
       //typedef typename vector_type::value_type value_type;
         
       const int
-        m = B.dimension(0),
-        n = B.dimension(1);
+        m = B.extent(0),
+        n = B.extent(1);
 
       static_assert(is_vector<vector_type>::value, "value type is not vector type");      
       static_assert(vector_type::vector_length == 4 || vector_type::vector_length == 8, 
@@ -459,7 +459,7 @@ namespace KokkosBatched {
     invoke(const ScalarType alpha,
            const AViewType &A,
            const BViewType &B) {
-      return SerialTrsmInternalLeftUpper<Algo::Trsm::Unblocked>::invoke(ArgDiag::use_unit_diag,
+      return SerialTrsmInternalLeftLower<Algo::Trsm::Unblocked>::invoke(ArgDiag::use_unit_diag,
                                                                         B.extent(0), B.extent(1),
                                                                         alpha, 
                                                                         A.data(), A.stride_1(), A.stride_0(),
@@ -477,7 +477,7 @@ namespace KokkosBatched {
     invoke(const ScalarType alpha,
            const AViewType &A,
            const BViewType &B) {
-      return SerialTrsmInternalLeftUpper<Algo::Trsm::Blocked>::invoke(ArgDiag::use_unit_diag,
+      return SerialTrsmInternalLeftLower<Algo::Trsm::Blocked>::invoke(ArgDiag::use_unit_diag,
                                                                       B.extent(0), B.extent(1),
                                                                       alpha, 
                                                                       A.data(), A.stride_1(), A.stride_0(),

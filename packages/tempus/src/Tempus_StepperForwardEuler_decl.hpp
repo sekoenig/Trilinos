@@ -11,8 +11,10 @@
 
 #include "Tempus_config.hpp"
 #include "Tempus_StepperExplicit.hpp"
-#include "Tempus_StepperForwardEulerObserver.hpp"
-
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
+  #include "Tempus_StepperForwardEulerObserver.hpp"
+#endif
+#include "Tempus_StepperForwardEulerAppAction.hpp"
 
 namespace Tempus {
 
@@ -56,25 +58,44 @@ public:
 
   /** \brief Default constructor.
    *
-   *  - Constructs with a default ParameterList.
-   *  - Can reset ParameterList with setParameterList().
    *  - Requires subsequent setModel() and initialize() calls before calling
    *    takeStep().
   */
   StepperForwardEuler();
 
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
   /// Constructor
   StepperForwardEuler(
     const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    Teuchos::RCP<Teuchos::ParameterList> pList = Teuchos::null);
+    const Teuchos::RCP<StepperObserver<Scalar> >& obs,
+    bool useFSAL,
+    std::string ICConsistency,
+    bool ICConsistencyCheck);
+#endif
+ 
+  /// Constructor
+  StepperForwardEuler(
+    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
+    bool useFSAL,
+    std::string ICConsistency,
+    bool ICConsistencyCheck,
+    const Teuchos::RCP<StepperForwardEulerAppAction<Scalar> >& stepperFEAppAction);
 
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
   /// \name Basic stepper methods
   //@{
     virtual void setObserver(
       Teuchos::RCP<StepperObserver<Scalar> > obs = Teuchos::null);
 
-    /// Initialize during construction and after changing input parameters.
-    virtual void initialize();
+    virtual Teuchos::RCP<StepperObserver<Scalar> > getObserver() const
+    { return this->stepperFEObserver_; }
+#endif
+
+    virtual void setAppAction(
+      Teuchos::RCP<StepperForwardEulerAppAction<Scalar> > appAction);
+
+    virtual Teuchos::RCP<StepperForwardEulerAppAction<Scalar> > getAppAction() const
+      { return stepperFEAppAction_; }
 
     /// Set the initial conditions, make them consistent, and set needed memory.
     virtual void setInitialConditions (
@@ -93,25 +114,23 @@ public:
     virtual OrderODE getOrderODE()   const {return FIRST_ORDER_ODE;}
   //@}
 
-  /// \name ParameterList methods
-  //@{
-    void setParameterList(const Teuchos::RCP<Teuchos::ParameterList> & pl);
-    Teuchos::RCP<Teuchos::ParameterList> getNonconstParameterList();
-    Teuchos::RCP<Teuchos::ParameterList> unsetParameterList();
-    Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
-    Teuchos::RCP<Teuchos::ParameterList> getDefaultParameters() const;
-  //@}
+  Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
 
   /// \name Overridden from Teuchos::Describable
   //@{
-    virtual std::string description() const;
     virtual void describe(Teuchos::FancyOStream        & out,
                           const Teuchos::EVerbosityLevel verbLevel) const;
   //@}
 
+  virtual bool isValidSetup(Teuchos::FancyOStream & out) const;
+
 protected:
 
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
   Teuchos::RCP<StepperForwardEulerObserver<Scalar> >  stepperFEObserver_;
+#endif
+  Teuchos::RCP<StepperForwardEulerAppAction<Scalar> > stepperFEAppAction_;
+
 
 };
 

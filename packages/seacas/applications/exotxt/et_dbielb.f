@@ -1,35 +1,8 @@
-C Copyright (c) 2007-2017 National Technology & Engineering Solutions
+C Copyright(C) 1999-2020 National Technology & Engineering Solutions
 C of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 C NTESS, the U.S. Government retains certain rights in this software.
-C
-C Redistribution and use in source and binary forms, with or without
-C modification, are permitted provided that the following conditions are
-C met:
-C
-C     * Redistributions of source code must retain the above copyright
-C       notice, this list of conditions and the following disclaimer.
-C
-C     * Redistributions in binary form must reproduce the above
-C       copyright notice, this list of conditions and the following
-C       disclaimer in the documentation and/or other materials provided
-C       with the distribution.
-C
-C     * Neither the name of NTESS nor the names of its
-C       contributors may be used to endorse or promote products derived
-C       from this software without specific prior written permission.
-C
-C THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-C "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-C LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-C A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-C OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-C SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-C LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-C DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-C THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-C (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-C OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-C
+C 
+C See packages/seacas/LICENSE for details
 
 C=======================================================================
       SUBROUTINE DBIELB (NDB, OPTION, NELBS, NELBE, IDELB, NUMELB,
@@ -125,7 +98,7 @@ C           6. error id
       END IF
 
       IF (ALL .OR. COPT) THEN
-C        Assumption: space has been reserverd for 'LINK'
+C        Assumption: space has been reserved for 'LINK'
 C        call MxFIND(array_name, ret_index, array_size)
          CALL MDFIND ('LINK', KLINK, IELNK)
          CALL MDSTAT (NERR, MEM)
@@ -135,7 +108,7 @@ C        call MxFIND(array_name, ret_index, array_size)
             RETURN
          END IF
          DO 110 IELB = NELBS, NELBE
-C           number of elments in a block
+C           number of elements in a block
             NEL  = NUMELB(IELB)
 C           number of nodes per element in the element block
             NLNK = NUMLNK(IELB)
@@ -153,7 +126,7 @@ C           number of nodes per element in the element block
       END IF
 
       IF (ALL .OR. AOPT) THEN
-C        Assumption: space has been reserverd for 'ATRIB'
+C        Assumption: space has been reserved for 'ATRIB'
 C        call MxFIND(array_name, ret_index, array_size)
          CALL MDFIND ('ATRIB', KATRIB, IEATR)
          CALL MDSTAT (NERR, MEM)
@@ -163,7 +136,7 @@ C        call MxFIND(array_name, ret_index, array_size)
             RETURN
          END IF
          DO 120 IELB = NELBS, NELBE
-C           number of elments in a block
+C           number of elements in a block
             NEL  = NUMELB(IELB)
 C           number of attributes in this block
             NATR = NUMATR(IELB)

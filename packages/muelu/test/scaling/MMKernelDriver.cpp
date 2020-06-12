@@ -481,7 +481,7 @@ void Multiply_MKL_SPMM(const Xpetra::Matrix<Scalar,LocalOrdinal,GlobalOrdinal,No
       copy_view(Acolind,AcolindMKL);
       copy_view(Bcolind,BcolindMKL);
   
-      if(Kokkos::Impl::is_same<Scalar,double>::value) {
+      if(std::is_same<Scalar,double>::value) {
         mkl_rc = mkl_sparse_d_create_csr(&AMKL, SPARSE_INDEX_BASE_ZERO,
                                           Au->getNodeNumRows(),
                                           Au->getNodeNumCols(),
@@ -695,7 +695,7 @@ void Multiply_KokkosKernels(const Xpetra::Matrix<Scalar,LocalOrdinal,GlobalOrdin
                                                      Browptr,Bcolind,Bvals,false,
                                                      Crowptr,Ccolind,Cvals);
       kh.destroy_spgemm_handle();
-      KCRS::execution_space::fence();
+      typename KCRS::execution_space().fence();
   
       #ifdef USE_DESCRIPTIVE_STATS
       switch (alg_enum) {

@@ -32,20 +32,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#include <gtest/gtest.h>                // for AssertHelper, EXPECT_EQ, etc
-#include <stddef.h>                     // for size_t, NULL
-#include <unistd.h>                     // for unlink
-#include <iostream>                     // for ostream, operator<<, etc
-#include <stdexcept>                    // for runtime_error
-#include <string>                       // for string, operator==, etc
-#include <vector>                       // for vector
-#include <stk_io/StkMeshIoBroker.hpp>   // for StkMeshIoBroker
-#include <stk_mesh/base/BulkData.hpp>   // for BulkData
-#include <stk_mesh/base/CoordinateSystems.hpp>  // for Cartesian, etc
-#include <stk_mesh/base/GetEntities.hpp>  // for count_selected_entities
-#include <stk_mesh/base/MetaData.hpp>   // for MetaData, put_field, etc
-#include <stk_util/parallel/Parallel.hpp>  // for ParallelMachine
-#include "stk_util/environment/WallTime.hpp"
 #include "Ioss_DBUsage.h"               // for DatabaseUsage::READ_MODEL
 #include "Ioss_ElementBlock.h"          // for ElementBlock
 #include "Ioss_Field.h"                 // for Field, etc
@@ -57,6 +43,7 @@
 #include "mpi.h"                        // for ompi_communicator_t, etc
 #include "stk_io/DatabasePurpose.hpp"   // for DatabasePurpose::READ_MESH, etc
 #include "stk_io/MeshField.hpp"         // for MeshField
+#include "stk_io/WriteMesh.hpp"
 #include "stk_mesh/base/Bucket.hpp"     // for Bucket
 #include "stk_mesh/base/Field.hpp"      // for Field
 #include "stk_mesh/base/FieldBase.hpp"  // for field_bytes_per_entity, etc
@@ -64,7 +51,22 @@
 #include "stk_mesh/base/Selector.hpp"   // for operator<<, Selector, etc
 #include "stk_mesh/base/Types.hpp"      // for BucketVector, PartVector, etc
 #include "stk_topology/topology.hpp"    // for topology, etc
+#include "stk_unit_test_utils/GenerateALefRAMesh.hpp"
+#include "stk_util/environment/WallTime.hpp"
+#include <gtest/gtest.h>                // for AssertHelper, EXPECT_EQ, etc
+#include <iostream>                     // for ostream, operator<<, etc
+#include <stddef.h>                     // for size_t, NULL
+#include <stdexcept>                    // for runtime_error
+#include <stk_io/StkMeshIoBroker.hpp>   // for StkMeshIoBroker
+#include <stk_mesh/base/BulkData.hpp>   // for BulkData
+#include <stk_mesh/base/CoordinateSystems.hpp>  // for Cartesian, etc
+#include <stk_mesh/base/GetEntities.hpp>  // for count_selected_entities
+#include <stk_mesh/base/MetaData.hpp>   // for MetaData, put_field, etc
 #include <stk_unit_test_utils/MeshFixture.hpp>
+#include <stk_util/parallel/Parallel.hpp>  // for ParallelMachine
+#include <string>                       // for string, operator==, etc
+#include <unistd.h>                     // for unlink
+#include <vector>                       // for vector
 
 namespace Ioss { class DatabaseIO; }
 namespace stk { namespace mesh { class Bucket; } }
@@ -475,7 +477,7 @@ TEST(UnitTestField, writeFieldsWithSameName)
         EXPECT_TRUE( &nodeField == myFieldBase);
     }
 
-    unlink(mesh_name.c_str());
+    stk::unit_test_util::delete_mesh(mesh_name);
 }
 
 //////////////////////
@@ -654,6 +656,7 @@ protected:
             std::string filename = "junk-" + solnCases.get_solution_case_names()[solnIndex] + ".g";
             EXPECT_NO_THROW(write_mesh_with_fields(stkIo, filename, rank, solnCases.get_fields_for_case(solnIndex)));
             verify_fields_are_on_entities(filename, rank, solnCases.get_fields_for_case(solnIndex), locallyOwnedEntities.size());
+            stk::unit_test_util::delete_mesh(filename);
         }
 
         verify_acceleration_is_not_on_entities(get_bulk(), rank);
@@ -697,7 +700,8 @@ protected:
 class LateFieldFixture : public LateFieldFixtureNoTest, public ::ngp_testing::Test
 {
 protected:
-  virtual void allocate_bulk(stk::mesh::BulkData::AutomaticAuraOption auraOption, stk::mesh::FieldDataManager * fieldDataManager)
+  void custom_allocate_bulk(stk::mesh::BulkData::AutomaticAuraOption auraOption,
+                            stk::mesh::FieldDataManager * fieldDataManager)
   {
     if (nullptr == metaData) {
       allocate_meta();
@@ -710,16 +714,16 @@ protected:
                                        fieldDataManager);
   }
 
-  virtual void setup_mesh(const std::string &meshSpecification, stk::mesh::BulkData::AutomaticAuraOption auraOption, stk::mesh::FieldDataManager * fieldDataManager)
+  virtual void custom_setup_mesh(const std::string &meshSpecification, stk::mesh::BulkData::AutomaticAuraOption auraOption, stk::mesh::FieldDataManager * fieldDataManager)
   {
-    allocate_bulk(auraOption, fieldDataManager);
+    custom_allocate_bulk(auraOption, fieldDataManager);
     metaData->enable_late_fields();
     stk::io::fill_mesh(meshSpecification, *bulkData);
   }
 
   virtual void setup_empty_mesh(stk::mesh::BulkData::AutomaticAuraOption auraOption, stk::mesh::FieldDataManager * fieldDataManager)
   {
-    allocate_bulk(auraOption, fieldDataManager);
+    custom_allocate_bulk(auraOption, fieldDataManager);
     metaData->enable_late_fields();
   }
 
@@ -772,7 +776,7 @@ protected:
 
   template <typename T>
   void setup_add_late_first_field(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     // Note that we still have a nodal coordinates field
 
     stk::mesh::Field<T> & lateField = declare_field<T>("late_field", rank);
@@ -786,7 +790,7 @@ protected:
   void setup_add_late_field(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField = declare_field<T>("late_field", rank);
@@ -811,7 +815,7 @@ protected:
 
   template <typename T>
   void setup_performance_of_late_field(stk::mesh::EntityRank rank, int numberOfFields, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
-    setup_mesh("generated:100x100x100", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:100x100x100", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     for (int i = 0; i < numberOfFields; ++i) {
       stk::mesh::Field<T> & lateField = declare_field<T>("late_field" + std::to_string(i), rank);
       put_field(lateField, get_meta().universal_part());
@@ -843,7 +847,7 @@ protected:
     create_part("block_2", stk::topology::ELEM_RANK);
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
 
     stk::mesh::Entity elem2 = get_bulk().get_entity(stk::topology::ELEM_RANK, 2);
     get_bulk().modification_begin();
@@ -869,7 +873,7 @@ protected:
   void setup_add_late_field_multiple_duplicate_put_field(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField = declare_field<T>("late_field", rank);
@@ -887,7 +891,7 @@ protected:
     create_part("block_2", stk::topology::ELEM_RANK);
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField = declare_field<T>("late_field", rank);
@@ -904,7 +908,7 @@ protected:
   void setup_add_two_late_fields_sequential(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField1 = declare_field<T>("late_field1", rank);
@@ -924,7 +928,7 @@ protected:
   void setup_add_two_late_fields_interleaved(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField1 = declare_field<T>("late_field1", rank);
@@ -945,7 +949,7 @@ protected:
   void setup_add_two_late_fields_out_of_order(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField1 = declare_field<T>("late_field1", rank);
@@ -966,7 +970,7 @@ protected:
   void setup_add_two_late_fields_different_type_out_of_order(stk::mesh::EntityRank rank, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T1> & earlyField = declare_field<T1>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor<T1>(earlyField, 1);
 
     stk::mesh::Field<T1> & lateField1    = declare_field<T1>("late_field1", rank);
@@ -987,7 +991,7 @@ protected:
   void setup_add_two_late_fields_different_rank_out_of_order(stk::mesh::EntityRank rank1, stk::mesh::EntityRank rank2, stk::mesh::FieldDataManager * fieldDataManager = nullptr) {
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", stk::topology::ELEM_RANK);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     stk::mesh::Field<T> & lateField1 = declare_field<T>("late_field1", rank1);
@@ -1011,7 +1015,7 @@ protected:
     create_part("block_2", stk::topology::ELEM_RANK);
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, *get_meta().get_part("block_1"));
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
 
     stk::mesh::Entity elem2 = get_bulk().get_entity(stk::topology::ELEM_RANK, 2);
     get_bulk().modification_begin();
@@ -1046,7 +1050,7 @@ protected:
     create_part("block_1", stk::topology::ELEM_RANK, addIoPartAttribute);
     stk::mesh::Field<T> & earlyField = declare_field<T>("early_field", rank);
     put_field(earlyField, get_meta().universal_part());
-    setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
+    custom_setup_mesh("generated:1x1x2", stk::mesh::BulkData::NO_AUTO_AURA, fieldDataManager);
     set_field_values_with_scale_factor(earlyField, 1);
 
     create_part("block_2", stk::topology::ELEM_RANK);
@@ -1426,5 +1430,60 @@ TEST_F(LateFieldFixture, DISABLED_performanceOfSingleLateFieldContiguous)
   setup_performance_of_single_late_field<int>(stk::topology::NODE_RANK, 64, fieldDataManager);
 }
 
+TEST(SharedSidesetField, verifySidesetFieldAfterMeshRead) {
+  std::string serialOutputMeshName = "ARB.e";
+
+  if (stk::parallel_machine_size(MPI_COMM_WORLD) == 2)
+  {
+    const std::string fieldName = "surface_1_df";
+    const double initValue = 123.0;
+
+    // Build the target serial mesh and write it to a file
+    if (stk::parallel_machine_rank(MPI_COMM_WORLD) == 0)
+    {
+      stk::mesh::MetaData meta(3);
+      stk::mesh::BulkData bulk(meta, MPI_COMM_SELF);
+
+      stk::unit_test_util::create_AB_mesh_with_sideset_and_distribution_factors(bulk,
+                                                                                stk::unit_test_util::LEFT,
+                                                                                stk::unit_test_util::DECREASING,
+                                                                                fieldName,
+                                                                                initValue);
+
+      stk::io::write_mesh_with_fields(serialOutputMeshName, bulk, 1, 1.0);
+    }
+
+    {
+      stk::mesh::MetaData meta(3);
+      stk::mesh::BulkData bulk(meta, MPI_COMM_WORLD);
+      stk::io::StkMeshIoBroker stkIo;
+      stkIo.property_add(Ioss::Property("DECOMPOSITION_METHOD", "RIB"));
+
+      stkIo.set_bulk_data(bulk);
+      stkIo.add_mesh_database(serialOutputMeshName, stk::io::READ_MESH);
+      stkIo.create_input_mesh();
+      stkIo.add_all_mesh_fields_as_input_fields();
+
+      stkIo.populate_bulk_data();
+
+      const stk::mesh::BucketVector& buckets = bulk.get_buckets(stk::topology::FACE_RANK, meta.universal_part());
+      ASSERT_EQ(1u, buckets.size());
+      for (stk::mesh::Bucket* bucket : buckets)
+      {
+        ASSERT_EQ(1u, bucket->size());
+        stk::mesh::Entity face = (*bucket)[0];
+        stk::mesh::FieldBase* field = meta.get_field(stk::topology::FACE_RANK, fieldName);
+        EXPECT_NE(nullptr, field);
+        unsigned numEntries = stk::mesh::field_scalars_per_entity(*field, face);
+        double* fieldData = reinterpret_cast<double*>(stk::mesh::field_data(*field, face));
+        for (unsigned entry = 0; entry < numEntries; ++entry)
+        {
+            EXPECT_NEAR(initValue, fieldData[entry], 1e-12);
+        }
+      }
+    }
+  }
+  unlink(serialOutputMeshName.c_str());
+}
 } //namespace <anonymous>
 

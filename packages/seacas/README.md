@@ -1,3 +1,8 @@
+# Copyright(C) 1999-2020 National Technology & Engineering Solutions
+# of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
+# NTESS, the U.S. Government retains certain rights in this software.
+# 
+# See packages/seacas/LICENSE for details
 # SEACAS  [[Documentation](http://gsjaardema.github.io/seacas/)]
 
 * [Build instructions](#build-instructions)
@@ -163,7 +168,7 @@ At this time, you should have all external TPL libraries built and
 installed into `${WHERE_TO_INSTALL}/lib` and `${WHERE_TO_INSTALL}/include`. You are now ready
 to configure the SEACAS portion of the Trilinos cmake build.
 
-The relavant defines for SEACAS are:
+The relevant defines for SEACAS are:
 ```bash
   -D Trilinos_ENABLE_SEACAS:BOOL=ON
   -D TPL_ENABLE_Netcdf:BOOL=ON
@@ -178,10 +183,6 @@ The relavant defines for SEACAS are:
   -D SEACAS_ENABLE_TESTS=ON
   -D Trilinos_EXTRA_LINK_FLAGS:STRING="-L${WHERE_TO_INSTALL}/lib -lpnetcdf -lhdf5_hl -lhdf5 -lz"
 ```
-
-If you are using a NetCDF version prior to 4.3 and NetCDF was compiled
-with parallel enabled, then you also need to add `-D TPL_Netcdf_PARALLEL:BOOL=ON`
-This is automatically determined for NetCDF-4.3 and later.
 
 ## Testing
 There are a few unit tests for exodus, and aprepro that can be run via `make test` if you configured with `-D SEACAS_ENABLE_TESTS=ON`.

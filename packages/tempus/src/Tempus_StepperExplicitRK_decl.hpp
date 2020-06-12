@@ -10,10 +10,12 @@
 #define Tempus_StepperExplicitRK_decl_hpp
 
 #include "Tempus_config.hpp"
+#include "Tempus_StepperRKBase.hpp"
 #include "Tempus_StepperExplicit.hpp"
 #include "Tempus_RKButcherTableau.hpp"
-#include "Tempus_StepperObserverComposite.hpp"
-#include "Tempus_StepperExplicitRKObserverComposite.hpp"
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
+  #include "Tempus_StepperRKObserverComposite.hpp"
+#endif
 
 
 namespace Tempus {
@@ -51,30 +53,35 @@ namespace Tempus {
  *  \f]
  *
  *  <b> Algorithm </b>
- *  The single-timestep algorithm for Explicit RK is simply,
- *   - for \f$i = 1 \ldots s\f$ do
- *     - \f$X_i \leftarrow x_{n-1}
- *              + \Delta t\,\sum_{j=1}^{i-1} a_{ij}\,\dot{X}_j\f$
- *     - Evaluate \f$\bar{f}(X_{i},t_{n-1}+c_{i}\Delta t)\f$
- *     - \f$\dot{X}_i \leftarrow \bar{f}(X_i,t_{n-1}+c_i\Delta t)\f$
- *   - end for
- *   - \f$x_n \leftarrow x_{n-1} + \Delta t\,\sum_{i=1}^{s}b_i\,\dot{X}_i\f$
+ *  The single-timestep algorithm for Explicit RK is
  *
- *  When using the First-Step-As-Last (FSAL) priniciple, where one can
- *  reuse the last function evaulation as the first evaluation of the next
- *  time step, the algorithm is only slightly more complicated.
- *   - for \f$i = 1 \ldots s\f$ do
- *     - if ( i==1 && useFSAL && (previous step not failed) )
- *       - tmp = \f$\dot{X}_1\f$
- *       - \f$\dot{X}_1 = \dot{X}_s\f$
- *       - \f$\dot{X}_s\f$ = tmp
- *     - else
- *       - \f$X_i \leftarrow x_{n-1}
- *                + \Delta t\,\sum_{j=1}^{i-1} a_{ij}\,\dot{X}_j\f$
- *       - Evaluate \f$\bar{f}(X_{i},t_{n-1}+c_{i}\Delta t)\f$
- *       - \f$\dot{X}_i \leftarrow \bar{f}(X_i,t_{n-1}+c_i\Delta t)\f$
- *   - end for
- *   - \f$x_n \leftarrow x_{n-1} + \Delta t\,\sum_{i=1}^{s}b_i\,\dot{X}_i\f$
+ *  \f{algorithm}{
+ *  \renewcommand{\thealgorithm}{}
+ *  \caption{Explicit RK with the application-action locations indicated.}
+ *  \begin{algorithmic}[1]
+ *    \State {\it appAction.execute(solutionHistory, stepper, BEGIN\_STEP)}
+ *    \State $X \leftarrow x_{n-1}$ \Comment Set initial guess to last timestep.
+ *    \For {$i = 0 \ldots s-1$}
+ *        \State {\it appAction.execute(solutionHistory, stepper, BEGIN\_STAGE)}
+ *        \State {\it appAction.execute(solutionHistory, stepper, BEFORE\_SOLVE)}
+ *      \If { i==0 and useFSAL and (previous step not failed) }
+ *        \State tmp = $\dot{X}_0$
+ *        \State $\dot{X}_0 = \dot{X}_s$
+ *        \State $\dot{X}_s$ = tmp
+ *        \State {\bf continue}
+ *      \Else
+ *        \State $X \leftarrow x_{n-1}
+ *                  + \Delta t\,\sum_{j=1}^{i-1} a_{ij}\,\dot{X}_j$
+ *        \State {\it appAction.execute(solutionHistory, stepper, AFTER\_SOLVE)}
+ *        \State {\it appAction.execute(solutionHistory, stepper, BEFORE\_EXPLICIT\_EVAL)}
+ *        \State $\dot{X}_i \leftarrow \bar{f}(X_i,t_{n-1}+c_i\Delta t)$
+ *      \EndIf
+ *      \State {\it appAction.execute(solutionHistory, stepper, END\_STAGE)}
+ *    \EndFor
+ *    \State $x_n \leftarrow x_{n-1} + \Delta t\,\sum_{i=1}^{s}b_i\,\dot{X}_i$
+ *    \State {\it appAction.execute(solutionHistory, stepper, END\_STEP)}
+ *  \end{algorithmic}
+ *  \f}
  *
  *   For Explicit RK, FSAL requires \f$c_1 = 0\f$, \f$c_s = 1\f$, and
  *   be stiffly accurate (\f$a_{sj} = b_j\f$).  An example of this is
@@ -89,46 +96,23 @@ namespace Tempus {
  *   \f]
  */
 template<class Scalar>
-class StepperExplicitRK : virtual public Tempus::StepperExplicit<Scalar>
+class StepperExplicitRK : virtual public Tempus::StepperExplicit<Scalar>,
+                          virtual public Tempus::StepperRKBase<Scalar>
 {
+
 public:
-
-  /** \brief Default constructor.
-   *
-   *  - Constructs with a default ParameterList.
-   *  - Can reset ParameterList with setParameterList().
-   *  - Requires subsequent setModel() and initialize() calls before calling
-   *    takeStep().
-  */
-  StepperExplicitRK();
-
-  /// Constructor to specialize Stepper parameters.
-  StepperExplicitRK(
-    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    Teuchos::RCP<Teuchos::ParameterList> pList);
-
-  /// Constructor to use default Stepper parameters.
-  StepperExplicitRK(
-    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    std::string stepperType = "RK Explicit 4 Stage");
-
-  /// Constructor for StepperFactory.
-  StepperExplicitRK(
-    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    std::string stepperType, Teuchos::RCP<Teuchos::ParameterList> pList);
 
   /// \name Basic stepper methods
   //@{
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
     virtual void setObserver(
       Teuchos::RCP<StepperObserver<Scalar> > obs = Teuchos::null);
 
-    virtual void setTableau(std::string stepperType);
-
-    virtual void setTableau(
-      Teuchos::RCP<Teuchos::ParameterList> pList = Teuchos::null);
-
-    virtual void setTableau(
-      Teuchos::RCP<const RKButcherTableau<Scalar> > ERK_ButcherTableau);
+    virtual Teuchos::RCP<StepperObserver<Scalar> > getObserver() const
+    { return this->stepperObserver_; }
+#endif
+    virtual Teuchos::RCP<const RKButcherTableau<Scalar> > getTableau()
+    { return tableau_; }
 
     /// Initialize during construction and after changing input parameters.
     virtual void initialize();
@@ -141,18 +125,13 @@ public:
     virtual void takeStep(
       const Teuchos::RCP<SolutionHistory<Scalar> >& solutionHistory);
 
-    virtual std::string getStepperType() const
-     { return this->stepperPL_->template get<std::string>("Stepper Type"); }
-
     /// Get a default (initial) StepperState
     virtual Teuchos::RCP<Tempus::StepperState<Scalar> > getDefaultStepperState();
-    virtual Scalar getOrder() const {return ERK_ButcherTableau_->order();}
-    virtual Scalar getOrderMin() const {return ERK_ButcherTableau_->orderMin();}
-    virtual Scalar getOrderMax() const {return ERK_ButcherTableau_->orderMax();}
+    virtual Scalar getOrder() const {return tableau_->order();}
+    virtual Scalar getOrderMin() const {return tableau_->orderMin();}
+    virtual Scalar getOrderMax() const {return tableau_->orderMax();}
     virtual Scalar getInitTimeStep(
         const Teuchos::RCP<SolutionHistory<Scalar> >& solutionHistory) const;
-
-    virtual Teuchos::RCP<Thyra::VectorBase<Scalar> > getStageX() {return stageX_;}
 
     virtual bool isExplicit()         const {return true;}
     virtual bool isImplicit()         const {return false;}
@@ -162,35 +141,66 @@ public:
     virtual bool isMultiStepMethod() const {return !isOneStepMethod();}
 
     virtual OrderODE getOrderODE()   const {return FIRST_ORDER_ODE;}
+
+    void getValidParametersBasicERK(Teuchos::RCP<Teuchos::ParameterList> pl) const;
+    virtual std::string getDescription() const = 0;
   //@}
 
-  /// \name ParameterList methods
-  //@{
-    void setParameterList(const Teuchos::RCP<Teuchos::ParameterList> & pl);
-    Teuchos::RCP<Teuchos::ParameterList> getNonconstParameterList();
-    Teuchos::RCP<Teuchos::ParameterList> unsetParameterList();
-    Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
-    Teuchos::RCP<Teuchos::ParameterList> getDefaultParameters() const;
-  //@}
+  Teuchos::RCP<const Teuchos::ParameterList> getValidParameters() const;
 
   /// \name Overridden from Teuchos::Describable
   //@{
-    virtual std::string description() const;
     virtual void describe(Teuchos::FancyOStream        & out,
                           const Teuchos::EVerbosityLevel verbLevel) const;
   //@}
 
+  virtual bool isValidSetup(Teuchos::FancyOStream & out) const;
+
+  /// \name Accessors methods
+  //@{
+    /** \brief Use embedded if avialable. */
+    virtual void setUseEmbedded(bool a) { useEmbedded_ = a; }
+    virtual bool getUseEmbedded() const { return useEmbedded_; }
+    virtual bool getUseEmbeddedDefault() const { return false; }
+  //@}
+
+
 protected:
 
-  Teuchos::RCP<const RKButcherTableau<Scalar> >          ERK_ButcherTableau_;
+  /// Default setup for constructor.
+  virtual void setupDefault();
+
+  /// Setup for constructor.
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
+  virtual void setup(
+    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
+    const Teuchos::RCP<StepperRKObserverComposite<Scalar> >& obs,
+    bool useFSAL,
+    std::string ICConsistency,
+    bool ICConsistencyCheck,
+    bool useEmbedded);
+#endif
+  virtual void setup(
+    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
+    bool useFSAL,
+    std::string ICConsistency,
+    bool ICConsistencyCheck,
+    bool useEmbedded,
+    const Teuchos::RCP<StepperRKAppAction<Scalar> >& stepperRKAppAction);
+
+  virtual void setupTableau() = 0;
+
+
+  Teuchos::RCP<RKButcherTableau<Scalar> >                tableau_;
 
   std::vector<Teuchos::RCP<Thyra::VectorBase<Scalar> > > stageXDot_;
-  Teuchos::RCP<Thyra::VectorBase<Scalar> >               stageX_;
 
-  Teuchos::RCP<StepperObserverComposite<Scalar> >    stepperObserver_;
-  Teuchos::RCP<StepperExplicitRKObserverComposite<Scalar> >  stepperExplicitRKObserver_;
+#ifndef TEMPUS_HIDE_DEPRECATED_CODE
+  Teuchos::RCP<StepperRKObserverComposite<Scalar> >      stepperObserver_;
+#endif
 
   // For Embedded RK
+  bool useEmbedded_;
   Teuchos::RCP<Thyra::VectorBase<Scalar> >               ee_;
   Teuchos::RCP<Thyra::VectorBase<Scalar> >               abs_u0;
   Teuchos::RCP<Thyra::VectorBase<Scalar> >               abs_u;

@@ -130,6 +130,7 @@ if [[ "$ATDM_CONFIG_COMPILER" == "CLANG-3.9.0" ]] ; then
   export OMPI_CC=`which clang`
   export OMPI_FC=`which gfortran`
   export LAPACK_ROOT=/usr/lib64/atlas
+  export BLAS_ROOT=/usr/lib64/atlas
   export ATDM_CONFIG_LAPACK_LIBS="-L${LAPACK_ROOT};-llapack"
   export ATDM_CONFIG_BLAS_LIBS="-L${BLAS_ROOT}/lib;-lblas"
 elif [[ "$ATDM_CONFIG_COMPILER" == "GNU-6.1.0" ]] ; then
@@ -138,6 +139,7 @@ elif [[ "$ATDM_CONFIG_COMPILER" == "GNU-6.1.0" ]] ; then
   export OMPI_CC=`which gcc`
   export OMPI_FC=`which gfortran`
   export LAPACK_ROOT=/usr/lib64/atlas
+  export BLAS_ROOT=/usr/lib64/atlas
   export ATDM_CONFIG_LAPACK_LIBS="-L${LAPACK_ROOT};-llapack"
   export ATDM_CONFIG_BLAS_LIBS="-L${BLAS_ROOT}/lib;-lblas"
 elif [[ "$ATDM_CONFIG_COMPILER" == "GNU-7.2.0" ]] ; then
@@ -146,6 +148,7 @@ elif [[ "$ATDM_CONFIG_COMPILER" == "GNU-7.2.0" ]] ; then
   export OMPI_CC=`which gcc`
   export OMPI_FC=`which gfortran`
   export LAPACK_ROOT=/usr/lib64/atlas
+  export BLAS_ROOT=/usr/lib64/atlas
   export ATDM_CONFIG_LAPACK_LIBS="-L${LAPACK_ROOT};-llapack"
   export ATDM_CONFIG_BLAS_LIBS="-L${BLAS_ROOT}/lib;-lblas"
 elif [[ "$ATDM_CONFIG_COMPILER" == "INTEL-17.0.1" ]] ; then
@@ -166,11 +169,11 @@ else
 fi
 
 module load sems-openmpi/1.10.1
-module load sems-netcdf/4.4.1/exo_parallel
-module load sems-hdf5/1.8.12/parallel
-module load sems-zlib/1.2.8/base
 module load sems-boost/1.59.0/base
-module unload sems-python/2.7.9 
+module load sems-netcdf/4.7.3/parallel
+module load sems-hdf5/1.10.6/parallel
+module load sems-zlib/1.2.8/base
+module unload sems-python/2.7.9
 module load sems-superlu/4.3/base
 
 if [[ "${ATDM_CONFIG_SHARED_LIBS}" == "ON" ]] ; then
@@ -182,12 +185,19 @@ fi
 export ATDM_CONFIG_USE_HWLOC=OFF
 export HWLOC_LIBS=-lhwloc
 
+export ZLIB_ROOT=${SEMS_ZLIB_ROOT}
 export BOOST_ROOT=${SEMS_BOOST_ROOT}
 export HDF5_ROOT=${SEMS_HDF5_ROOT}
 export NETCDF_ROOT=${SEMS_NETCDF_ROOT}
+if [[ "${SEMS_PNETCDF_ROOT}" == "" ]] ; then
+  export PNETCDF_ROOT=${SEMS_NETCDF_ROOT}
+else
+  export PNETCDF_ROOT=${SEMS_PNETCDF_ROOT}
+fi
 
-export ATDM_CONFIG_HDF5_LIBS="-L${SEMS_HDF5_ROOT}/lib;${SEMS_HDF5_ROOT}/lib/libhdf5_hl.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_HDF5_ROOT}/lib/libhdf5.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_ZLIB_ROOT}/lib/libz.${ATDM_CONFIG_TPL_LIB_EXT};-ldl"
-export ATDM_CONFIG_NETCDF_LIBS="-L${SEMS_BOOST_ROOT}/lib;-L${SEMS_NETCDF_ROOT}/lib;-L${SEMS_NETCDF_ROOT}/lib;-L${SEMS_PNETCDF_ROOT}/lib;-L${SEMS_HDF5_ROOT}/lib;${SEMS_BOOST_ROOT}/lib/libboost_program_options.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_BOOST_ROOT}/lib/libboost_system.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_NETCDF_ROOT}/lib/libnetcdf.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_NETCDF_ROOT}/lib/libpnetcdf.a;${SEMS_HDF5_ROOT}/lib/libhdf5_hl.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_HDF5_ROOT}/lib/libhdf5.${ATDM_CONFIG_TPL_LIB_EXT};${SEMS_ZLIB_ROOT}/lib/libz.${ATDM_CONFIG_TPL_LIB_EXT};-ldl;-lcurl"
+export ATDM_CONFIG_HDF5_LIBS="${HDF5_ROOT}/lib/libhdf5_hl.${ATDM_CONFIG_TPL_LIB_EXT};${HDF5_ROOT}/lib/libhdf5.${ATDM_CONFIG_TPL_LIB_EXT};${ZLIB_ROOT}/lib/libz.${ATDM_CONFIG_TPL_LIB_EXT};-ldl"
+
+export ATDM_CONFIG_NETCDF_LIBS="-L${NETCDF_ROOT}/lib;${NETCDF_ROOT}/lib/libnetcdf.${ATDM_CONFIG_TPL_LIB_EXT};${PNETCDF_ROOT}/lib/libpnetcdf.a;${ATDM_CONFIG_HDF5_LIBS};-lcurl"
 
 # NOTE: SEMS does not provide a *.a files for PNetCDF so we can't use them in
 # a shared lib build :-(

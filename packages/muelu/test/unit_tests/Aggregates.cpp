@@ -263,6 +263,8 @@ class AggregateGenerator {
       aggFact->SetParameter("aggregation: enable phase 2b",              Teuchos::ParameterEntry(true));
       aggFact->SetParameter("aggregation: enable phase 3",               Teuchos::ParameterEntry(true));
 
+      aggFact->SetParameter("aggregation: phase2a include root",         Teuchos::ParameterEntry(true));
+
       // Hybrid
       level.Set("aggregationRegionType", regionType);
 
@@ -585,6 +587,11 @@ class AggregateGenerator {
     for (LO i = 0; i < numAggs; ++i)
       aggSizes[i] = aggStart[i+1] - aggStart[i];
 
+    // LBV on 09/27/19: the aggregate size of 2 is only
+    // expected because the problem is 1D and the nodes
+    // are treated in a lexicographic order. Using a
+    // different ordering will almost always result in
+    // at least on aggregate of size 3 and one of size 1.
     bool foundAggNotSize2=false;
     for (int i=0; i<aggSizes.size(); ++i)
       if (aggSizes[i] != 2) {

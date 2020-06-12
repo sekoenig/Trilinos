@@ -54,8 +54,9 @@ template<typename T> class MultistateField;
 class FieldBase
 {
 public:
-  STK_FUNCTION FieldBase() = default;
+  KOKKOS_DEFAULTED_FUNCTION FieldBase() = default;
   STK_FUNCTION virtual ~FieldBase() {}
+  virtual void sync_to_host() {}
 };
 
 
@@ -102,13 +103,16 @@ public:
 
     void set_all(const StkMeshAdapter& ngpMesh, const T& value)
     {
-        ngp::for_each_entity_run(ngpMesh, field->entity_rank(), *field, KOKKOS_LAMBDA(const StkMeshAdapter::MeshIndex& entity) {
-            T* fieldPtr = static_cast<T*>(stk::mesh::field_data(*field, *entity.bucket, entity.bucketOrd));
-            *fieldPtr = value;
-        });
+      ngp::for_each_entity_run(ngpMesh, field->entity_rank(), *field, KOKKOS_LAMBDA(const StkMeshAdapter::MeshIndex& entity) {
+                                 T* fieldPtr = static_cast<T*>(stk::mesh::field_data(*field, *entity.bucket, entity.bucketOrd));
+                                 int numScalars = stk::mesh::field_scalars_per_entity(*field, *entity.bucket);
+                                 for (int i=0; i<numScalars; i++) {
+                                   fieldPtr[i] = value;
+                                 }
+                               });
     }
 
-    void sync_to_host() { }
+    void sync_to_host() override { }
 
     void sync_to_device() { }
 
@@ -117,6 +121,10 @@ public:
     void modify_on_device() { }
 
     void clear_sync_state() { }
+
+    void swap(ConstStkFieldAdapter<T> &sf) { }
+
+    void swap(StkFieldAdapter<T> &sf) { }
 
     stk::mesh::EntityRank get_rank() const { return field->entity_rank(); }
 
@@ -188,9 +196,13 @@ public:
 
     unsigned get_ordinal() const { return stkFieldAdapter.get_ordinal(); }
 
-    void sync_to_host() { }
+    void sync_to_host() override { }
 
     void sync_to_device() { }
+
+    void swap(ConstStkFieldAdapter<T> &sf) { }
+
+    void swap(StkFieldAdapter<T> &sf) { }
 
 #ifdef STK_HIDE_DEPRECATED_CODE
 private:
@@ -204,10 +216,6 @@ private:
     void copy_device_to_host(const stk::mesh::BulkData& bulk, const stk::mesh::FieldBase& field) { };
 private:
 #endif
-
-    void swap_data(ConstStkFieldAdapter<T> &sf) { }
-
-    void swap_data(StkFieldAdapter<T> &sf) { }
 
     bool need_sync_to_host() const { return false; }
 
@@ -294,7 +302,7 @@ public:
         Kokkos::deep_copy(deviceFieldExistsOnBucket, hostFieldExistsOnBucket);
     }
 
-    void sync_to_host()
+    void sync_to_host() override
     {
         if (need_sync_to_host()) {
             ProfilingBlock prof("copy_to_host for " + hostField->name());
@@ -325,7 +333,7 @@ public:
         fieldData.clear_sync_state();  // New Kokkos API
     }
 
-    STK_FUNCTION StaticField(const StaticField &) = default;
+    KOKKOS_DEFAULTED_FUNCTION StaticField(const StaticField &) = default;
 
     STK_FUNCTION virtual ~StaticField() {}
 
@@ -379,6 +387,14 @@ public:
 
     const stk::mesh::BulkData& get_bulk() const { return *hostBulk; }
 
+    STK_FUNCTION
+    void swap(StaticField<T> &sf)
+    {
+      swap_views(hostData,   sf.hostData);
+      swap_views(deviceData, sf.deviceData);
+      swap_views(fieldData,  sf.fieldData);
+    }
+
 #ifdef STK_HIDE_DEPRECATED_CODE
 private:
 #endif
@@ -427,14 +443,6 @@ private:
       ViewType tmpView = view2;
       view2 = view1;
       view1 = tmpView;
-    }
-
-    STK_FUNCTION
-    void swap_data(StaticField<T> &sf)
-    {
-      swap_views(hostData,   sf.hostData);
-      swap_views(deviceData, sf.deviceData);
-      swap_views(fieldData,  sf.fieldData);
     }
 
     template <typename ViewType>
@@ -530,7 +538,7 @@ public:
     {
     }
 
-    STK_FUNCTION ConstStaticField(const ConstStaticField &) = default;
+    KOKKOS_DEFAULTED_FUNCTION ConstStaticField(const ConstStaticField &) = default;
 
     STK_FUNCTION virtual ~ConstStaticField() {}
 
@@ -559,7 +567,7 @@ public:
     STK_FUNCTION
     unsigned get_ordinal() const { return staticField.get_ordinal(); }
 
-    void sync_to_host()
+    void sync_to_host() override
     {
         if (need_sync_to_host()) {
             copy_device_to_host();
@@ -571,6 +579,19 @@ public:
         if (need_sync_to_device()) {
             copy_host_to_device();
         }
+    }
+
+    STK_FUNCTION
+    void swap(ConstStaticField<T> &sf)
+    {
+        swap(sf.staticField);
+    }
+
+    STK_FUNCTION
+    void swap(StaticField<T> &sf)
+    {
+        staticField.swap(sf);
+        constDeviceData = staticField.deviceData;
     }
 
 #ifdef STK_HIDE_DEPRECATED_CODE
@@ -607,19 +628,6 @@ private:
     void clear_sync_state()
     {
         staticField.clear_sync_state();
-    }
-
-    STK_FUNCTION
-    void swap_data(ConstStaticField<T> &sf)
-    {
-        swap_data(sf.staticField);
-    }
-
-    STK_FUNCTION
-    void swap_data(StaticField<T> &sf)
-    {
-        staticField.swap_data(sf);
-        constDeviceData = staticField.deviceData;
     }
 
 #ifdef KOKKOS_ENABLE_CUDA

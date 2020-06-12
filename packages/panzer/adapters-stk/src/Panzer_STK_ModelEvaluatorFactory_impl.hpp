@@ -77,7 +77,6 @@
 
 #include "Panzer_STK_Interface.hpp"
 #include "Panzer_STK_ExodusReaderFactory.hpp"
-#include "Panzer_STK_PamgenReaderFactory.hpp"
 #include "Panzer_STK_LineMeshFactory.hpp"
 #include "Panzer_STK_SquareQuadMeshFactory.hpp"
 #include "Panzer_STK_SquareTriMeshFactory.hpp"
@@ -100,6 +99,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <cstdlib> // for std::getenv
 
 // Piro solver objects
 #include "Thyra_EpetraModelEvaluator.hpp"
@@ -666,6 +666,15 @@ namespace panzer_stk {
       bool write_fm_files = p.sublist("Options").get("Write Field Manager Files",false);
       std::string fm_file_prefix = p.sublist("Options").get("Field Manager File Prefix","Panzer_AssemblyGraph");
 
+      // Allow users to override inputs via runtime env
+      {
+        auto check_write_dag = std::getenv("PANZER_WRITE_DAG");
+        if (check_write_dag != nullptr) {
+          write_dot_files = true;
+          write_fm_files = true;
+        }
+      }
+
       fmb = buildFieldManagerBuilder(wkstContainer,physicsBlocks,bcs,*eqset_factory,bc_factory,cm_factory,
                                      user_cm_factory,p.sublist("Closure Models"),*linObjFactory,user_data_params,
                                      write_dot_files,dot_file_prefix,
@@ -960,8 +969,10 @@ namespace panzer_stk {
       mesh_factory->setParameterList(Teuchos::rcp(new Teuchos::ParameterList(mesh_params.sublist("Exodus File"))));
     }
     else if (mesh_params.get<std::string>("Source") ==  "Pamgen Mesh") {
-      mesh_factory = Teuchos::rcp(new panzer_stk::STK_PamgenReaderFactory());
-      mesh_factory->setParameterList(Teuchos::rcp(new Teuchos::ParameterList(mesh_params.sublist("Pamgen Mesh"))));
+      mesh_factory = Teuchos::rcp(new panzer_stk::STK_ExodusReaderFactory());
+      Teuchos::RCP<Teuchos::ParameterList> pamgenList = Teuchos::rcp(new Teuchos::ParameterList(mesh_params.sublist("Pamgen Mesh")));
+      pamgenList->set("File Type","Pamgen"); // For backwards compatibility when pamgen had separate factory from exodus
+      mesh_factory->setParameterList(pamgenList);
     }
     else if (mesh_params.get<std::string>("Source") ==  "Inline Mesh") {
 

@@ -1,35 +1,8 @@
-// Copyright(C) 2008-2017 National Technology & Engineering Solutions
+// Copyright(C) 1999-2020 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
-//
-//     * Redistributions in binary form must reproduce the above
-//       copyright notice, this list of conditions and the following
-//       disclaimer in the documentation and/or other materials provided
-//       with the distribution.
-//
-//     * Neither the name of NTESS nor the names of its
-//       contributors may be used to endorse or promote products derived
-//       from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
+// 
+// See packages/seacas/LICENSE for details
 
 #include "ED_SystemInterface.h"
 #include "exo_entity.h"
@@ -42,9 +15,7 @@
 #include <cstdlib>        // for exit
 #include <cstring>        // for strlen
 #include <string>
-#include <string> // for string, char_traits, etc
 #include <vector>
-#include <vector> // for vector
 
 namespace {
   size_t get_index(int file_id, EXOTYPE exo_type, size_t id, const char *label);
@@ -422,16 +393,16 @@ void Exo_Entity::internal_load_params()
         attributeNames.push_back(name);
       }
       else if (static_cast<int>(std::strlen(names[vg])) > name_size) {
-        fmt::print(stderr, fmt::v5::fg(fmt::color::red),
+        fmt::print(stderr, fmt::fg(fmt::color::red),
                    "exodiff: ERROR: {} attribute names appear corrupt\n"
                    "                A length is 0 or greater than name_size({})\n"
                    "                Here are the names that I received from"
                    " a call to ex_get_attr_names(...):\n",
                    label(), name_size);
         for (int k = 1; k <= numAttr; ++k) {
-          fmt::print(stderr, fmt::v5::fg(fmt::color::red), "\t\t{}) \"{}\"\n", k, names[k - 1]);
+          fmt::print(stderr, fmt::fg(fmt::color::red), "\t\t{}) \"{}\"\n", k, names[k - 1]);
         }
-        fmt::print(stderr, fmt::v5::fg(fmt::color::red), "                 Aborting...\n");
+        fmt::print(stderr, fmt::fg(fmt::color::red), "                 Aborting...\n");
         exit(1);
       }
       else {
