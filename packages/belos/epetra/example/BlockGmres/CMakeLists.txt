@@ -60,6 +60,15 @@ IF (${PACKAGE_NAME}_ENABLE_Triutils AND ${PACKAGE_NAME}_ENABLE_EpetraExt)
              "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Roots"
         )
 
+      TRIBITS_ADD_EXECUTABLE_AND_TEST(
+        BlockGmresPoly_Adv_Epetra_File_Ex
+        SOURCES BlockGmresPolyAdvEpetraExFile.cpp
+        COMM serial mpi
+        ARGS "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Arnoldi"
+             "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Gmres"
+             "--verbose --filename=orsirr1.hb --precond=none --max-degree=5 --poly-type=Roots"
+        )
+
       TRIBITS_ADD_EXECUTABLE(
         BlockGmresPolyResolve_Epetra_File_Ex
         SOURCES BlockGmresPolyResolveEpetraExFile.cpp
