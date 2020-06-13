@@ -99,6 +99,14 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
+IF (${PACKAGE_NAME}_ENABLE_Galeri)
+TRIBITS_ADD_EXECUTABLE(
+  GaleriMatixCreator
+  SOURCES GaleriMatrixCreator.cpp 
+  COMM serial mpi
+  )
+ENDIF (${PACKAGE_NAME}_ENABLE_Galeri)
+
 TRIBITS_ADD_EXECUTABLE(
   PseudoBlockCGEpetraEx
   SOURCES PseudoBlockCGEpetraExFile.cpp
