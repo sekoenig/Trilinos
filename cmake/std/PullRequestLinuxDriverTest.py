@@ -225,9 +225,9 @@ def setBuildEnviron(arguments):
                      'sems-parmetis/4.0.3/parallel',
                      'sems-scotch/6.0.3/nopthread_64bit_parallel',
                      'sems-superlu/4.3/base',
-                     'sems-cmake/3.10.3',
-                     'atdm-env',
-                     'atdm-ninja_fortran/1.7.2'],
+                     'sems-cmake/3.17.1',
+                     'sems-ninja_fortran/1.10.0',
+                     'atdm-env'],
                 'Trilinos_pullrequest_intel_17.0.1':
                      ['sems-env',
                      'sems-git/2.10.1',
@@ -548,7 +548,8 @@ def createPackageEnables(arguments):
                                                 'get-changed-trilinos-packages.sh'),
                                    os.path.join('origin', arguments.targetBranch),
                                    'HEAD',
-                                   'packageEnables.cmake'])
+                                   'packageEnables.cmake',
+                                   'package_subproject_list.cmake'])
         else:
             with open('packageEnables.cmake',  'w') as f_out:
                 f_out.write(dedent('''\
@@ -558,6 +559,10 @@ def createPackageEnables(arguments):
                     ENDMACRO()
 
                     PR_ENABLE_BOOL(Trilinos_ENABLE_''' + enable_map[arguments.job_base_name] + ''' ON)
+                    '''))
+            with open ('package_subproject_list.cmake', 'w') as f_out:
+                f_out.write(dedent('''\
+                    set(CTEST_LABELS_FOR_SUBPROJECTS ''' + enable_map[arguments.job_base_name] + ''')
                     '''))
         print('Enabled packages:')
         cmake_rstring = subprocess.check_output(['cmake',
@@ -658,6 +663,11 @@ def run():
 
     parallel_level = compute_n()
 
+    if 'JENKINS_TEST_WEIGHT' in os.environ:
+        test_parallel_level = os.environ['JENKINS_TEST_WEIGHT']
+    else:
+        test_parallel_level = parallel_level
+
     build_name = generateBuildNameString(arguments)
 
     config_script = config_map[arguments.job_base_name]
@@ -672,6 +682,7 @@ def run():
                            '-Ddashboard_model=Experimental',
                            '-Ddashboard_track={}'.format(CDash_Track),
                            '-DPARALLEL_LEVEL={}'.format(parallel_level),
+                           '-DTEST_PARALLEL_LEVEL={}'.format(test_parallel_level),
                            '-Dbuild_dir={}/pull_request_test'.format(arguments.workspaceDir),
                            '-Dconfigure_script=' +
                                os.path.join(arguments.workspaceDir,
@@ -680,8 +691,7 @@ def run():
                                             'std',
                                             config_script),
                            '-Dpackage_enables=../packageEnables.cmake',
-                           '-Dsubprojects_file=../TFW_single_configure_support_scripts/'+
-                           'package_subproject_list.cmake'])
+                           '-Dsubprojects_file=../package_subproject_list.cmake'])
 
     return return_value
 
