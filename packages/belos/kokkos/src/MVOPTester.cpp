@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
 {
   bool ierr;
   Kokkos::initialize();
+  {
   //bool verbose = false;
   bool verbose = true;
   /*if (argc>1) {
@@ -164,6 +165,7 @@ int main(int argc, char *argv[])
 
 
   TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose,std::cerr,success);
+  }
   Kokkos::finalize();
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

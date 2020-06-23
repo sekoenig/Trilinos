@@ -61,6 +61,7 @@
 int main(int argc, char *argv[]) {
 
   Kokkos::initialize();
+  {
 
   typedef double                            ST;
   typedef int                               OT;
@@ -188,18 +189,18 @@ bool proc_verbose = false;
     }
   }
 
-if (ret!=Belos::Converged || badRes) {
-  success = false;
-  if (proc_verbose)
-    std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
-} else {
-  success = true;
-  if (proc_verbose)
-    std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
-}
-//}
-//TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
-
-Kokkos::finalize();
-return success ? EXIT_SUCCESS : EXIT_FAILURE;
+  if (ret!=Belos::Converged || badRes) {
+    success = false;
+    if (proc_verbose)
+      std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
+  } else {
+    success = true;
+    if (proc_verbose)
+      std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
+  }
+  //}
+  //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
+  }
+  Kokkos::finalize();
+  return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

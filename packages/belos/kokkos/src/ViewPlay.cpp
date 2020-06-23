@@ -35,7 +35,7 @@ void MvPrint(Kokkos::View<ST*> A){
 
 int main(int argc, char* argv[]) {
    Kokkos::initialize();
-  {
+   {
 
    //int N = atoi(argv[1]);
    int N = 5;
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Here is the dot prod: " << std::endl;
   std::cout << z2() << std::endl;
   }
-   Kokkos::finalize();
+  Kokkos::finalize();
 }
 
 //Creation Methods
