@@ -56,6 +56,7 @@
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
+#include "Teuchos_YamlParameterListCoreHelpers.hpp"
 
 int main(int argc, char *argv[]) {
   //
@@ -88,11 +89,13 @@ int main(int argc, char *argv[]) {
     double conv = 1.0; //Convection term
     std::string MatrixType("Laplace3D");
     std::string filename("");
+    std::string yamlFile("");
 
     Teuchos::CommandLineProcessor cmdp(false,true);
     cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
     cmdp.setOption("debug","nondebug",&debug,"Print debugging information from solver.");
     cmdp.setOption("filename",&filename,"Name of the file to which matrix is saved.  Default is MatrixType+nx.");
+    cmdp.setOption("yamlfile",&yamlFile, "Name of the YAML file from which to read Galeri matrix paramters.");
     cmdp.setOption("nx",&nx,"Number of discretization points in each direction of PDE.");
     cmdp.setOption("matrix-type",&MatrixType,"Matrix type. See Galeri documentation. (Default: Laplace3D)");
     cmdp.setOption("diff",&diff,"Diffusion term.  Default: 1e-5");
@@ -101,10 +104,15 @@ int main(int argc, char *argv[]) {
     if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
       return -1;
     }
-
+    RCP<ParameterList> GaleriList;
+    if(yamlFile.compare("") != 0){//string::compare returns 0 when equal.
+      GaleriList = Teuchos::getParametersFromYamlFile(yamlFile);
+    }
+    else{
+      GaleriList = rcp(new Teuchos::ParameterList);
+    }
 
   proc_verbose = verbose && (MyPID==0);  /* Only print on the zero processor */
-
 
 
     //Generate Galeri problem
@@ -115,15 +123,19 @@ int main(int argc, char *argv[]) {
         MapType = "Cartesian3D";
       }
 
-      Teuchos::ParameterList GaleriList;
-      GaleriList.set ("n", nx * nx * nx);
-      GaleriList.set ("nx", nx);
-      GaleriList.set ("ny", nx);
-      GaleriList.set ("nz", nx);
-      GaleriList.set ("diff", diff);
-      GaleriList.set ("conv", conv);
-      Map = rcp (Galeri::CreateMap (MapType, Comm, GaleriList));
-      A = rcp (Galeri::CreateCrsMatrix (MatrixType, &*Map, GaleriList));
+      if(!GaleriList->isParameter("nx"))
+        GaleriList->set ("nx", nx);
+      if(!GaleriList->isParameter("ny"))
+        GaleriList->set ("ny", nx);
+      if(!GaleriList->isParameter("nz"))
+        GaleriList->set ("nz", nx);
+      if(!GaleriList->isParameter("diff"))
+        GaleriList->set ("diff", diff);
+      if(!GaleriList->isParameter("conv"))
+        GaleriList->set ("conv", conv);
+      GaleriList->print(std::cout);
+      Map = rcp (Galeri::CreateMap (MapType, Comm, *GaleriList));
+      A = rcp (Galeri::CreateCrsMatrix (MatrixType, &*Map, *GaleriList));
     
 
     A->OptimizeStorage();

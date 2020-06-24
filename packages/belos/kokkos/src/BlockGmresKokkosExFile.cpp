@@ -60,7 +60,9 @@
 
 int main(int argc, char *argv[]) {
 
+bool success = true;
   Kokkos::initialize();
+  {
 
   typedef double                            ST;
   //typedef double                           ST2;
@@ -80,7 +82,6 @@ int main(int argc, char *argv[]) {
   using Teuchos::rcp;
 
 bool verbose = true;
-bool success = true;
 //try {
 bool proc_verbose = false;
   int frequency = 10;        // frequency of status test output.
@@ -200,18 +201,18 @@ bool proc_verbose = false;
     }
   }
 
-if (ret!=Belos::Converged || badRes) {
-  success = false;
-  if (proc_verbose)
-    std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
-} else {
-  success = true;
-  if (proc_verbose)
-    std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
-}
-//}
-//TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
-
-Kokkos::finalize();
-return success ? EXIT_SUCCESS : EXIT_FAILURE;
+  if (ret!=Belos::Converged || badRes) {
+    success = false;
+    if (proc_verbose)
+      std::cout << std::endl << "ERROR:  Belos did not converge!" << std::endl;
+  } else {
+    success = true;
+    if (proc_verbose)
+      std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
+  }
+  //}
+  //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
+  }
+  Kokkos::finalize();
+  return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -57,7 +57,9 @@ using std::endl;
 int main(int argc, char *argv[])
 {
   bool ierr;
+  bool success = true;
   Kokkos::initialize();
+  {
   //bool verbose = false;
   bool verbose = true;
   /*if (argc>1) {
@@ -66,7 +68,6 @@ int main(int argc, char *argv[])
     }
   }*/
 
-  bool success = true;
 //  try {
     // number of global elements
     int dim = 10;
@@ -185,6 +186,7 @@ int main(int argc, char *argv[])
 
 
   //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose,std::cerr,success);
+  }
   Kokkos::finalize();
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
