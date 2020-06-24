@@ -57,6 +57,7 @@ using std::endl;
 int main(int argc, char *argv[])
 {
   bool ierr;
+  bool success = true;
   Kokkos::initialize();
   {
   //bool verbose = false;
@@ -67,7 +68,6 @@ int main(int argc, char *argv[])
     }
   }*/
 
-  bool success = true;
 //  try {
     // number of global elements
     int dim = 10;

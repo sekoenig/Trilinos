@@ -60,6 +60,7 @@
 
 int main(int argc, char *argv[]) {
 
+bool success = true;
   Kokkos::initialize();
   {
 
@@ -80,7 +81,6 @@ int main(int argc, char *argv[]) {
   using Teuchos::rcp;
 
 bool verbose = true;
-bool success = true;
 //try {
 bool proc_verbose = false;
   int frequency = 10;        // frequency of status test output.
