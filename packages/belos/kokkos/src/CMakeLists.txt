@@ -82,12 +82,6 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
-  LabelEpetraTest
-  SOURCES LabelEpetraTest.cpp
-  COMM serial mpi
-  )
-
-TRIBITS_ADD_EXECUTABLE(
   MultiGmresKokkosEx
   SOURCES MultiGmresKokkosEx.cpp 
   COMM serial mpi
@@ -107,6 +101,7 @@ TRIBITS_ADD_EXECUTABLE(
   )
 ENDIF (${PACKAGE_NAME}_ENABLE_Galeri)
 
+IF (${PACKAGE_NAME}_ENABLE_Epetra)
 TRIBITS_ADD_EXECUTABLE(
   PseudoBlockCGEpetraEx
   SOURCES PseudoBlockCGEpetraExFile.cpp
@@ -114,8 +109,8 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
-  PseudoBlockCGTpetraEx
-  SOURCES PseudoBlockCGTpetraExFile.cpp
+  LabelEpetraTest
+  SOURCES LabelEpetraTest.cpp
   COMM serial mpi
   )
 
@@ -124,12 +119,21 @@ TRIBITS_ADD_EXECUTABLE(
   SOURCES BlockGmresEpetraExFile.cpp
   COMM serial mpi
   )
+ENDIF (${PACKAGE_NAME}_ENABLE_Epetra)
+
+IF (${PACKAGE_NAME}_ENABLE_Tpetra)
+TRIBITS_ADD_EXECUTABLE(
+  PseudoBlockCGTpetraEx
+  SOURCES PseudoBlockCGTpetraExFile.cpp
+  COMM serial mpi
+  )
 
 TRIBITS_ADD_EXECUTABLE(
   BlockGmresTpetraEx
   SOURCES BlockGmresTpetraExFile.cpp
   COMM serial mpi
   )
+ENDIF (${PACKAGE_NAME}_ENABLE_Tpetra)
 
 TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyKokkosMatrixMarketFiles
   SOURCE_DIR ${Belos_SOURCE_DIR}/kokkos/src/
