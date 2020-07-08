@@ -58,6 +58,18 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  KokkosILUEx
+  SOURCES KokkosILUEx.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  ILUGmresKokkosEx
+  SOURCES ILUGmresKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   MVTestInternal
   SOURCES MVTestInternal.cpp
   COMM serial mpi
