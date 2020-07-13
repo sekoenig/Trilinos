@@ -36,12 +36,12 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     using lno_view_t      = typename graph_t::row_map_type::non_const_type; //row map view type
     using lno_nnz_view_t  = typename graph_t::entries_type::non_const_type; //entries view type
     using scalar_view_t   = typename crsMat_t::values_type::non_const_type; //values view type
-    using KernelHandle    = KokkosKernels::Experimental::KokkosKernelsHandle <const size_type, const lno_t, const scalar_t,
+    using KernelHandle    = KokkosKernels::Experimental::KokkosKernelsHandle <size_type, lno_t, scalar_t,
                                                                               execution_space, memory_space, memory_space>;
 
     //KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> A;
     crsMat_t A;// Matrix from which to create ILU factorization. 
-    KernelHandle kh_sptrsv_L, kh_sptrsv_U; //Kernel handles for ILU factorization. 
+    mutable KernelHandle kh_sptrsv_L, kh_sptrsv_U; //Kernel handles for ILU factorization. 
     // Allocate row map, entries, values views (1-D) for L and U
     // We don't know how big to make these until ILU setup, so will resize them later.  
     lno_view_t     L_row_map;
@@ -50,6 +50,8 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     lno_view_t     U_row_map;
     lno_nnz_view_t U_entries;
     scalar_view_t  U_values;	
+    // one-time allocate temp vector for applying L and U solve:
+    ViewVectorType tmp;
 
   public:
   // Shallow copy for mat of same scalar type:
@@ -60,7 +62,8 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     L_values ("L_values",0),
     U_row_map("U_row_map",0),
     U_entries("U_entries",0),
-    U_values ("U_values",0)	
+    U_values ("U_values",0),
+    tmp ("tmp",0)
     {}
 
   //This doesn't work yet!! That is view notation!
@@ -69,6 +72,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
   //  KokkosILUOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType2, OrdinalType, Device> mat) 
   //   : myMatrix(Kokkos::ViewAllocateWithoutInitializing("Mat"),mat.extent(0),mat.extent(1)) {Kokkos::deep_copy(myMatrix,mat);}
   //
+  //TODO add all the options for ILU.  Take out the extra junk. 
     int SetUpILU() {
     int success = 1;
   int algo_spiluk = LVLSCHED_RP; // SPILUK kernel implementation
@@ -163,6 +167,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     scalar_view_t  U_values ("U_values",  spiluk_handle->get_nnzU());	
     */
 
+    Kokkos::resize(tmp, N);
     Kokkos::resize(L_row_map, N + 1);
     Kokkos::resize(L_entries, spiluk_handle->get_nnzL());
     Kokkos::resize(L_values, spiluk_handle->get_nnzL());
@@ -207,6 +212,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     }
 
     //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
+    // y = A*x
     void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...
       // Note: spmv computes y = beta*y + alpha*Op(A)*x  spmv(mode,alpha,A,x,beta,y);
@@ -215,19 +221,18 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
       KokkosMultiVec<ScalarType> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType> *>(&const_cast<MultiVec<ScalarType> &>(x));
       KokkosMultiVec<ScalarType> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType> *>(&y);
 
-      // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. (TODO find a better way...)
+      // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. 
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft> ysub = Kokkos::subview(y_vec->myView, Kokkos::ALL, 0);
-     //  using RANK_SPECIALISE =
-     //   typename std::conditional<static_cast<int> (x_vec->myView.rank) == 2, KokkosSparse::RANK_TWO, KokkosSparse::RANK_ONE>::type;
-     // KokkosSparse::spmv(mode, alpha, myMatrix, x_vec->myView(), beta, y_vec->myView(), RANK_SPECIALISE());
-      //KokkosSparse::spmv(mode, alpha, A, x_vec->myView, beta, y_vec->myView);
 
       // KokkosSparse::Experimental::sptrsv_solve(handle, rowmap, entries, values, b, x);
       // x = U\b, x = L\b, Ux=b, etc. 
       // TODO did I pass in correct vectors? for solve??
-          KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_L, L_row_map, L_entries, L_values, xsub, ysub); 
-          KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_U, U_row_map, U_entries, U_values, xsub, ysub);
+      // LUy = x by this layout
+      // Uy = L\x = tmp
+      // y = U\tmp
+      KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_L, L_row_map, L_entries, L_values, xsub, tmp); 
+      KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_U, U_row_map, U_entries, U_values, tmp, ysub);
 
     }
 
