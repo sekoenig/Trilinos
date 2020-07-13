@@ -57,6 +57,7 @@
 
 #include "BelosKokkosAdapter.hpp"
 #include "KokkosKernels_IOUtils.hpp"
+#include "BelosKokkosILUOp.hpp"
 
 int main(int argc, char *argv[]) {
 
@@ -72,6 +73,7 @@ bool success = true;
   //typedef SCT::magnitudeType                MT;
   //typedef Belos::KokkosMultiVec<ST>         MV;
   //typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
+  typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVec<ST2> KMV2;
@@ -97,10 +99,12 @@ bool proc_verbose = false;
   double tol = 1.0e-8;           // relative residual tolerance
   bool converged = false;  
   bool verboseTimes = false; //Show timing at every low precision Gmres iter?  
+  bool precOn = false;
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("verboseTimes","quietTimes",&verbose,"Print timings at every Gmres run.");
+  cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
   //cmdp.setOption("tol",&tol,"Relative residual tolerance used by Gmres solver.");
@@ -127,6 +131,13 @@ bool proc_verbose = false;
   RCP<Belos::KokkosOperator<ST2, OT, EXSP>> A2 = 
             rcp(new Belos::KokkosOperator<ST2,OT,EXSP>(crsMat2));
   OT numRows = crsMat.numRows();
+  //Test code for ILU operator: 
+  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
+            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+
+  std::cout << "Setting up ILU prec: " << std::endl;
+  ILUprec->SetUpILU();
+  std::cout << "Exited ILU prec setup." << std::endl;
   
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
   X1->MvInit(0.0);
@@ -185,6 +196,9 @@ bool proc_verbose = false;
 
   Belos::LinearProblem<ST,KMV,KOP> problem1;
   problem1.setOperator(A1);
+  if(precOn) {
+    problem1.setRightPrec(ILUprec);
+  }
   RCP< Belos::SolverManager<ST,KMV,KOP> > Solver1
     = rcp( new Belos::BlockGmresSolMgr<ST,KMV,KOP>(rcp(&problem1,false), rcp(&belosList,false)) );
   int iter = 1; //initialize IR loop counter.

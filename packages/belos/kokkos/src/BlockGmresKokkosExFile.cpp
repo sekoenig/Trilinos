@@ -56,6 +56,7 @@
 #include "Teuchos_StandardCatchMacros.hpp"
 
 #include "BelosKokkosAdapter.hpp"
+#include "BelosKokkosILUOp.hpp"
 #include "KokkosKernels_IOUtils.hpp"
 
 int main(int argc, char *argv[]) {
@@ -72,6 +73,7 @@ bool success = true;
   typedef SCT::magnitudeType                MT;
   typedef Belos::KokkosMultiVec<ST>         MV;
   typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
+  typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
@@ -84,17 +86,19 @@ bool success = true;
 bool verbose = true;
 //try {
 bool proc_verbose = false;
-  int frequency = 10;        // frequency of status test output.
+  int frequency = 25;        // frequency of status test output.
   int numrhs = 1;            // number of right-hand sides to solve for
   int maxiters = -1;         // maximum number of iterations allowed per linear system
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 25;      // number of restarts allowed
   bool expresidual = false; // use explicit residual
+  bool precOn = false;
   std::string filename("bcsstk13.mtx"); // example matrix
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
+  cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -117,6 +121,14 @@ bool proc_verbose = false;
             rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
   
+  //Test code for ILU operator: 
+  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
+            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+
+  std::cout << "Setting up ILU prec: " << std::endl;
+  ILUprec->SetUpILU();
+  std::cout << "Exited ILU prec setup." << std::endl;
+
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
   X->MvInit(0.0);
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> B = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
@@ -151,6 +163,9 @@ bool proc_verbose = false;
   // Construct an unpreconditioned linear problem instance.
   //
   Belos::LinearProblem<ST,KMV,KOP> problem( A, X, B );
+  if(precOn) {
+    problem.setRightPrec(ILUprec);
+  }
   bool set = problem.setProblem();
   if (set == false) {
     if (proc_verbose)
