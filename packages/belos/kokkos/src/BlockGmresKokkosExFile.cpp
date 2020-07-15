@@ -120,14 +120,16 @@ bool proc_verbose = false;
   RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
             rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
-  
+
   //Test code for ILU operator: 
   RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
             rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
 
+  if(precOn) { 
   std::cout << "Setting up ILU prec: " << std::endl;
   ILUprec->SetUpILU();
   std::cout << "Exited ILU prec setup." << std::endl;
+  }
 
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
   X->MvInit(0.0);
