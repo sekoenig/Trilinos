@@ -53,6 +53,7 @@
 
 using std::cout;
 using std::endl;
+using Teuchos::RCP;
 
 int main(int argc, char *argv[])
 {
@@ -113,6 +114,19 @@ int main(int argc, char *argv[])
 
     std::cout << "Print ivec2, double." << std::endl;
     ivec2->MvPrint(cout);
+
+    //Test new impl of MvTransMv with Gemv:
+    RCP<Teuchos::SerialDenseMatrix<int, ScalarType>> denseMat = Teuchos::rcp( new Teuchos::SerialDenseMatrix<int, ScalarType>(5,1));
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> Avec = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(8,5) );
+    Avec->MvInit(2.0);
+    Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> multiVec = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(8,1) );
+    multiVec->MvInit(3.0);
+    multiVec->MvTransMv(1.0,*Avec,*denseMat);
+    cout << "should be all 48: " << endl;
+    denseMat->print(std::cout);
+
+
+
 
     
     Kokkos::View<double**,Kokkos::LayoutLeft> mv("test",4,2);
