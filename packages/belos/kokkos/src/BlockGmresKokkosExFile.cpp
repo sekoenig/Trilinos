@@ -68,10 +68,11 @@ bool success = true;
   typedef double                            ST;
   //typedef double                           ST2;
   typedef int                               OT;
-  typedef Kokkos::DefaultExecutionSpace     EXSP;
+  //typedef Kokkos::DefaultExecutionSpace     EXSP;
+  typedef Kokkos::CudaSpace                EXSP;
   typedef Teuchos::ScalarTraits<ST>        SCT;
   typedef SCT::magnitudeType                MT;
-  typedef Belos::KokkosMultiVec<ST>         MV;
+  typedef Belos::KokkosMultiVec<ST, EXSP>         MV;
   typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
   typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
@@ -131,9 +132,9 @@ bool proc_verbose = false;
   std::cout << "Exited ILU prec setup." << std::endl;
   }
 
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
+  Teuchos::RCP<MV> X = Teuchos::rcp( new MV(numRows, numrhs) );
   X->MvInit(0.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> B = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
+  Teuchos::RCP<MV> B = Teuchos::rcp( new MV(numRows, numrhs) );
   B->MvInit(1.0);
 
   proc_verbose = verbose;  /* Only print on the zero processor */
@@ -204,7 +205,7 @@ bool proc_verbose = false;
   bool badRes = false;
   std::vector<ST> actual_resids( numrhs );
   std::vector<ST> rhs_norm( numrhs );
-  Belos::KokkosMultiVec<ST> resid(numRows, numrhs);
+  MV resid(numRows, numrhs);
   OPT::Apply( *A, *X, resid );
   MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
   MVT::MvNorm( resid, actual_resids );

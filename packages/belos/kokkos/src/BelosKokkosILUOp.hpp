@@ -78,7 +78,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
   int algo_spiluk = LVLSCHED_RP; // SPILUK kernel implementation
   int algo_sptrsv = LVLSCHED_RP; // SPTRSV kernel implementation
   int k = 0;                     // fill level
-  int team_size = -1;            // team size
+  int team_size = -1;            // team size //TODO I bet in the original driver, this has an option to read from cmnd line
 
     scalar_t tolerance = 0.0000000001;
     scalar_t one  = scalar_t(1.0);
@@ -113,6 +113,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     // EXERCISE: Create a SPTRSV handle
     // EXERCISE hint: input arguments include implementation type (i.e. KokkosSparse::Experimental::SPTRSVAlgorithm::SEQLVLSCHD_RP or KokkosSparse::Experimental::SPTRSVAlgorithm::SEQLVLSCHD_TP1), number of matrix rows, lower or upper matrix flag (boolean)
     std::cout << "Create SPTRSV handle for L ..." << std::endl;
+    //TODO can use  SPTRSV_CUSPARSE if CUsparse is enabled... add this option.
     bool is_lower_tri = true;
     switch(algo_sptrsv) {
       case LVLSCHED_RP:
