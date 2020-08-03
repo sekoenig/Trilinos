@@ -26,7 +26,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
     using scalar_t  = ScalarType;
     using lno_t     = int;
     using Layout          = Kokkos::LayoutLeft;
-    using ViewVectorType  = Kokkos::View<ScalarType*, Layout>;
+    using ViewVectorType  = Kokkos::View<ScalarType*, Layout, Device>;
     using execution_space = typename ViewVectorType::device_type::execution_space;
     using memory_space    = typename ViewVectorType::device_type::memory_space;
     using crsMat_t = KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device>;
@@ -223,8 +223,8 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
       KokkosMultiVec<ScalarType> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType> *>(&y);
 
       // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. 
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft> ysub = Kokkos::subview(y_vec->myView, Kokkos::ALL, 0);
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = Kokkos::subview(y_vec->myView, Kokkos::ALL, 0);
 
       // KokkosSparse::Experimental::sptrsv_solve(handle, rowmap, entries, values, b, x);
       // x = U\b, x = L\b, Ux=b, etc. 
