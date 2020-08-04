@@ -85,7 +85,6 @@ bool success = true;
   using Teuchos::ParameterList;
   using Teuchos::RCP;
   using Teuchos::rcp;
-  //MV::multivecCount = 0;
 
 bool verbose = true;
 //try {
@@ -233,6 +232,7 @@ bool proc_verbose = false;
   }
 
   std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
+  std::cout << std::endl << "Final number of resizes is: " << MV::resizeScratchCount << std::endl;
   //}
   //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
   }
