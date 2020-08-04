@@ -80,10 +80,10 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
   int k = 0;                     // fill level
   int team_size = -1;            // team size //TODO I bet in the original driver, this has an option to read from cmnd line
 
-    scalar_t tolerance = 0.0000000001;
-    scalar_t one  = scalar_t(1.0);
-    scalar_t zero = scalar_t(0.0);
-    scalar_t mone = scalar_t(-1.0);
+    //scalar_t tolerance = 0.0000000001;
+    //scalar_t one  = scalar_t(1.0);
+    //scalar_t zero = scalar_t(0.0);
+    //scalar_t mone = scalar_t(-1.0);
 
     graph_t  graph    = A.graph; // in_graph
     const size_type N = graph.numRows();

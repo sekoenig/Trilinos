@@ -30,16 +30,23 @@
  //   template<class ScalarType2, class OrdinalType, class Device>
  //   friend class KokkosOperator; 
   public:
+    using size_type = typename Device::size_type;
+
+    static int multivecCount;
+
     // constructors
     KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs) 
-     : myView (label,numrows,numvecs)
-    {}
+     : myView (label,numrows,numvecs),
+     scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),SCRATCH_SIZE,SCRATCH_SIZE)
+    { multivecCount++; }
     KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs) 
-     : myView ("MV",numrows,numvecs)
-    {}
+     : myView ("MV",numrows,numvecs),
+     scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),SCRATCH_SIZE,SCRATCH_SIZE)
+     { multivecCount++; }
     KokkosMultiVec<ScalarType, Device> (const int numrows) 
-     : myView("MV",numrows,1)
-    {}
+     : myView("MV",numrows,1),
+     scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),SCRATCH_SIZE,SCRATCH_SIZE)
+    { multivecCount++; }
 
 
     // Make so that copy constructor of MV gives deep copy.  
@@ -297,7 +304,9 @@
 
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
+      //Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> dotView = getScratchView(myView.extent(1));
+      std::cerr << "Now in Dot.  dotView extent(0) is: " << dotView.extent(0) << " extent(1) is: " << dotView.extent(1) << std::endl;
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
       for(unsigned int i=0; i < myView.extent(1); i++){
@@ -361,6 +370,42 @@
     Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> myView;
     bool debug = true; 
  private:
+    const int SCRATCH_SIZE = 60; 
+    mutable Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> scratchView;
+
+    Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> getScratchView( size_type m, size_type n ) const {
+      if( scratchView.extent(0) < m || scratchView.extent(1) < n ){
+        std::cerr << "scratchView extent(0) = " << scratchView.extent(0) << "scratchView extent(1) = " << scratchView.extent(1) << std::endl;
+        size_type tmpSize = scratchView.extent(0);
+        while ( tmpSize < m || tmpSize < n ){
+          tmpSize += 50; 
+        }
+        std::cerr << "New tmpSize is: " << tmpSize << std::endl;
+        Kokkos::resize(scratchView, tmpSize, tmpSize);
+        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
+            << "Requested size is m = " << m << "  n = " << n << std::endl;
+        std::cerr << "After resize, scratchView extent(0) = " << scratchView.extent(0) << " scratchView extent(1) = " << scratchView.extent(1) << std::endl;
+      }
+      return Kokkos::subview(scratchView, std::make_pair(0,(int) m), std::make_pair(0,(int) n));  
+    }
+
+    Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> getScratchView( size_type m ) const {
+      if( scratchView.extent(0) < m ){
+        std::cerr << "scratchView extent(0) = " << scratchView.extent(0) << "scratchView extent(1) = " << scratchView.extent(1) << std::endl;
+        size_type tmpSize = scratchView.extent(0);
+        while ( tmpSize < m ){
+          tmpSize += 50; 
+        }
+        std::cerr << "New tmpSize is: " << tmpSize << std::endl;
+        Kokkos::resize(scratchView, tmpSize, tmpSize);
+        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
+            << "Requested size is m = " << m << std::endl;
+        std::cerr << "After resize, scratchView extent(0) = " << scratchView.extent(0) << " scratchView extent(1) = " << scratchView.extent(1) << std::endl;
+      }
+      return Kokkos::subview(scratchView, std::make_pair(0,(int) m), 0);   //TODO: More effective to put the null in the first dimension?? 
+    }
+    
+    
     void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**, Kokkos::LayoutLeft, Device> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
   //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
