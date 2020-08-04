@@ -85,7 +85,7 @@ bool success = true;
   using Teuchos::ParameterList;
   using Teuchos::RCP;
   using Teuchos::rcp;
-  int Belos::KokkosMultiVec::multivecCount = 0;
+  //MV::multivecCount = 0;
 
 bool verbose = true;
 //try {
@@ -232,7 +232,7 @@ bool proc_verbose = false;
       std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
   }
 
-  std::cout << std::endl << std::cout << "Final num multivecs is: " << Belos::KokkosMultiVec::multivecCount << std::endl;
+  std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
   //}
   //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
   }

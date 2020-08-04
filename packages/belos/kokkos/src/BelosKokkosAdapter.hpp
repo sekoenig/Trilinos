@@ -428,6 +428,10 @@
 
   };
 
+  //Must include a templated definition of our static variable to compile:
+  template<class ScalarType, class Device> 
+  int KokkosMultiVec< ScalarType, Device >::multivecCount = 0;
+
 
   /// \class KokkosOperator
   /// \brief Implementation of Belos::Operator using Kokkos::Crs matrix.
