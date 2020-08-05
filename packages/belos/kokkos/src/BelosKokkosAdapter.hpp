@@ -31,6 +31,8 @@
  //   friend class KokkosOperator; 
   public:
     using size_type = typename Device::size_type;
+    using ViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Device>;
+    using ViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device>;
 
     static int multivecCount;
     static int resizeScratchCount;
@@ -78,15 +80,15 @@
     //TODO: Would it be better if this was deep copy?  So we can't change the user's original data?  
     // And so the user can't change ours?
     // But doing so would add a bunch of deep copy's to clone view... Maybe make it an option?  
-    KokkosMultiVec<ScalarType, Device> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device> & sourceView) : 
+    KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView) : 
       myView(sourceView),
       scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
     { multivecCount++; }
     
     // Here is a new version of the constructor that allows us to reuse an already existing scratch space.
     // Use this so that cloneViews can use same scratch space of original vector. 
-    KokkosMultiVec<ScalarType, Device> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device> & sourceView,
-      Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device> & userScratchView ) : 
+    KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView,
+      ViewMatrixType & userScratchView ) : 
       myView(sourceView),
       //scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
       scratchView(userScratchView)
@@ -104,7 +106,7 @@
     }
 
     //This function specialization makes things compile...else compiler can't deduce template type?
-    //KokkosMultiVec<ScalarType> (const Kokkos::View<ScalarType**,Kokkos::LayoutLeft> & sourceView) : 
+    //KokkosMultiVec<ScalarType> (const ViewMatrixType & sourceView) : 
     //    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1)) {Kokkos::deep_copy(myView,sourceView);}
     //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
     ~KokkosMultiVec<ScalarType, Device>(){}
@@ -157,7 +159,7 @@
       //  if(debug){ std::cout << "copy entire MV" << std::endl; } //TODO remove debug stuff
       }
       else if (isAscending){ //Copy contiguous subset
-        Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
         Kokkos::deep_copy(B->myView,ThisSub);
      //   if(debug){ std::cout << "copy contiguous subset of  MV" << std::endl; }
       } 
@@ -236,14 +238,14 @@
         Kokkos::deep_copy(myView,A_vec->myView);
       }
       else if (isAscending){ //Copy contiguous subset
-        Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
-        Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        ViewMatrixType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
+        ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
         Kokkos::deep_copy(ThisSub, Asub);
       } 
       else{ //Copy columns one by one
         for(unsigned int i=0; i<index.size(); i++){
-          Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(i, i+1));
-          Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
+          ViewMatrixType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(i, i+1));
+          ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index[i], index[i]+1));
           Kokkos::deep_copy(ThisSub, Asub);
         }
       }
@@ -261,11 +263,11 @@
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> mat(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+      ViewMatrixType mat(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
       Teuchos2KokkosMat(B,mat);
       if( myView.extent(1) == 1 ){ // Only 1 col
-        Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> Bsub = Kokkos::subview(mat, Kokkos::ALL, 0);
-        Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
+        ViewVectorType Bsub = Kokkos::subview(mat, Kokkos::ALL, 0);
+        ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
       }
       else{
@@ -278,7 +280,7 @@
                    const MultiVec<ScalarType>& B){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosMultiVec<ScalarType, Device> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(B));
-      Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
+      ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
       //KokkosMultiVec<ScalarType> temp(myView.extent(0),myView.extent(1));
       Kokkos::deep_copy(temp, B_vec->myView);
       //Kokkos::deep_copy(myView, B_vec->myView); // BAD!  Assumes myVec != A.  
@@ -289,7 +291,7 @@
     //! Scale each element of the vectors in \c *this with \c alpha.
     void MvScale ( const ScalarType alpha ) {
       //Later- Can we do this better with less copying?  TODO
-      //Kokkos::View<ScalarType**, Kokkos::LayoutLeft> temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
+      //ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
       //KokkosBlas::scal(temp, alpha, myView); 
       KokkosBlas::scal(myView, alpha, myView); 
       //Kokkos::deep_copy(myView, temp);
@@ -298,8 +300,8 @@
     //! Scale each element of the \c i-th vector in \c *this with \c alpha[i].
     void MvScale ( const std::vector<ScalarType>& alpha ){
       //Later- Can we do this better with less copying?  TODO
-      //Kokkos::View<ScalarType**, Kokkos::LayoutLeft> temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> scalars(Kokkos::ViewAllocateWithoutInitializing("alpha"), alpha.size());
+      //ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
+      ViewVectorType scalars(Kokkos::ViewAllocateWithoutInitializing("alpha"), alpha.size());
       for(unsigned int i = 0 ; i < alpha.size(); i++){
         scalars(i) = alpha.at(i);
       } 
@@ -312,22 +314,22 @@
     void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       if(A_vec->myView.extent(1) == 1 && myView.extent(1) == 1){
-        Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
-        Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
+        ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
+        ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         ScalarType soln = KokkosBlas::dot(Asub, mysub);
         soln = alpha*soln;
         B(0,0) = soln;
       }
      // else if( myView.extent(1) == 1 ){ // Only 1 col in soln vec
-     //   Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1));
-     //   Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
+     //   ViewVectorType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1));
+     //   ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
      //   KokkosBlas::gemv("C", alpha, A_vec->myView, mysub, ScalarType(0.0), soln);
      //   for( unsigned int i = 0; i < soln.extent(0); i++){
      //     B(i,0) = soln(i);
      //   }
      // }
       else{
-        Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
+        ViewMatrixType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
         KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln);
         Kokkos2TeuchosMat(soln, B);
       }
@@ -336,8 +338,8 @@
 
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
-      //Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> dotView = getScratchView(myView.extent(1));
+      //ViewVectorType dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
+      ViewVectorType dotView = getScratchView(myView.extent(1));
       //std::cerr << "Now in Dot.  dotView extent(0) is: " << dotView.extent(0) << " extent(1) is: " << dotView.extent(1) << std::endl;
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
@@ -348,7 +350,7 @@
 
     //! alpha[i] = norm of i-th column of (*this)
     void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> normView(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
+      ViewVectorType normView(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
       switch( norm_type ) { 
         case ( OneNorm ) : 
           KokkosBlas::nrm1(normView, myView);
@@ -399,13 +401,13 @@
   //private: //This var should be private, but I can't get friend class templaty stuff to work, so...
     //static int rand_seed; //C++ initializes to zero.  Need this so new MVs in program will have different 
                           // results with MVRandom. 
-    Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> myView;
+    ViewMatrixType myView;
     bool debug = true; 
  private:
     const int SCRATCH_SIZE = 60; 
-    mutable Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> scratchView;
+    mutable ViewMatrixType scratchView;
 
-    Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> getScratchView( size_type m, size_type n ) const {
+    ViewMatrixType getScratchView( size_type m, size_type n ) const {
       if( scratchView.extent(0) < m || scratchView.extent(1) < n ){
         size_type tmpSize = scratchView.extent(0);
         while ( tmpSize < m || tmpSize < n ){
@@ -419,7 +421,7 @@
       return Kokkos::subview(scratchView, std::make_pair(0,(int) m), std::make_pair(0,(int) n));  
     }
 
-    Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> getScratchView( size_type m ) const {
+    ViewVectorType getScratchView( size_type m ) const {
       if( scratchView.extent(0) < m ){
         size_type tmpSize = scratchView.extent(0);
         while ( tmpSize < m ){
@@ -434,7 +436,7 @@
     }
     
     
-    void Kokkos2TeuchosMat(const Kokkos::View<const ScalarType**, Kokkos::LayoutLeft, Device> & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
+    void Kokkos2TeuchosMat(const ViewMatrixType & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
   //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(unsigned int i = 0; i < K.extent(0); i++){
@@ -444,7 +446,7 @@
       } 
     }
 
-    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, Kokkos::View<ScalarType**, Kokkos::LayoutLeft, Device> & K) const {
+    void Teuchos2KokkosMat(const Teuchos::SerialDenseMatrix<int, ScalarType> &T, ViewMatrixType & K) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
       //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
       for(unsigned int i = 0; i < K.extent(0); i++){
