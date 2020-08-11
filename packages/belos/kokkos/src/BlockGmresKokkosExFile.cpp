@@ -85,6 +85,8 @@ bool success = true;
   using Teuchos::ParameterList;
   using Teuchos::RCP;
   using Teuchos::rcp;
+  using std::cout;
+  using std::endl;
 
 bool verbose = true;
 //try {
@@ -233,6 +235,11 @@ bool proc_verbose = false;
 
   std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
   std::cout << std::endl << "Final number of resizes is: " << MV::resizeScratchCount << std::endl;
+
+#ifdef JENN_DEBUG
+  cout << "The JENN_DEBUG variable is working!!!" << endl;
+#endif
+
   //}
   //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
   }

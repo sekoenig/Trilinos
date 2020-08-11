@@ -390,6 +390,10 @@ struct impl_update_matrix_block<TeamHandle,ViewType,ViewTypeScratch,Kokkos::Layo
 template<class TeamHandle, class ViewTypeA, class ViewTypeB, class ViewTypeC>
 KOKKOS_INLINE_FUNCTION
 void impl_team_gemm_block(const TeamHandle& team, const ViewTypeC& C, const ViewTypeA& A, const ViewTypeB& B) {
+//#ifdef JENN_DEBUG 
+printf("Jenn_DEBUG: in Kokkos impl_team_gemm_block");
+//#endif
+
   typedef typename ViewTypeC::non_const_value_type ScalarC;
 // GNU COMPILER BUG WORKAROUND
 #if defined(KOKKOS_COMPILER_GNU) || !defined(__CUDA_ARCH__)

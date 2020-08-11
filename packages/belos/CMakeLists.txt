@@ -9,6 +9,11 @@ TRIBITS_PACKAGE(Belos)
 ## Set up package-specific options
 ######################################################################
 
+# Extra debug flags for Jennifers:
+if(JENN_DEBUG)
+  add_definitions(-DJENN_DEBUG)
+endif()
+
 TRIBITS_ADD_SHOW_DEPRECATED_WARNINGS_OPTION()
 
 # Kokkos includes an implementation of the Tall Skinny QR (TSQR)
