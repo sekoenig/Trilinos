@@ -32,7 +32,9 @@
   public:
     using size_type = typename Device::size_type;
     using ViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Device>;
+    using ConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Device>;
     using ViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device>;
+    using ConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Device>;
 
     static int multivecCount;
     static int resizeScratchCount;
@@ -263,10 +265,11 @@
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      ViewMatrixType mat(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
-      Teuchos2KokkosMat(B,mat);
+      //ViewMatrixType mat(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+      ConstViewMatrixType mat(B.values(), A_vec->myView.extent(1), myView.extent(1));
+      //Teuchos2KokkosMat(B,mat);
       if( myView.extent(1) == 1 ){ // Only 1 col
-        ViewVectorType Bsub = Kokkos::subview(mat, Kokkos::ALL, 0);
+        ConstViewVectorType Bsub = Kokkos::subview(mat, Kokkos::ALL, 0);
         ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
       }
@@ -301,10 +304,11 @@
     void MvScale ( const std::vector<ScalarType>& alpha ){
       //Later- Can we do this better with less copying?  TODO
       //ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
-      ViewVectorType scalars(Kokkos::ViewAllocateWithoutInitializing("alpha"), alpha.size());
-      for(unsigned int i = 0 ; i < alpha.size(); i++){
-        scalars(i) = alpha.at(i);
-      } 
+      //ViewVectorType scalars(Kokkos::ViewAllocateWithoutInitializing("alpha"), alpha.size());
+      ConstViewVectorType scalars(alpha.data(), alpha.size());
+      //for(unsigned int i = 0 ; i < alpha.size(); i++){
+        //scalars(i) = alpha.at(i);
+      //} 
       //KokkosBlas::scal(temp, scalars, myView); 
       KokkosBlas::scal(myView, scalars, myView); 
       //Kokkos::deep_copy(myView, temp);
@@ -329,28 +333,31 @@
      //   }
      // }
       else{
-        ViewMatrixType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
+        //ViewMatrixType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
+        ViewMatrixType soln(B.values(), A_vec->myView.extent(1), myView.extent(1));
         KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln);
-        Kokkos2TeuchosMat(soln, B);
+        //Kokkos2TeuchosMat(soln, B);
       }
     }
 
 
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
+      ViewVectorType dotView(b.data(),myView.extent(1)); //Make an unmanaged view of b. 
       //ViewVectorType dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
-      ViewVectorType dotView = getScratchView(myView.extent(1));
+      //ViewVectorType dotView = getScratchView(myView.extent(1));
       //std::cerr << "Now in Dot.  dotView extent(0) is: " << dotView.extent(0) << " extent(1) is: " << dotView.extent(1) << std::endl;
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
-      for(unsigned int i=0; i < myView.extent(1); i++){
-        b[i] = dotView(i); //Is there a better way to do this?
-      }
+      //for(unsigned int i=0; i < myView.extent(1); i++){
+        //b[i] = dotView(i); //Is there a better way to do this?
+      //}
     }
 
     //! alpha[i] = norm of i-th column of (*this)
     void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
-      ViewVectorType normView(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
+      ViewVectorType normView(normvec.data() ,myView.extent(1));
+      //ViewVectorType normView(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
       switch( norm_type ) { 
         case ( OneNorm ) : 
           KokkosBlas::nrm1(normView, myView);
@@ -367,10 +374,10 @@
               << norm_type << ".  The current list of valid norm "
               "types is {OneNorm, TwoNorm, InfNorm}.");
       }   
-      for(unsigned int i=0; i < myView.extent(1); i++){
-        normvec[i] = normView(i); 
+      //for(unsigned int i=0; i < myView.extent(1); i++){
+        //normvec[i] = normView(i); 
         //TODO: will probably have to mirror the normView to the host space. 
-      }
+      //}
     }
 
     //! Fill all columns of *this with random values.
@@ -387,7 +394,7 @@
        Kokkos::deep_copy(myView,alpha);
     }
 
-    //! Print (*this) to the given output stream.
+    //! Print (*this) to the given output stream.//TODO use printf so works on device?? 
     void MvPrint( std::ostream& os ) const {
       for(unsigned int i = 0; i < (myView.extent(0)); i++){
         for (unsigned int j = 0; j < (myView.extent(1)); j++){
@@ -415,8 +422,8 @@
         }
         Kokkos::resize(scratchView, tmpSize, tmpSize);
         resizeScratchCount++;
-        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
-            << "Requested size is m = " << m << "  n = " << n << std::endl;
+//        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
+//            << "Requested size is m = " << m << "  n = " << n << std::endl;
       }
       return Kokkos::subview(scratchView, std::make_pair(0,(int) m), std::make_pair(0,(int) n));  
     }
@@ -429,8 +436,8 @@
         }
         Kokkos::resize(scratchView, tmpSize, tmpSize);
         resizeScratchCount++;
-        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
-            << "Requested size is m = " << m << std::endl;
+//        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
+//            << "Requested size is m = " << m << std::endl;
       }
       return Kokkos::subview(scratchView, std::make_pair(0,(int) m), 0);   //TODO: More effective to put the null in the first dimension?? 
     }
