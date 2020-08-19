@@ -50,6 +50,7 @@
 #include "BelosLinearProblem.hpp"
 #include "BelosBlockGmresSolMgr.hpp"
 #include "BelosOutputManager.hpp"
+#include "BelosSolverOp.hpp"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -81,6 +82,8 @@ bool success = true;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
   typedef Belos::OperatorTraits<ST,KMV,KOP>  OPT;
+  //typedef Belos::KokkosSolverOp<ST, OT, EXSP> KSOP; 
+  typedef Belos::SolverOp<ST> SOP; 
 
   using Teuchos::ParameterList;
   using Teuchos::RCP;
@@ -98,12 +101,18 @@ bool proc_verbose = false;
   int maxrestarts = 25;      // number of restarts allowed
   bool expresidual = false; // use explicit residual
   bool precOn = false;
+  bool polyPrec = true;
+  int polyDeg = 25;
+  bool polyRandomRhs = true; // if True, poly may be different on each run!
   std::string filename("bcsstk13.mtx"); // example matrix
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
-  cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
+  cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
+  cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
+  cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
+  cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -170,7 +179,29 @@ bool proc_verbose = false;
   // Construct an unpreconditioned linear problem instance.
   //
   Belos::LinearProblem<ST,KMV,KOP> problem( A, X, B );
-  if(precOn) {
+  if(polyPrec){
+    std::string innerSolverType = "GmresPoly";
+
+    //Has to be KMV and KOP for the Linear Prob specialization.  
+    // Can't plug something in here unless it has a Multivector Traits specialization. 
+    //Go change solverOp to take a Belos::Multivector. .... Or do we already have this for Belos::Multivectors? 
+    //What here is specific to Kokkos??
+    RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
+    innerProblem->setOperator(A);
+    //Teuchos::ParameterList innerList;
+    RCP<Teuchos::ParameterList> innerList;
+    //innerList.set("Random RHS", polyRandomRhs );           // Use RHS from linear system or random vector
+    //innerList.set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
+    //RCP<SOP> myPolyPrec = rcp(new SOP(Teuchos::rcpFromRef(innerProblem), Teuchos::rcpFromRef(innerList), innerSolverType));
+    RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
+    if(precOn){
+      innerProblem->setRightPrec(ILUprec);
+    }
+    problem.setRightPrec(myPolyPrec);
+    //problem.setRightPrec(Teuchos::rcpFromRef(myPolyPrec));
+    //problem.setOperator(Teuchos::rcpFromRef(myPolyPrc));
+  }
+  else if(precOn) {
     problem.setRightPrec(ILUprec);
   }
   bool set = problem.setProblem();
