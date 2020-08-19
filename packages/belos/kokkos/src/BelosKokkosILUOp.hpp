@@ -219,8 +219,8 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
       // Note: spmv computes y = beta*y + alpha*Op(A)*x  spmv(mode,alpha,A,x,beta,y);
       //ScalarType alpha = 1.0;
       //ScalarType beta = 0;
-      KokkosMultiVec<ScalarType> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType> *>(&const_cast<MultiVec<ScalarType> &>(x));
-      KokkosMultiVec<ScalarType> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType> *>(&y);
+      KokkosMultiVec<ScalarType, Device> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>(&const_cast<MultiVec<ScalarType> &>(x));
+      KokkosMultiVec<ScalarType, Device> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>(&y);
 
       // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. 
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);

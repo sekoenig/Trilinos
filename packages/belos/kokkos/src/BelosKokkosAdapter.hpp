@@ -35,6 +35,16 @@
     using ConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Device>;
     using ViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device>;
     using ConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Device>;
+    
+    //Unmanaged view types: 
+    using UMViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Device, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMHostViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Device, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMHostConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMHostViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Device, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+    using UMHostConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
     static int multivecCount;
     static int resizeScratchCount;
@@ -265,16 +275,19 @@
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      //ViewMatrixType mat(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
-      ConstViewMatrixType mat(B.values(), A_vec->myView.extent(1), myView.extent(1));
+      UMHostConstViewMatrixType mat_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
+      ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+      Kokkos::deep_copy(mat_d, mat_h);
+
+      //UMConstViewMatrixType mat(B.values(), A_vec->myView.extent(1), myView.extent(1));
       //Teuchos2KokkosMat(B,mat);
       if( myView.extent(1) == 1 ){ // Only 1 col
-        ConstViewVectorType Bsub = Kokkos::subview(mat, Kokkos::ALL, 0);
+        ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
         ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
       }
       else{
-        KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat, beta, myView);
+        KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
       }
     }
 
@@ -305,12 +318,17 @@
       //Later- Can we do this better with less copying?  TODO
       //ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
       //ViewVectorType scalars(Kokkos::ViewAllocateWithoutInitializing("alpha"), alpha.size());
-      ConstViewVectorType scalars(alpha.data(), alpha.size());
+      
+      UMHostConstViewVectorType scalars_h(alpha.data(), alpha.size());
+      ViewVectorType scalars_d(Kokkos::ViewAllocateWithoutInitializing("scalars_d"), alpha.size());
+      Kokkos::deep_copy(scalars_d, scalars_h);
+
+      //UMConstViewVectorType scalars(alpha.data(), alpha.size());
       //for(unsigned int i = 0 ; i < alpha.size(); i++){
         //scalars(i) = alpha.at(i);
       //} 
       //KokkosBlas::scal(temp, scalars, myView); 
-      KokkosBlas::scal(myView, scalars, myView); 
+      KokkosBlas::scal(myView, scalars_d, myView); 
       //Kokkos::deep_copy(myView, temp);
     }
 
@@ -334,8 +352,11 @@
      // }
       else{
         //ViewMatrixType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
-        ViewMatrixType soln(B.values(), A_vec->myView.extent(1), myView.extent(1));
-        KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln);
+        //UMViewMatrixType soln(B.values(), A_vec->myView.extent(1), myView.extent(1));
+        UMHostViewMatrixType soln_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
+        ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+        KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln_d);
+        Kokkos::deep_copy(soln_h, soln_d);
         //Kokkos2TeuchosMat(soln, B);
       }
     }
@@ -343,12 +364,13 @@
 
     //! b[i] = A[i]^T * this[i]
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
-      ViewVectorType dotView(b.data(),myView.extent(1)); //Make an unmanaged view of b. 
-      //ViewVectorType dotView(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
+      UMHostViewVectorType dotView_h(b.data(),myView.extent(1)); //Make an unmanaged view of b. 
+      ViewVectorType dotView_d(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
       //ViewVectorType dotView = getScratchView(myView.extent(1));
       //std::cerr << "Now in Dot.  dotView extent(0) is: " << dotView.extent(0) << " extent(1) is: " << dotView.extent(1) << std::endl;
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      KokkosBlas::dot(dotView, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
+      KokkosBlas::dot(dotView_d, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
+      Kokkos::deep_copy(dotView_h, dotView_d);
       //for(unsigned int i=0; i < myView.extent(1); i++){
         //b[i] = dotView(i); //Is there a better way to do this?
       //}
@@ -356,17 +378,17 @@
 
     //! alpha[i] = norm of i-th column of (*this)
     void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
-      ViewVectorType normView(normvec.data() ,myView.extent(1));
-      //ViewVectorType normView(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
+      UMHostViewVectorType normView_h(normvec.data() ,myView.extent(1));
+      ViewVectorType normView_d(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
       switch( norm_type ) { 
         case ( OneNorm ) : 
-          KokkosBlas::nrm1(normView, myView);
+          KokkosBlas::nrm1(normView_d, myView);
           break;
         case ( TwoNorm ) : 
-          KokkosBlas::nrm2(normView, myView);
+          KokkosBlas::nrm2(normView_d, myView);
           break;
         case ( InfNorm ) : 
-          KokkosBlas::nrminf(normView, myView);
+          KokkosBlas::nrminf(normView_d, myView);
           break;
         default:
           TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
@@ -374,6 +396,7 @@
               << norm_type << ".  The current list of valid norm "
               "types is {OneNorm, TwoNorm, InfNorm}.");
       }   
+      Kokkos::deep_copy(normView_h, normView_d);
       //for(unsigned int i=0; i < myView.extent(1); i++){
         //normvec[i] = normView(i); 
         //TODO: will probably have to mirror the normView to the host space. 
