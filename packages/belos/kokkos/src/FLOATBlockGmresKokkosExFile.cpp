@@ -50,6 +50,7 @@
 #include "BelosLinearProblem.hpp"
 #include "BelosBlockGmresSolMgr.hpp"
 #include "BelosOutputManager.hpp"
+#include "BelosSolverOp.hpp"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -66,22 +67,30 @@ bool success = true;
   {
 
   typedef float                            ST;
+  //typedef double                            ST;
   //typedef double                           ST2;
   typedef int                               OT;
   typedef Kokkos::DefaultExecutionSpace     EXSP;
+  //typedef Kokkos::CudaSpace                EXSP;
+  //typedef Kokkos::HostSpace               EXSP;
+  //typedef Kokkos::CudaUVMSpace               EXSP;
   typedef Teuchos::ScalarTraits<ST>        SCT;
   typedef SCT::magnitudeType                MT;
-  typedef Belos::KokkosMultiVec<ST>         MV;
+  typedef Belos::KokkosMultiVec<ST, EXSP>         MV;
   typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
   typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
   typedef Belos::OperatorTraits<ST,KMV,KOP>  OPT;
+  //typedef Belos::KokkosSolverOp<ST, OT, EXSP> KSOP; 
+  typedef Belos::SolverOp<ST> SOP; 
 
   using Teuchos::ParameterList;
   using Teuchos::RCP;
   using Teuchos::rcp;
+  using std::cout;
+  using std::endl;
 
 bool verbose = true;
 //try {
@@ -93,12 +102,18 @@ bool proc_verbose = false;
   int maxrestarts = 25;      // number of restarts allowed
   bool expresidual = false; // use explicit residual
   bool precOn = false;
+  bool polyPrec = false;
+  int polyDeg = 25;
+  bool polyRandomRhs = true; // if True, poly may be different on each run!
   std::string filename("bcsstk13.mtx"); // example matrix
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
-  cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
+  cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
+  cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
+  cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
+  cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -120,20 +135,20 @@ bool proc_verbose = false;
   RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
             rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
-  
+
   //Test code for ILU operator: 
   RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
             rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
 
-  if(precOn) {
+  if(precOn) { 
   std::cout << "Setting up ILU prec: " << std::endl;
   ILUprec->SetUpILU();
   std::cout << "Exited ILU prec setup." << std::endl;
   }
 
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
+  Teuchos::RCP<MV> X = Teuchos::rcp( new MV(numRows, numrhs) );
   X->MvInit(0.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> B = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
+  Teuchos::RCP<MV> B = Teuchos::rcp( new MV(numRows, numrhs) );
   B->MvInit(1.0);
 
   proc_verbose = verbose;  /* Only print on the zero processor */
@@ -165,7 +180,25 @@ bool proc_verbose = false;
   // Construct an unpreconditioned linear problem instance.
   //
   Belos::LinearProblem<ST,KMV,KOP> problem( A, X, B );
-  if(precOn) {
+  if(polyPrec){
+    std::string innerSolverType = "GmresPoly";
+
+    //Has to be KMV and KOP for the Linear Prob specialization.  
+    // Can't plug something in here unless it has a Multivector Traits specialization. 
+    //Go change solverOp to take a Belos::Multivector. .... Or do we already have this for Belos::Multivectors? 
+    //What here is specific to Kokkos??
+    RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
+    innerProblem->setOperator(A);
+    RCP<Teuchos::ParameterList> innerList = rcp(new Teuchos::ParameterList() );
+    innerList->set("Random RHS", polyRandomRhs );           // Use RHS from linear system or random vector
+    innerList->set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
+    RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
+    if(precOn){
+      innerProblem->setRightPrec(ILUprec);
+    }
+    problem.setRightPrec(myPolyPrec);
+  }
+  else if(precOn) {
     problem.setRightPrec(ILUprec);
   }
   bool set = problem.setProblem();
@@ -204,7 +237,7 @@ bool proc_verbose = false;
   bool badRes = false;
   std::vector<ST> actual_resids( numrhs );
   std::vector<ST> rhs_norm( numrhs );
-  Belos::KokkosMultiVec<ST> resid(numRows, numrhs);
+  MV resid(numRows, numrhs);
   OPT::Apply( *A, *X, resid );
   MVT::MvAddMv( -1.0, resid, 1.0, *B, resid );
   MVT::MvNorm( resid, actual_resids );
@@ -227,6 +260,14 @@ bool proc_verbose = false;
     if (proc_verbose)
       std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
   }
+
+  std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
+  std::cout << std::endl << "Final number of resizes is: " << MV::resizeScratchCount << std::endl;
+
+#ifdef JENN_DEBUG
+  cout << "The JENN_DEBUG variable is working!!!" << endl;
+#endif
+
   //}
   //TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
   }

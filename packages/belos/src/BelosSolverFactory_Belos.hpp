@@ -62,10 +62,24 @@ class BelosSolverFactory : public Impl::SolverFactoryParent<double,MultiVec<doub
     };
 };
 
+class BelosSolverFactory : public Impl::SolverFactoryParent<float,MultiVec<float>,Operator<float>>
+{
+  public:
+    BelosSolverFactory() {
+      Details::registerSolverFactory();
+    };
+};
+
 namespace Impl {
 
 template<>
 class SolverFactorySelector<double,MultiVec<double>,Operator<double>> {
+  public:
+    typedef BelosSolverFactory type;
+};
+
+template<>
+class SolverFactorySelector<float,MultiVec<float>,Operator<float>> {
   public:
     typedef BelosSolverFactory type;
 };
@@ -81,6 +95,20 @@ class BelosComplexSolverFactory : public Impl::SolverFactoryParent<std::complex<
 
 template<>
 class SolverFactorySelector<std::complex<double>,MultiVec<std::complex<double>>,Operator<std::complex<double>>> {
+  public:
+    typedef BelosComplexSolverFactory type;
+};
+
+class BelosComplexSolverFactory : public Impl::SolverFactoryParent<std::complex<float>,MultiVec<std::complex<float>>,Operator<std::complex<float>>>
+{
+  public:
+    BelosComplexSolverFactory() {
+      Details::registerSolverFactory();
+    };
+};
+
+template<>
+class SolverFactorySelector<std::complex<float>,MultiVec<std::complex<float>>,Operator<std::complex<float>>> {
   public:
     typedef BelosComplexSolverFactory type;
 };

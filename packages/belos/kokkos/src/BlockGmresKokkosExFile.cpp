@@ -101,7 +101,7 @@ bool proc_verbose = false;
   int maxrestarts = 25;      // number of restarts allowed
   bool expresidual = false; // use explicit residual
   bool precOn = false;
-  bool polyPrec = true;
+  bool polyPrec = false;
   int polyDeg = 25;
   bool polyRandomRhs = true; // if True, poly may be different on each run!
   std::string filename("bcsstk13.mtx"); // example matrix
@@ -188,18 +188,14 @@ bool proc_verbose = false;
     //What here is specific to Kokkos??
     RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
     innerProblem->setOperator(A);
-    //Teuchos::ParameterList innerList;
-    RCP<Teuchos::ParameterList> innerList;
-    //innerList.set("Random RHS", polyRandomRhs );           // Use RHS from linear system or random vector
-    //innerList.set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
-    //RCP<SOP> myPolyPrec = rcp(new SOP(Teuchos::rcpFromRef(innerProblem), Teuchos::rcpFromRef(innerList), innerSolverType));
+    RCP<Teuchos::ParameterList> innerList = rcp(new Teuchos::ParameterList() );
+    innerList->set("Random RHS", polyRandomRhs );           // Use RHS from linear system or random vector
+    innerList->set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
     RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
     if(precOn){
       innerProblem->setRightPrec(ILUprec);
     }
     problem.setRightPrec(myPolyPrec);
-    //problem.setRightPrec(Teuchos::rcpFromRef(myPolyPrec));
-    //problem.setOperator(Teuchos::rcpFromRef(myPolyPrc));
   }
   else if(precOn) {
     problem.setRightPrec(ILUprec);

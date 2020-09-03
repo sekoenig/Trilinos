@@ -315,7 +315,7 @@ private:
   static constexpr int verbosity_default_ = Belos::Errors;
   static constexpr const char * label_default_ = "Belos";
   static constexpr const char * outerSolverType_default_ = "";
-  static constexpr const char * polyType_default_ = "Arnoldi";
+  static constexpr const char * polyType_default_ = "Roots";
   static constexpr const char * orthoType_default_ = "ICGS";
   static constexpr bool addRoots_default_ = true;
   static constexpr bool dampPoly_default_ = false;

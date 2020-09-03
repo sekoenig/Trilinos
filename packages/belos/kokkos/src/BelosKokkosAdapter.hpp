@@ -9,7 +9,6 @@
 #include <Teuchos_SerialDenseMatrix.hpp>
 
 
-
 #ifndef BELOS_KOKKOS_ADAPTER_HPP
 #define BELOS_KOKKOS_ADAPTER_HPP
  namespace Belos {
@@ -285,6 +284,7 @@
         ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
         ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
+      //  std::cout << "A has size: " << A_vec->myView.extent(0) << " by " << A_vec->myView.extent(1) << std::endl;
       }
       else{
         KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
@@ -351,11 +351,18 @@
      //   }
      // }
       else{
+      //TODO denote internal data by _
         //ViewMatrixType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1), myView.extent(1));
         //UMViewMatrixType soln(B.values(), A_vec->myView.extent(1), myView.extent(1));
         UMHostViewMatrixType soln_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
-        ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+        //Kokkos::Timer timeAlloc;
+        ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1)); //TODO don't allocate each iteration!  
+        //Kokkos::fence();
+        //double time1 = timeAlloc.seconds();
+        //std::cout << "Seconds for alloc: " << time1 << std::endl;        
         KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln_d);
+        //std::cout << "A has size " << A_vec->myView.extent(0) << " by " << A_vec->myView.extent(1) << " to be transposed." << std::endl; 
+        //std::cout << "this has size " << myView.extent(0) << " by " << myView.extent(1) << std::endl;
         Kokkos::deep_copy(soln_h, soln_d);
         //Kokkos2TeuchosMat(soln, B);
       }
