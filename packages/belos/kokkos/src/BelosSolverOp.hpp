@@ -70,10 +70,10 @@ class SolverOp : public Operator<ScalarType> {
 private:
 
   using MultiVector = MultiVec<ScalarType>;
-  using Operator = Operator<ScalarType>; 
+  using Op = Operator<ScalarType>; 
 
-  Teuchos::RCP<SolverManager<ScalarType,MultiVector,Operator> > solver_;
-  Teuchos::RCP<LinearProblem<ScalarType,MultiVector,Operator> > lp_;
+  Teuchos::RCP<SolverManager<ScalarType,MultiVector,Op> > solver_;
+  Teuchos::RCP<LinearProblem<ScalarType,MultiVector,Op> > lp_;
   Teuchos::RCP<Teuchos::ParameterList> plist_;
 
   //! Name of solver to be passed into solver factory. 
@@ -99,7 +99,7 @@ public:
     /// When true, the bool \c initSolnVec causes the solution vector \c Y to be itialized to zero
     /// when apply(X,Y) is called.
 
-  SolverOp( const Teuchos::RCP<LinearProblem<ScalarType,MultiVector,Operator> >& lp, 
+  SolverOp( const Teuchos::RCP<LinearProblem<ScalarType,MultiVector,Op> >& lp, 
 		  const Teuchos::RCP<Teuchos::ParameterList>& plist,
       const std::string solver_name,
       bool initSolnVec = false )  
@@ -108,7 +108,7 @@ public:
     solver_name_(solver_name),
     initSolnVec_(initSolnVec)
   {
-    Belos::SolverFactory<ScalarType,MultiVector,Operator> factory;
+    Belos::SolverFactory<ScalarType,MultiVector,Op> factory;
     solver_ = factory.create( solver_name_, plist );
     solver_->setProblem( lp_ );
   }
