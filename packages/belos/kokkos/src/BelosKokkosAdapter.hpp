@@ -14,16 +14,18 @@
  namespace Belos {
   //Forward class declaration of KokkosOperator:
   template<class ScalarType, class OrdinalType, class Device>
-  class KokkosOperator; // : public Operator<ScalarType>;
+  class KokkosOperator; 
 
   /// \class KokkosMultiVec
-  /// \brief Implementation of Belos::MultiVec using Kokkos_MultiVector.
+  /// \brief Implementation of Belos::MultiVec using Kokkos::View.
   ///
   /// Belos::MultiVec offers a simple abstract interface for
   /// multivector operations in Belos solver algorithms.  This class
-  /// implements Belos::MultiVec by extending Kokkos_MultiVector.
-  template<class ScalarType, class Device =Kokkos::DefaultExecutionSpace >
+  /// implements Belos::MultiVec using Kokkos::View.
+  template<class ScalarType, class Device = Kokkos::DefaultExecutionSpace >
   class KokkosMultiVec : public MultiVec<ScalarType> {
+
+  //TODO T- Did we make myView public because of this??
     //Think it is okay for ScalarType to not match ScalarType2 b/c eventually we might want
     //MV and OP to have different precisions
  //   template<class ScalarType2, class OrdinalType, class Device>
@@ -46,30 +48,25 @@
     using UMHostConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
     static int multivecCount;
-    static int resizeScratchCount;
 
     // constructors
     // TODO: Should the views in these first 3 constructors be initialized?  Or not?
     KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs) :
-      myView (label,numrows,numvecs),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
+      myView (label,numrows,numvecs)
     { multivecCount++; }
 
     KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs) :
-      myView ("MV",numrows,numvecs),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
+      myView ("MV",numrows,numvecs)
     { multivecCount++; }
 
     KokkosMultiVec<ScalarType, Device> (const int numrows) :
-      myView("MV",numrows,1),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
+      myView("MV",numrows,1)
     { multivecCount++; }
 
     // Make so that copy constructor of MV gives deep copy.  
     template < class ScalarType2 >
       KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType2, Device> &sourceVec) : 
-      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs()),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0) //New scratch space since deep copy.
+      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
     {
       Kokkos::deep_copy(myView,sourceVec.myView);
       multivecCount++;
@@ -77,8 +74,7 @@
 
     //Need this explicitly, else compiler makes its own with shallow copy. 
     KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
-      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs()),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0) //New scratch space since deep copy.
+      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
     {
       Kokkos::deep_copy(myView,sourceVec.myView);
       multivecCount++;
@@ -92,25 +88,13 @@
     // And so the user can't change ours?
     // But doing so would add a bunch of deep copy's to clone view... Maybe make it an option?  
     KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView) : 
-      myView(sourceView),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
+      myView(sourceView)
     { multivecCount++; }
     
-    // Here is a new version of the constructor that allows us to reuse an already existing scratch space.
-    // Use this so that cloneViews can use same scratch space of original vector. 
-    KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView,
-      ViewMatrixType & userScratchView ) : 
-      myView(sourceView),
-      //scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
-      scratchView(userScratchView)
-    { multivecCount++; }
-
-
     // This version allows us to make exclusive changes to the view and convert between scalar types:
     template < class ScalarType2 > //TODO: Fix this so that passing in a view without device specified actually compiles...
     KokkosMultiVec<ScalarType, Device> (const Kokkos::View<ScalarType2**,Kokkos::LayoutLeft, Device> & sourceView) : 
-      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1)),
-      scratchView(Kokkos::ViewAllocateWithoutInitializing("SCRATCH"),0,0)
+      myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1))
     {
       Kokkos::deep_copy(myView,sourceView);
       multivecCount++;
@@ -203,8 +187,7 @@
       }
       if(isAscending ){ //Copy entire multivec.
       KokkosMultiVec<ScalarType, Device> * B = 
-          new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),
-            scratchView);
+          new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
         return B; 
       }
       else{
@@ -224,8 +207,7 @@
       }
       if(isAscending ){ //Copy entire multivec.
       const KokkosMultiVec<ScalarType, Device> * B = 
-          new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),
-            scratchView);
+          new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
         return B; 
       }
       else{
@@ -384,8 +366,6 @@
     void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
       UMHostViewVectorType dotView_h(b.data(),myView.extent(1)); //Make an unmanaged view of b. 
       ViewVectorType dotView_d(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
-      //ViewVectorType dotView = getScratchView(myView.extent(1));
-      //std::cerr << "Now in Dot.  dotView extent(0) is: " << dotView.extent(0) << " extent(1) is: " << dotView.extent(1) << std::endl;
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosBlas::dot(dotView_d, A_vec->myView, myView); //TODO check- it should be A that is conjugate transposed, not mv.  Is it??
       Kokkos::deep_copy(dotView_h, dotView_d);
@@ -452,38 +432,7 @@
     ViewMatrixType myView;
     bool debug = true; 
  private:
-    const int SCRATCH_SIZE = 60; 
-    mutable ViewMatrixType scratchView;
 
-    ViewMatrixType getScratchView( size_type m, size_type n ) const {
-      if( scratchView.extent(0) < m || scratchView.extent(1) < n ){
-        size_type tmpSize = scratchView.extent(0);
-        while ( tmpSize < m || tmpSize < n ){
-          tmpSize += 50; 
-        }
-        Kokkos::resize(scratchView, tmpSize, tmpSize);
-        resizeScratchCount++;
-//        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
-//            << "Requested size is m = " << m << "  n = " << n << std::endl;
-      }
-      return Kokkos::subview(scratchView, std::make_pair(0,(int) m), std::make_pair(0,(int) n));  
-    }
-
-    ViewVectorType getScratchView( size_type m ) const {
-      if( scratchView.extent(0) < m ){
-        size_type tmpSize = scratchView.extent(0);
-        while ( tmpSize < m ){
-          tmpSize += 50; 
-        }
-        Kokkos::resize(scratchView, tmpSize, tmpSize);
-        resizeScratchCount++;
-//        std::cerr << "WARNING: Kokkos scratchView has been resized!!" << std::endl 
-//            << "Requested size is m = " << m << std::endl;
-      }
-      return Kokkos::subview(scratchView, std::make_pair(0,(int) m), 0);   //TODO: More effective to put the null in the first dimension?? 
-    }
-    
-    
     void Kokkos2TeuchosMat(const ViewMatrixType & K,  Teuchos::SerialDenseMatrix<int, ScalarType> &T) const {
       TEUCHOS_TEST_FOR_EXCEPTION(K.extent(0) != (unsigned)T.numRows() || K.extent(1) != (unsigned)T.numCols(), std::runtime_error, "Error: Matrix dimensions do not match!");
   //This is all on host, so there's no use trying to use parallel_for, right?... Well, host could have openMP... TODO improve this?
@@ -509,10 +458,6 @@
   //Must include a templated definition of our static variable to compile:
   template<class ScalarType, class Device> 
   int KokkosMultiVec< ScalarType, Device >::multivecCount = 0;
-
-  template<class ScalarType, class Device> 
-  int KokkosMultiVec< ScalarType, Device >::resizeScratchCount = 0;
-
 
   /// \class KokkosOperator
   /// \brief Implementation of Belos::Operator using Kokkos::Crs matrix.

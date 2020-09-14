@@ -262,7 +262,6 @@ bool proc_verbose = false;
   }
 
   std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
-  std::cout << std::endl << "Final number of resizes is: " << MV::resizeScratchCount << std::endl;
 
 #ifdef JENN_DEBUG
   cout << "The JENN_DEBUG variable is working!!!" << endl;
