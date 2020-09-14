@@ -296,12 +296,23 @@
                    const MultiVec<ScalarType>& B){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       KokkosMultiVec<ScalarType, Device> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(B));
-      ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
+      //ViewMatrixType temp(Kokkos::ViewAllocateWithoutInitializing("tmp"), myView.extent(0), myView.extent(1));
       //KokkosMultiVec<ScalarType> temp(myView.extent(0),myView.extent(1));
-      Kokkos::deep_copy(temp, B_vec->myView);
+        //Kokkos::Timer timeCopy1;
+      //Kokkos::deep_copy(temp, B_vec->myView);
+        //Kokkos::fence();
+        //double time1 = timeCopy1.seconds();
+        //std::cout << "Seconds for Copy1: " << time1 << std::endl;        
       //Kokkos::deep_copy(myView, B_vec->myView); // BAD!  Assumes myVec != A.  
-      KokkosBlas::axpby(alpha, A_vec->myView, beta, temp);
-      Kokkos::deep_copy(myView,temp);
+      //KokkosBlas::axpby(alpha, A_vec->myView, beta, temp);
+
+      // myView = alpha A + beta B + 0 * myView
+      KokkosBlas::update(alpha, A_vec->myView, beta, B_vec->myView, (ScalarType) 0.0, myView);
+        //Kokkos::Timer timeCopy2;
+      //Kokkos::deep_copy(myView,temp);
+        //Kokkos::fence();
+        //double time2 = timeCopy2.seconds();
+        //std::cout << "Seconds for Copy2: " << time2 << std::endl;        
     }
 
     //! Scale each element of the vectors in \c *this with \c alpha.
