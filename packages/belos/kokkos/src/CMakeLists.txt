@@ -64,6 +64,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  JacobiPrec
+  SOURCES JacobiPrec.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   ILUGmresKokkosEx
   SOURCES ILUGmresKokkosExFile.cpp
   COMM serial mpi

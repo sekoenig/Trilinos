@@ -57,6 +57,7 @@
 
 #include "BelosKokkosAdapter.hpp"
 #include "BelosKokkosILUOp.hpp"
+#include "BelosKokkosJacobiOp.hpp"
 #include "KokkosKernels_IOUtils.hpp"
 
 int main(int argc, char *argv[]) {
@@ -122,11 +123,11 @@ bool proc_verbose = false;
   OT numRows = crsMat.numRows();
   
   //Test code for ILU operator: 
-  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
-            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> ILUprec = 
+            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,4));
 
   std::cout << "Setting up ILU prec: " << std::endl;
-  ILUprec->SetUpILU();
+  ILUprec->SetUpJacobi();
   std::cout << "Exited ILU prec setup." << std::endl;
 
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );

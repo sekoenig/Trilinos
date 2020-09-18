@@ -75,8 +75,9 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
   //TODO add all the options for ILU.  Take out the extra junk. 
     int SetUpILU() {
     int success = 1;
-  int algo_spiluk = LVLSCHED_RP; // SPILUK kernel implementation
-  int algo_sptrsv = LVLSCHED_RP; // SPTRSV kernel implementation
+    //Defaulting to team policy; Nathan says this usually exposes more parallelism.  
+  int algo_spiluk = LVLSCHED_TP1; // SPILUK kernel implementation
+  int algo_sptrsv = LVLSCHED_TP1; // SPTRSV kernel implementation
   int k = 0;                     // fill level
   int team_size = -1;            // team size //TODO I bet in the original driver, this has an option to read from cmnd line
 
