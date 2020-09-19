@@ -33,7 +33,7 @@
 
   //TODO: really check if these typedefs match the template. 
     using scalar_t  = ScalarType;
-    using Layout          = Kokkos::LayoutLeft;
+    using Layout          = Kokkos::LayoutRight;
     using ViewVectorType  = Kokkos::View<ScalarType*, Layout, Device>;
     using ManyVectorType  = Kokkos::View<ScalarType**, Layout, Device>;
     using ManyMatrixType  = Kokkos::View<ScalarType***, Layout, Device>;
@@ -85,12 +85,15 @@
     auto values = A_.values; 
     auto colIdxView = A_.graph.entries;
     auto rowPtrView = A_.graph.row_map;
+//    printf("%s\n Memory space of values: ",decltype(values)::memory_space::name());
+//    printf("%s\n Memory space of Ablocks_: ",decltype(Ablocks_)::memory_space::name());
 
-    int colPtr = 0;
+    //int colPtr = 0;
     for (int row = 0; row < numRows; row++){
       int rowBlk = floor(row/blockSize_);
+      int colPtr = rowPtrView(row); //New line here. 
       while( colPtr < rowPtrView(row+1) ) { // If we are still in the same row...
-        int colBlk = floor( colIdxView(colPtr)/blockSize_ );
+        int colBlk = floor( colIdxView(colPtr)/blockSize_ ); //** THIS is the first line where we have problems.  Trying to access a GPU thing on host, probably.  
           if( rowBlk == colBlk) { // Then we are in one of the blocks to extract.
             Ablocks_( rowBlk, row % blockSize_, colIdxView(colPtr) % blockSize_ ) = values(colPtr);
           }
@@ -99,6 +102,18 @@
     }
 
       printf("Finished extracting Jacobi blocks. \n \n");
+
+    //Print the blocks so we can see if we did it right:
+    for(int b = 0; b < Ablocks_.extent(0); b++){
+      std::cout << "Block number " << b << std::endl;
+      for(int i = 0; i < Ablocks_.extent(1); i++){
+        for (int j = 0; j < Ablocks_.extent(2); j++){
+          std::cout << Ablocks_(b, i , j) << "  ";
+        }
+        std::cout << std::endl;
+      } 
+      std::cout << std::endl;
+    }
       //TODO: should we store policy as part of the object so we dont' have to recreate for apply?
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
@@ -127,6 +142,7 @@
       ::invoke(member, one, Ssub, Asub);
       });}
     else if (solve_ == "TRSV"){
+    std::cout << "computing inverses!!!" << std::endl;
       Kokkos::parallel_for
         ("task2.factorize-invert",
          policy, KOKKOS_LAMBDA(const member_type &member) {
@@ -139,6 +155,20 @@
 	const double t = timer.seconds();
 	printf("task 2: construction of jacobi time = %f , # of constructions per min = %.0f \n", t, 1.0/t*60);
 
+std::cout << "Printing inverses!" << std::endl;
+
+
+    //Print the blocks so we can see if we did it right:
+    for(int b = 0; b < Ablocks_.extent(0); b++){
+      std::cout << "Block number " << b << std::endl;
+      for(int i = 0; i < Ablocks_.extent(1); i++){
+        for (int j = 0; j < Ablocks_.extent(2); j++){
+          std::cout << Ablocks_(b, i , j) << "  ";
+        }
+        std::cout << std::endl;
+      } 
+      std::cout << std::endl;
+    }
     }
 
     //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
@@ -168,8 +198,6 @@
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
           policy = policy_type(numBlocks_, teamSize_);
-  Kokkos::Impl::Timer timer;
-	timer.reset();
 	    const int  one (1);
     if(solve_ == "GEMV" ){
     //TODO: Should we save the "subBlocks" variables as part of the object so we don't have to recreate for apply?
@@ -208,9 +236,6 @@
             KokkosBatched::Algo::Trsv::Unblocked>::invoke(member, one, Asub, ysub);
       });
     }
-    Kokkos::fence();
-	const double t = timer.seconds();
-	printf("task 2: construction of jacobi time = %f , # of constructions per min = %.0f \n", t, 1.0/t*60);
 
     }
 
