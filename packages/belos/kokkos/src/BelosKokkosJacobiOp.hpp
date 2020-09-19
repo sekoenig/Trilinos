@@ -88,18 +88,17 @@
 //    printf("%s\n Memory space of values: ",decltype(values)::memory_space::name());
 //    printf("%s\n Memory space of Ablocks_: ",decltype(Ablocks_)::memory_space::name());
 
-    //int colPtr = 0;
-    for (int row = 0; row < numRows; row++){
-      int rowBlk = floor(row/blockSize_);
-      int colPtr = rowPtrView(row); //New line here. 
+    Kokkos::parallel_for("Extract Blocks", numRows, KOKKOS_LAMBDA (int row) {
+      int rowBlk = floor((double)(row/blockSize_));
+      int colPtr = rowPtrView(row); 
       while( colPtr < rowPtrView(row+1) ) { // If we are still in the same row...
-        int colBlk = floor( colIdxView(colPtr)/blockSize_ ); //** THIS is the first line where we have problems.  Trying to access a GPU thing on host, probably.  
+        int colBlk = floor( (double)(colIdxView(colPtr)/blockSize_ )); 
           if( rowBlk == colBlk) { // Then we are in one of the blocks to extract.
             Ablocks_( rowBlk, row % blockSize_, colIdxView(colPtr) % blockSize_ ) = values(colPtr);
           }
         colPtr++;
       }
-    }
+    });
 
       printf("Finished extracting Jacobi blocks. \n \n");
 
