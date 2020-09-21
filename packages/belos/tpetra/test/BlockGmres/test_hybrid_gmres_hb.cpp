@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   Tpetra::ScopeGuard tpetraScope(&argc,&argv);
 
   bool success = false;
-  bool verbose = false;
+  bool verbose = true;
   try {
     const ST one  = SCT::one();
 
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
     int maxrestarts = 15;                     // number of restarts allowed
     std::string outersolver("Block Gmres");   // name of outer solver
     std::string polytype("Roots");            // polynomial configuration.  
-    std::string filename("bcsstk14.hb");      // name of matrix file
+    std::string filename("bcsstk13.mtx");      // name of matrix file
     MT tol = 1.0e-5;                          // relative residual tolerance
     MT polytol = tol/10;                      // relative residual tolerance for polynomial construction
 
@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
     B = rcp( new MV(map,numrhs) );
     OPT::Apply( *A, *X, *B );
     MVT::MvInit( *X, 0.0 );
+    MVT::MvInit( *B, 1.0 );
 
     //
     // ********Other information used by block solver***********

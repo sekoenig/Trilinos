@@ -537,7 +537,7 @@ namespace Belos {
        2) Check value of norms
        3) Zero out B and make sure that C is zero as well
     *********************************************************************/
-    {
+    /*{
       Teuchos::RCP<MV> B, C;
       std::vector<MagType> norms(numvecs), norms2(numvecs);
 
@@ -561,7 +561,7 @@ namespace Belos {
           return false;
         }
       }
-    }
+    }*/
 
 
     /*********** CloneView(const MV,std::vector<int>) and MvNorm() ************
@@ -570,7 +570,7 @@ namespace Belos {
        2) Check value of norms for agreement
        3) Zero out B and make sure that C is zerod as well
     *********************************************************************/
-    {
+    /*{
       Teuchos::RCP<MV> B;
       Teuchos::RCP<const MV> C;
       std::vector<MagType> normsB(numvecs), normsC(numvecs_2);
@@ -600,7 +600,7 @@ namespace Belos {
         }
       }
     }
-
+   */
 
     /*********** SetBlock() and MvNorm() *********************************
        SetBlock() will copy the vectors from C into B
@@ -614,7 +614,7 @@ namespace Belos {
        overwritten, making it more difficult to test.
     *********************************************************************/
     {
-      Teuchos::RCP<MV> B, C;
+      Teuchos::RCP<MV> B, C; //numvecs = 10, numvecs_2 = 5
       std::vector<MagType> normsB1(numvecs), normsB2(numvecs),
                            normsC1(numvecs_2), normsC2(numvecs_2);
 
@@ -623,14 +623,20 @@ namespace Belos {
       // Just do every other one, interleaving the vectors of C into B
       ind.resize(numvecs_2);
       for (int i=0; i<numvecs_2; i++) {
-        ind[i] = 2*i;
+        ind[i] = 2*i; // 0,2,4,6,..
       }
       MVT::MvRandom(*B);
+    //  std::cout << "Print B vec" << std::endl;
+    //  MVT::MvPrint(*B,std::cout);
       MVT::MvRandom(*C);
+    //  std::cout << "Print C vec" << std::endl;
+    //  MVT::MvPrint(*C,std::cout);
 
       MVT::MvNorm(*B,normsB1);
       MVT::MvNorm(*C,normsC1);
-      MVT::SetBlock(*C,ind,*B);
+      MVT::SetBlock(*C,ind,*B);// Copy vectors of C to vectors specified by ind in B. 
+    //  std::cout << "Print B vec after setBlock.  Shoud have C cols in 0 2 4 6 8." << std::endl;
+    //  MVT::MvPrint(*B,std::cout);
       MVT::MvNorm(*B,normsB2);
       MVT::MvNorm(*C,normsC2);
 
@@ -687,6 +693,7 @@ namespace Belos {
           return false;
         }
       }
+      std::cout << "Got past first set of commented tests!" << endl;
     }
 
 
@@ -1104,7 +1111,7 @@ namespace Belos {
        1) Use alpha==0,beta==1 and check that D == C
        2) Use alpha==1,beta==0 and check that D == B
     *********************************************************************/
-    {
+    /*{
       const int p = 7;
       Teuchos::RCP<MV> B, D;
       Teuchos::RCP<const MV> C;
@@ -1145,7 +1152,7 @@ namespace Belos {
       }
 
     }
-
+    */
 
     /*********** MvTimesMatAddMv() 7 by 5 ********************************
        C = alpha*B*SDM + beta*C
@@ -1282,6 +1289,8 @@ namespace Belos {
         }
       }
     }
+
+      std::cout << "Got past first set of commented tests!" << endl;
 
     /*********** MvTimesMatAddMv() 5 by 7 ********************************
        C = alpha*B*SDM + beta*C
