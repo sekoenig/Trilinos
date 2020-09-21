@@ -4062,7 +4062,7 @@ namespace Tpetra {
     Kokkos::parallel_for
       ("Tpetra::CrsMatrix::getLocalDiagCopy",
        range_type (0, myNumRows),
-       [&] (const LO lclRow) {
+       [&, INV, h_offsets] (const LO lclRow) { // Value capture is a workaround for cuda + gcc-7.2 compiler bug w/c++14
         lclVecHost1d(lclRow) = STS::zero (); // default value if no diag entry
         if (h_offsets[lclRow] != INV) {
           auto curRow = lclMat.rowConst (lclRow);
@@ -4085,7 +4085,6 @@ namespace Tpetra {
     using Teuchos::RCP;
     using Teuchos::rcp;
     using Teuchos::rcpFromRef;
-    using LO = local_ordinal_type;
     using vec_type = Vector<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
     const char tfecfFuncName[] = "leftScale: ";
 
@@ -4146,7 +4145,6 @@ namespace Tpetra {
     using Teuchos::RCP;
     using Teuchos::rcp;
     using Teuchos::rcpFromRef;
-    using LO = local_ordinal_type;
     typedef Vector<Scalar, LocalOrdinal, GlobalOrdinal, Node> vec_type;
     const char tfecfFuncName[] = "rightScale: ";
 
@@ -5198,7 +5196,7 @@ namespace Tpetra {
           Y_in.scale (beta);
         }
         // Do the Export operation.
-        Y_in.doExport (*Y_rowMap, *exporter, ADD);
+        Y_in.doExport (*Y_rowMap, *exporter, ADD_ASSIGN);
       }
     }
     else { // Don't do an Export: row Map and range Map are the same.
@@ -5340,12 +5338,13 @@ namespace Tpetra {
       importMV_->putScalar (ZERO);
       // Do the local computation.
       this->localApply (*X, *importMV_, mode, alpha, ZERO);
+
       if (Y_is_overwritten) {
         Y_in.putScalar (ZERO);
       } else {
         Y_in.scale (beta);
       }
-      Y_in.doExport (*importMV_, *importer, ADD);
+      Y_in.doExport (*importMV_, *importer, ADD_ASSIGN);
     }
     // otherwise, multiply into Y
     else {
@@ -6917,7 +6916,8 @@ namespace Tpetra {
     const SrcDistObject& srcObj,
     const size_t numSameIDs,
     const Kokkos::DualView<const local_ordinal_type*, buffer_device_type>& permuteToLIDs,
-    const Kokkos::DualView<const local_ordinal_type*, buffer_device_type>& permuteFromLIDs)
+    const Kokkos::DualView<const local_ordinal_type*, buffer_device_type>& permuteFromLIDs,
+    const CombineMode /*CM*/)
   {
     using Details::Behavior;
     using Details::dualViewStatusToString;
@@ -9602,7 +9602,7 @@ namespace Tpetra {
         }
 
         Teuchos::ArrayView<const int>  EPID1 = MyImporter.is_null() ? Teuchos::ArrayView<const int>() : MyImporter->getExportPIDs();
-        Teuchos::ArrayView<const LO>   ELID1 = MyImporter.is_null() ? Teuchos::ArrayView<const int>() : MyImporter->getExportLIDs();
+        Teuchos::ArrayView<const LO>   ELID1 = MyImporter.is_null() ? Teuchos::ArrayView<const LO>() : MyImporter->getExportLIDs();
 
         Teuchos::ArrayView<const int>  TEPID2  =  rowTransfer.getExportPIDs(); // row matrix
         Teuchos::ArrayView<const LO>   TELID2  =  rowTransfer.getExportLIDs();

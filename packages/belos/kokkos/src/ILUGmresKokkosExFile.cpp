@@ -57,6 +57,7 @@
 
 #include "BelosKokkosAdapter.hpp"
 #include "BelosKokkosILUOp.hpp"
+#include "BelosKokkosJacobiOp.hpp"
 #include "KokkosKernels_IOUtils.hpp"
 
 int main(int argc, char *argv[]) {
@@ -91,6 +92,7 @@ bool proc_verbose = false;
   int maxiters = -1;         // maximum number of iterations allowed per linear system
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 25;      // number of restarts allowed
+  int blksize = 4;
   bool expresidual = false; // use explicit residual
   bool precOn = true;
   std::string filename("bcsstk13.mtx"); // example matrix
@@ -99,6 +101,7 @@ bool proc_verbose = false;
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
+  cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -122,11 +125,11 @@ bool proc_verbose = false;
   OT numRows = crsMat.numRows();
   
   //Test code for ILU operator: 
-  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
-            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> ILUprec = 
+            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize));
 
   std::cout << "Setting up ILU prec: " << std::endl;
-  ILUprec->SetUpILU();
+  ILUprec->SetUpJacobi();
   std::cout << "Exited ILU prec setup." << std::endl;
 
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );

@@ -50,6 +50,7 @@
 #include "BelosLinearProblem.hpp"
 #include "BelosBlockGmresSolMgr.hpp"
 #include "BelosOutputManager.hpp"
+#include "BelosSolverOp.hpp"
 
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
@@ -76,6 +77,7 @@ bool success = true;
   typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
+  typedef Belos::SolverOp<ST> SOP; 
   typedef Belos::MultiVec<ST2> KMV2;
   typedef Belos::Operator<ST2> KOP2; 
 
@@ -100,11 +102,17 @@ bool proc_verbose = false;
   bool converged = false;  
   bool verboseTimes = false; //Show timing at every low precision Gmres iter?  
   bool precOn = false;
+  bool polyPrec = false;
+  int polyDeg = 25;
+  bool polyRandomRhs = true; // if True, poly may be different on each run!
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("verboseTimes","quietTimes",&verbose,"Print timings at every Gmres run.");
-  cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
+  cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
+  cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
+  cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
+  cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
   //cmdp.setOption("tol",&tol,"Relative residual tolerance used by Gmres solver.");
@@ -199,7 +207,21 @@ bool proc_verbose = false;
 
   Belos::LinearProblem<ST,KMV,KOP> problem1;
   problem1.setOperator(A1);
-  if(precOn) {
+  if(polyPrec){
+    std::string innerSolverType = "GmresPoly";
+
+    RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
+    innerProblem->setOperator(A1);
+    RCP<Teuchos::ParameterList> innerList = rcp(new Teuchos::ParameterList() );
+    innerList->set("Random RHS", polyRandomRhs );           // Use RHS from linear system or random vector
+    innerList->set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
+    RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
+    if(precOn){
+      innerProblem->setRightPrec(ILUprec);
+    }
+    problem1.setRightPrec(myPolyPrec);
+  }
+  else if(precOn) {
     problem1.setRightPrec(ILUprec);
   }
   RCP< Belos::SolverManager<ST,KMV,KOP> > Solver1
