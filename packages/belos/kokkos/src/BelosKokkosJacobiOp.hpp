@@ -123,7 +123,7 @@
     if(solve_ == "GEMV" ){
     //TODO: Should we save the "subBlocks" variables as part of the object so we don't have to recreate for apply?
 	Kokkos::parallel_for
-	  ("task2.factorize-invert",
+	  ("GEMV Compute Inverses",
 	   policy, KOKKOS_LAMBDA(const member_type &member) {
       const int i = member.league_rank();
       auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
@@ -143,7 +143,7 @@
     else if (solve_ == "TRSV"){
     std::cout << "computing inverses!!!" << std::endl;
       Kokkos::parallel_for
-        ("task2.factorize-invert",
+        ("TRSV Compute Inverses",
          policy, KOKKOS_LAMBDA(const member_type &member) {
          const int i = member.league_rank();
          auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
@@ -220,13 +220,41 @@ std::cout << "Printing inverses!" << std::endl;
     else if (solve_ == "TRSV"){
     //Must deep copy here because TRSV uses same input and output vector.
     Kokkos::deep_copy(y_vec->myView, x_vec->myView);
+
+    //Print y before LU inv:
+    std::cout << "Printing y before apply LU inv: " << std::endl;
+    for(int k=0; k< y_vec->myView.extent(0); k++){
+      std::cout << (y_vec->myView)(k,0) << std::endl;
+    }
+    std::cout << std::endl;
       Kokkos::parallel_for
         ("TRSV apply LU inv",
          policy, KOKKOS_LAMBDA(const member_type &member) {
+            printf("in the TRSV apply LU inv. 1 \n");
          const int i = member.league_rank();
          auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = 
             Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+            printf("in the TRSV apply LU inv. \n");
+
+            if(i == 0){
+              printf("Printing A from proc 0: \n");
+              for(int k = 0; k < Asub.extent(0); k++){
+                for (int j = 0; j < Asub.extent(1); j++){
+                  printf(" %d ",Asub(k , j)); 
+                }
+                printf(" \n ");
+              } 
+            }
+            if(i == 2){
+              printf("Printing A from proc 2: \n");
+              for(int k = 0; k < Asub.extent(0); k++){
+                for (int j = 0; j < Asub.extent(1); j++){
+                  printf(" %d ",Asub(k , j)); 
+                }
+                printf(" \n ");
+              } 
+            }
       KokkosBatched::TeamTrsv<member_type,KokkosBatched::Uplo::Lower,
             KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::Unit,
             KokkosBatched::Algo::Trsv::Unblocked> ::invoke(member, one, Asub, ysub);
@@ -234,6 +262,14 @@ std::cout << "Printing inverses!" << std::endl;
             KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::NonUnit,
             KokkosBatched::Algo::Trsv::Unblocked>::invoke(member, one, Asub, ysub);
       });
+            Kokkos::fence();
+
+    //Print y after LU inv:
+    std::cout << "Printing y after apply LU inv: " << std::endl;
+    for(int k=0; k< y_vec->myView.extent(0); k++){
+      std::cout << (y_vec->myView)(k,0) << std::endl;
+    }
+    std::cout << std::endl;
     }
 
     }
