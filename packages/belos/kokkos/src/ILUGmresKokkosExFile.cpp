@@ -93,8 +93,10 @@ bool proc_verbose = false;
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 25;      // number of restarts allowed
   int blksize = 4;
+  int teamsize = -1;
   bool expresidual = false; // use explicit residual
   bool precOn = true;
+  std::string jacobisolve("TRSV"); //Solve type for Jacobi prec- TRSV or GEMV. 
   std::string filename("bcsstk13.mtx"); // example matrix
   MT tol = 1.0e-6;           // relative residual tolerance
 
@@ -102,6 +104,8 @@ bool proc_verbose = false;
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("prec","noprec",&precOn,"Use preconditioning.");
   cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
+  cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations.");
+  cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV.");
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
@@ -126,7 +130,7 @@ bool proc_verbose = false;
   
   //Test code for ILU operator: 
   RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> ILUprec = 
-            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize));
+            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize,jacobisolve,teamsize));
 
   std::cout << "Setting up ILU prec: " << std::endl;
   ILUprec->SetUpJacobi();

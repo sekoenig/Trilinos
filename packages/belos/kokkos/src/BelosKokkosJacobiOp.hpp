@@ -182,7 +182,7 @@
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
           policy = policy_type(numBlocks_, teamSize_);
-	    const int  one (1);
+	    const int  one (1), zero(0);
     if(solve_ == "GEMV" ){
     //TODO: Should we save the "subBlocks" variables as part of the object so we don't have to recreate for apply?
 	Kokkos::parallel_for
@@ -190,17 +190,13 @@
 	   policy, KOKKOS_LAMBDA(const member_type &member) {
       const int i = member.league_rank();
       auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
-
-      KokkosBatched::TeamLU<member_type,KokkosBatched::Algo::Level3::Unblocked>::invoke(member,Asub);
-      auto Ssub = Kokkos::subview(Sblocks_, i, Kokkos::ALL(), Kokkos::ALL());
-      KokkosBatched::TeamCopy<member_type,KokkosBatched::Trans::NoTranspose>::invoke(member, Asub, Ssub);
-      KokkosBatched::TeamSetIdentity<member_type>::invoke(member, Asub);
-      KokkosBatched::TeamTrsm<member_type, KokkosBatched::Side::Left,KokkosBatched::Uplo::Lower,
-            KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::Unit,
-            KokkosBatched::Algo::Level3::Unblocked> ::invoke(member, one, Ssub, Asub);
-      KokkosBatched::TeamTrsm<member_type,KokkosBatched::Side::Left,KokkosBatched::Uplo::Upper,
-            KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::NonUnit,
-            KokkosBatched::Algo::Level3::Unblocked>::invoke(member, one, Ssub, Asub);
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = 
+         Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = 
+         Kokkos::subview(x_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+      //auto Ssub = Kokkos::subview(Sblocks_, i, Kokkos::ALL(), Kokkos::ALL());
+      KokkosBatched::TeamGemv<member_type, KokkosBatched::Trans::NoTranspose, KokkosBatched::Algo::Level2::Unblocked>
+        ::invoke(member, one, Asub, xsub, zero, ysub);
             });}
     else if (solve_ == "TRSV"){
       //Must deep copy here because TRSV uses same input and output vector.
