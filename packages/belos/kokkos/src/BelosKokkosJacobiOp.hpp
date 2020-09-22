@@ -24,9 +24,9 @@
 #ifndef BELOS_KOKKOS_JACOBI_HPP
 #define BELOS_KOKKOS_JACOBI_HPP
  namespace Belos {
-  /// \class KokkosOperator
-  /// \brief Implementation of Belos::Operator using Kokkos::Crs matrix.
-  ///
+  /// \class KokkosJacobiOperator
+  /// \brief Implementation of Kokkos-based block Jacobi preconditioner to be used with Belos.
+  
   template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace>
   class KokkosJacobiOperator : public Operator<ScalarType> {
   private:
@@ -46,7 +46,6 @@
 
     crsMat_t A_;// Matrix from which to create Jacobi preconditioner. 
     ManyMatrixType Ablocks_; //To hold the Jacobi blocks. 
-    ManyMatrixType Sblocks_; //To hold block inverses if GEMV option chosen.
     int blockSize_;
     int numBlocks_;
     int teamSize_;
@@ -57,7 +56,6 @@
     KokkosJacobiOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> A, int blockSize, std::string solve="TRSV", int teamSize=-1) 
      : A_(A), 
      Ablocks_("Ablocks",0,0,0),
-     Sblocks_("Sblocks",0,0,0),
      blockSize_(blockSize),
      numBlocks_(-1),
      solve_(solve),
@@ -65,6 +63,7 @@
     {}
 
     void SetUpJacobi() {
+    ManyMatrixType Sblocks_("Sblocks",0,0,0); //To hold the Jacobi blocks. 
     const size_type numRows = A_.graph.numRows();
     //Right now, we only support if the block size evenly divides the size of the matrix.
     if(numRows % blockSize_ != 0){
@@ -85,8 +84,6 @@
     auto values = A_.values; 
     auto colIdxView = A_.graph.entries;
     auto rowPtrView = A_.graph.row_map;
-//    printf("%s\n Memory space of values: ",decltype(values)::memory_space::name());
-//    printf("%s\n Memory space of Ablocks_: ",decltype(Ablocks_)::memory_space::name());
 
     Kokkos::parallel_for("Extract Blocks", numRows, KOKKOS_LAMBDA (int row) {
       int rowBlk = floor((double)(row/blockSize_));
@@ -159,25 +156,10 @@
     // y = A*x
     void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...
-      // Note: spmv computes y = beta*y + alpha*Op(A)*x  spmv(mode,alpha,A,x,beta,y);
-      //ScalarType alpha = 1.0;
-      //ScalarType beta = 0;
       KokkosMultiVec<ScalarType, Device> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>
             (&const_cast<MultiVec<ScalarType> &>(x));
       KokkosMultiVec<ScalarType, Device> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>(&y);
 
-      // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. 
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = Kokkos::subview(y_vec->myView, Kokkos::ALL, 0);
-
-      // KokkosSparse::Experimental::sptrsv_solve(handle, rowmap, entries, values, b, x);
-      // x = U\b, x = L\b, Ux=b, etc. 
-      // TODO did I pass in correct vectors? for solve??
-      // LUy = x by this layout
-      // Uy = L\x = tmp
-      // y = U\tmp
-  //    KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_L, L_row_map, L_entries, L_values, xsub, tmp); 
-   //   KokkosSparse::Experimental::sptrsv_solve( &kh_sptrsv_U, U_row_map, U_entries, U_values, tmp, ysub);
       //TODO: should we store policy as part of the object so we dont' have to recreate for apply?
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
@@ -194,7 +176,6 @@
          Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = 
          Kokkos::subview(x_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
-      //auto Ssub = Kokkos::subview(Sblocks_, i, Kokkos::ALL(), Kokkos::ALL());
       KokkosBatched::TeamGemv<member_type, KokkosBatched::Trans::NoTranspose, KokkosBatched::Algo::Level2::Unblocked>
         ::invoke(member, one, Asub, xsub, zero, ysub);
             });}
@@ -214,7 +195,7 @@
          const int i = member.league_rank();
          auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
          Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = 
-         Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+           Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
          /*if(i == 0){
            printf("Printing A from proc 0: \n");
            for(int k = 0; k < Asub.extent(0); k++){
@@ -231,7 +212,6 @@
          KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::NonUnit,
          KokkosBatched::Algo::Trsv::Unblocked>::invoke(member, one, Asub, ysub);
          });
-      Kokkos::fence();
 
       }
 
