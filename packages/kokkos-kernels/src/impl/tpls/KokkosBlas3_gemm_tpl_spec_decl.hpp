@@ -41,7 +41,6 @@
 // ************************************************************************
 //@HEADER
 */
-
 #ifndef KOKKOSBLAS3_GEMM_TPL_SPEC_DECL_HPP_
 #define KOKKOSBLAS3_GEMM_TPL_SPEC_DECL_HPP_
 
@@ -92,7 +91,9 @@ struct GEMM< \
     const int BST = B_is_lr?B.stride(0):B.stride(1), LDB = BST == 0 ? 1 : BST; \
     const int CST = C_is_lr?C.stride(0):C.stride(1), LDC = CST == 0 ? 1 : CST; \
     \
-    if(!A_is_lr && !B_is_lr && !C_is_lr )                               \
+    if(!A_is_lr && !B_is_lr && !C_is_lr ){                               \
+    /*if(JENN_DEBUG){ printf("Jenn_DEBUG: Calling HostBlas<double> gemm, layout left");}*/ \
+    printf("Jenn_DEBUG: Calling HostBlas<double> gemm, layout left"); \
       HostBlas<double>::gemm                                            \
         (transA[0],transB[0],                                                 \
          M,N,K,                                                         \
@@ -101,7 +102,9 @@ struct GEMM< \
          B.data(),LDB,                                                  \
          beta,                                                          \
          C.data(),LDC);                                                 \
-    if(A_is_lr && B_is_lr && C_is_lr )                                  \
+         }                            \
+    if(A_is_lr && B_is_lr && C_is_lr ){                                  \
+    printf("Jenn_DEBUG: Calling HostBlas<double> gemm, layout right"); \
       HostBlas<double>::gemm                                            \
         (transB[0],transA[0],                                                 \
          N,M,K,                                                         \
@@ -110,6 +113,7 @@ struct GEMM< \
          A.data(),LDA,                                                  \
          beta,                                                          \
          C.data(),LDC);                                                 \
+         }                            \
     Kokkos::Profiling::popRegion();                                     \
   } \
 };
@@ -155,7 +159,8 @@ struct GEMM< \
     const int BST = B_is_lr?B.stride(0):B.stride(1), LDB = BST == 0 ? 1 : BST; \
     const int CST = C_is_lr?C.stride(0):C.stride(1), LDC = CST == 0 ? 1 : CST; \
     \
-    if(!A_is_lr && !B_is_lr && !C_is_lr )                              \
+    if(!A_is_lr && !B_is_lr && !C_is_lr ) {                             \
+    printf("Jenn_DEBUG: Calling HostBlas<float> gemm, layout left"); \
       HostBlas<float>::gemm                                             \
         (transA[0],transB[0],                                                 \
          M,N,K,                                                         \
@@ -164,7 +169,9 @@ struct GEMM< \
          B.data(),LDB,                                                  \
          beta,                                                          \
          C.data(),LDC);                                                 \
-    if(A_is_lr && B_is_lr && C_is_lr )                                  \
+         }                                    \
+    if(A_is_lr && B_is_lr && C_is_lr ){                                  \
+    printf("Jenn_DEBUG: Calling HostBlas<float> gemm, layout right"); \
       HostBlas<float>::gemm                                             \
         (transB[0],transA[0],                                                 \
          N,M,K,                                                         \
@@ -173,6 +180,7 @@ struct GEMM< \
          A.data(),LDA,                                                  \
          beta,                                                          \
          C.data(),LDC);                                                 \
+         }                          \
     Kokkos::Profiling::popRegion(); \
   } \
 };
@@ -391,6 +399,8 @@ struct DotBasedGEMM{
     if(appxNumTeams > 1024)
       appxNumTeams = 1024;
 
+//std::cout << "ApprxNumTeams is: " << appxNumTeams << std::endl;
+
     // If there are more dot products than the number of teams,
     // then set the number of teams to be number of dot products
     // and each team will perform only one dot product.
@@ -405,18 +415,24 @@ struct DotBasedGEMM{
     // compute actual number of teams by using this factor.
     else{
       numDivPerDot = appxNumTeams / ndots;
+      if(numDivPerDot > 100 ){
+        numDivPerDot = 100;
+      }
       numTeams = ndots * numDivPerDot;
     }
+//std::cout << "numDivPerDot is: " << numDivPerDot << std::endl;
+//std::cout << "numTeams is: " << numTeams << std::endl;
 
     // Determine the local length for the dot product
     chunkSize = dotSize / numDivPerDot;
     if(numDivPerDot > 1)
       chunkSize++;
+//std::cout << "chunkSize is: " << chunkSize << std::endl;
 
     // Initialize C matrix if beta != 1
     if(beta == CVT::zero()) {
       Kokkos::MDRangePolicy<TagZero, ExecSpace, Kokkos::Rank<2>> policyInit({0,0}, {numCrows, numCcols});
-      Kokkos::parallel_for("Initialize C for Dot Product Based GEMM", policyInit, *this);
+      Kokkos::parallel_for("Initialize C for Dot Product Based GEMM beta=0", policyInit, *this);
     }
     else if(beta != CVT::one()) {
       Kokkos::MDRangePolicy<TagInit, ExecSpace, Kokkos::Rank<2>> policyInit({0,0}, {numCrows, numCcols});
@@ -426,11 +442,11 @@ struct DotBasedGEMM{
     // Multiply alpha*A^TB and add it to beta*C
     if(conjugateTranspose) {
       Kokkos::TeamPolicy<TagMultCT, ExecSpace> policyMult(numTeams, Kokkos::AUTO);
-      Kokkos::parallel_for("Perform Dot Product Based GEMM", policyMult, *this);
+      Kokkos::parallel_for("Perform Dot Product Based GEMM ConjTrans", policyMult, *this);
     }
     else{
       Kokkos::TeamPolicy<TagMult, ExecSpace> policyMult(numTeams, Kokkos::AUTO);
-      Kokkos::parallel_for("Perform Dot Product Based GEMM", policyMult, *this);
+      Kokkos::parallel_for("Perform Dot Product Based GEMM no trans", policyMult, *this);
     }
   }
 
@@ -455,14 +471,18 @@ struct DotBasedGEMM{
     
     scalar_C result = CVT::zero();
     const size_A baseInd = chunkSize*localRank; 
-    Kokkos::parallel_reduce( Kokkos::TeamThreadRange(teamMember, chunkSize), [&]( const size_A k, scalar_C &update ) {
+//Kokkos::Profiling::pushRegion("GEMM par reduce");
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, chunkSize), [&]( const size_A k, scalar_C &update ) {
 	if(baseInd + k < dotSize)
 	  update += alpha * A(baseInd+k, rowId) * B(baseInd+k, colId);
       }, result );
+//Kokkos::Profiling::popRegion;
 
+//Kokkos::Profiling::pushRegion("GEMM atomic");
     Kokkos::single(Kokkos::PerTeam(teamMember), [&] () { 
       Kokkos::atomic_add(&C(rowId, colId), result);
       });
+//Kokkos::Profiling::popRegion;
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -516,7 +536,7 @@ struct GEMM< \
         typename CViewType::const_value_type& beta, \
         const CViewType& C) { \
     \
-    Kokkos::Profiling::pushRegion("KokkosBlas::gemm[TPL_BLAS,double]"); \
+    Kokkos::Profiling::pushRegion("KokkosBlas::gemm[TPL_CUBLAS,double]"); \
     const bool A_t = (transA[0]!='N') && (transA[0]!='n'); \
     const int M = static_cast<int> (C.extent(0)); \
     const int N = static_cast<int> (C.extent(1)); \
@@ -548,16 +568,21 @@ struct GEMM< \
     constexpr int numDotsLayoutRightThreshold = 100; \
     if(   (!A_is_lr && transa != CUBLAS_OP_N && transb == CUBLAS_OP_N && M*N < numDotsLayoutLeftThreshold) \
        || ( A_is_lr && transa != CUBLAS_OP_N && transb == CUBLAS_OP_N && M*N < numDotsLayoutRightThreshold)) { \
+      /*printf("Jenn_DEBUG: Calling Kokkos DotBasedGEMM <double> for tall skinny matrices.");*/ \
       DotBasedGEMM<ExecSpace,AViewType,BViewType,CViewType> gemm(alpha,A,B,beta,C); \
       gemm.run(false); \
     } \
-    else { \
+    else {  \
       KokkosBlas::Impl::CudaBlasSingleton & s = KokkosBlas::Impl::CudaBlasSingleton::singleton(); \
-      if(!A_is_lr && !B_is_lr && !C_is_lr )				\
+      if(!A_is_lr && !B_is_lr && !C_is_lr ){				\
+    /*printf("Jenn_DEBUG: Calling CuBlas<double> gemm, layout left"); */ \
 	cublasDgemm(s.handle, transa, transb, M, N, K, &alpha, A.data(), LDA, B.data(), LDB, &beta, C.data(), LDC); \
-      if(A_is_lr && B_is_lr && C_is_lr )				\
+        }             \
+      if(A_is_lr && B_is_lr && C_is_lr ){				\
+    printf("Jenn_DEBUG: Calling CuBlas<double> gemm, layout right"); \
 	cublasDgemm(s.handle, transb, transa, N, M, K, &alpha, B.data(), LDB, A.data(), LDA, &beta, C.data(), LDC); \
-    } \
+       }              \
+    }  \
     Kokkos::Profiling::popRegion(); \
   } \
 };
@@ -589,7 +614,7 @@ struct GEMM< \
         typename CViewType::const_value_type& beta, \
         const CViewType& C) { \
     \
-    Kokkos::Profiling::pushRegion("KokkosBlas::gemm[TPL_BLAS,float]"); \
+    Kokkos::Profiling::pushRegion("KokkosBlas::gemm[TPL_CUBLAS,float]"); \
     const bool A_t = (transA[0]!='N') && (transA[0]!='n'); \
     const int M = static_cast<int> (C.extent(0)); \
     const int N = static_cast<int> (C.extent(1)); \
@@ -619,18 +644,23 @@ struct GEMM< \
     \
     constexpr int numDotsLayoutLeftThreshold = 1600; \
     constexpr int numDotsLayoutRightThreshold = 100; \
-    if(   (!A_is_lr && transa != CUBLAS_OP_N && transb == CUBLAS_OP_N && M*N < numDotsLayoutLeftThreshold) \
+     if(   (!A_is_lr && transa != CUBLAS_OP_N && transb == CUBLAS_OP_N && M*N < numDotsLayoutLeftThreshold) \
        || ( A_is_lr && transa != CUBLAS_OP_N && transb == CUBLAS_OP_N && M*N < numDotsLayoutRightThreshold)) { \
+      /*printf("Jenn_DEBUG: Calling Kokkos DotBasedGEMM <float> for tall skinny matrices."); */\
       DotBasedGEMM<ExecSpace,AViewType,BViewType,CViewType> gemm(alpha,A,B,beta,C); \
       gemm.run(false); \
     } \
-    else { \
+    else {  \
       KokkosBlas::Impl::CudaBlasSingleton & s = KokkosBlas::Impl::CudaBlasSingleton::singleton(); \
-      if(!A_is_lr && !B_is_lr && !C_is_lr ) \
+      if(!A_is_lr && !B_is_lr && !C_is_lr ){ \
+       /* printf("Jenn_DEBUG: Calling CuBlas<float> gemm, layout left"); */ \
         cublasSgemm(s.handle, transa, transb, M, N, K, &alpha, A.data(), LDA, B.data(), LDB, &beta, C.data(), LDC); \
-      if(A_is_lr && B_is_lr && C_is_lr ) \
+        }   \
+      if(A_is_lr && B_is_lr && C_is_lr ){ \
+        printf("Jenn_DEBUG: Calling CuBlas<float> gemm, layout right"); \
         cublasSgemm(s.handle, transb, transa, N, M, K, &alpha, B.data(), LDB, A.data(), LDA, &beta, C.data(), LDC); \
-    } \
+        }   \
+    }  \
     Kokkos::Profiling::popRegion(); \
   } \
 };
