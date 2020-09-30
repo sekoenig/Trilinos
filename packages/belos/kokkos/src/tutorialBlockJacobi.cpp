@@ -1,6 +1,6 @@
 /// Kokkos headers
 #include "Kokkos_Core.hpp"
-#include "impl/Kokkos_Timer.hpp"
+#include "Kokkos_Timer.hpp"
 #include "Kokkos_Random.hpp"
 
 /// KokkosKernels headers
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
     ///
     /// input arguments parsing
     ///
-    int N = 128*128; /// # of problems (batch size)
+    int N = 10; /// # of problems (batch size)
     int Blk = 5;     /// block dimension
     int Task = 0;    /// test both , 1 - task 1 only, 2 - task 2 only
     int TeamSize = 0;/// 0 - AUTO, otherwise 
@@ -178,6 +178,19 @@ int main(int argc, char* argv[]) {
         if (TeamSize != 0) 
           policy = policy_type(A.extent(0), TeamSize);
         timer.reset();
+      printf("Before LU factor:");
+
+    //Print the blocks so we can see if we did it right:
+    for(int b = 0; b < A.extent(0); b++){
+      std::cout << "Block number " << b << std::endl;
+      for(int i = 0; i < A.extent(1); i++){
+        for (int j = 0; j < A.extent(2); j++){
+          std::cout << A(b, i , j) << "  ";
+        }
+        std::cout << std::endl;
+      } 
+      std::cout << std::endl;
+    }
 	Kokkos::parallel_for
 	  ("task1.factorize",
 	   policy, KOKKOS_LAMBDA(const member_type &member) {
@@ -185,6 +198,19 @@ int main(int argc, char* argv[]) {
 	    auto AA = Kokkos::subview(A, i, Kokkos::ALL(), Kokkos::ALL());
 	    TeamLU<member_type,Algo::Level3::Unblocked>::invoke(member,AA);
 	  });
+      printf("After LU factor:");
+
+    //Print the blocks so we can see if we did it right:
+    for(int b = 0; b < A.extent(0); b++){
+      std::cout << "Block number " << b << std::endl;
+      for(int i = 0; i < A.extent(1); i++){
+        for (int j = 0; j < A.extent(2); j++){
+          std::cout << A(b, i , j) << "  ";
+        }
+        std::cout << std::endl;
+      } 
+      std::cout << std::endl;
+    }
 	Kokkos::deep_copy(T, A);
 	Kokkos::parallel_for
 	  ("task1.set-identity",
