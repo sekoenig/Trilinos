@@ -79,6 +79,7 @@
       printf("Block Jacobi Prec: Invalid solve type given. Using TRSV. \n \n");
     }
 
+    std::cout << "Using Jacobi solve " << solve_ << " with block size " << blockSize_ << std::endl;
       printf("started extracting Jacobi blocks. \n \n");
 
     auto values = A_.values; 

@@ -57,7 +57,7 @@
 #include "Teuchos_StandardCatchMacros.hpp"
 
 #include "BelosKokkosAdapter.hpp"
-#include "BelosKokkosILUOp.hpp"
+#include "BelosKokkosJacobiOp.hpp"
 #include "KokkosKernels_IOUtils.hpp"
 
 int main(int argc, char *argv[]) {
@@ -77,7 +77,6 @@ bool success = true;
   typedef SCT::magnitudeType                MT;
   typedef Belos::KokkosMultiVec<ST, EXSP>         MV;
   typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
-  typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
@@ -100,16 +99,22 @@ bool proc_verbose = false;
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   int maxrestarts = 25;      // number of restarts allowed
   bool expresidual = false; // use explicit residual
+  int blksize = 4;
+  int teamsize = -1;
   bool precOn = false;
   bool polyPrec = false;
   int polyDeg = 25;
   bool polyRandomRhs = true; // if True, poly may be different on each run!
+  std::string jacobisolve("GEMV"); //Solve type for Jacobi prec- TRSV or GEMV. 
   std::string filename("bcsstk13.mtx"); // example matrix
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
-  cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
+  cmdp.setOption("prec","noprec",&precOn,"Use Jacobi preconditioning.");
+  cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
+  cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations.");
+  cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV.");
   cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
   cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
   cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
@@ -135,14 +140,14 @@ bool proc_verbose = false;
             rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
 
-  //Test code for ILU operator: 
-  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
-            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+  //Test code for Jacobi operator: 
+  RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> JacobiPrec = 
+            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize,jacobisolve,teamsize));
 
   if(precOn) { 
-  std::cout << "Setting up ILU prec: " << std::endl;
-  ILUprec->SetUpILU();
-  std::cout << "Exited ILU prec setup." << std::endl;
+  std::cout << "Setting up Jacobi prec: " << std::endl;
+  JacobiPrec->SetUpJacobi();
+  std::cout << "Exited Jacobi prec setup." << std::endl;
   }
 
   Teuchos::RCP<MV> X = Teuchos::rcp( new MV(numRows, numrhs) );
@@ -159,7 +164,7 @@ bool proc_verbose = false;
   const int NumGlobalElements = B->GetGlobalLength();
   if (maxiters == -1)
     maxiters = NumGlobalElements - 1; // maximum number of iterations to run
-  //
+  
   ParameterList belosList;
   belosList.set( "Maximum Iterations", maxiters );       // Maximum number of iterations allowed
   belosList.set( "Convergence Tolerance", tol );         // Relative convergence tolerance requested
@@ -175,6 +180,7 @@ bool proc_verbose = false;
   }
   else
     belosList.set( "Verbosity", Belos::Errors + Belos::Warnings );
+  
   //
   // Construct an unpreconditioned linear problem instance.
   //
@@ -182,10 +188,10 @@ bool proc_verbose = false;
   if(polyPrec){
     std::string innerSolverType = "GmresPoly";
 
-    //Has to be KMV and KOP for the Linear Prob specialization.  
+    // Has to be KMV and KOP for the Linear Prob specialization.  
     // Can't plug something in here unless it has a Multivector Traits specialization. 
-    //Go change solverOp to take a Belos::Multivector. .... Or do we already have this for Belos::Multivectors? 
-    //What here is specific to Kokkos??
+    // Go change solverOp to take a Belos::Multivector. .... Or do we already have this for Belos::Multivectors? 
+    // What here is specific to Kokkos??
     RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
     innerProblem->setOperator(A);
     RCP<Teuchos::ParameterList> innerList = rcp(new Teuchos::ParameterList() );
@@ -193,12 +199,12 @@ bool proc_verbose = false;
     innerList->set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
     RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
     if(precOn){
-      innerProblem->setRightPrec(ILUprec);
+      innerProblem->setRightPrec(JacobiPrec);
     }
     problem.setRightPrec(myPolyPrec);
   }
   else if(precOn) {
-    problem.setRightPrec(ILUprec);
+    problem.setRightPrec(JacobiPrec);
   }
   bool set = problem.setProblem();
   if (set == false) {

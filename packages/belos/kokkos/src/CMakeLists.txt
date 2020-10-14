@@ -52,6 +52,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  GEMMTest
+  SOURCES GEMMTest.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   KokkosMVOPTester
   SOURCES MVOPTester.cpp
   COMM serial mpi

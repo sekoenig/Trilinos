@@ -58,7 +58,7 @@
 
 #include "BelosKokkosAdapter.hpp"
 #include "KokkosKernels_IOUtils.hpp"
-#include "BelosKokkosILUOp.hpp"
+#include "BelosKokkosJacobiOp.hpp"
 
 int main(int argc, char *argv[]) {
 
@@ -74,7 +74,6 @@ bool success = true;
   //typedef SCT::magnitudeType                MT;
   //typedef Belos::KokkosMultiVec<ST>         MV;
   //typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
-  typedef Belos::KokkosILUOperator<ST, OT, EXSP>       ILUOP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::SolverOp<ST> SOP; 
@@ -101,15 +100,21 @@ bool proc_verbose = false;
   double tol = 1.0e-8;           // relative residual tolerance
   bool converged = false;  
   bool verboseTimes = false; //Show timing at every low precision Gmres iter?  
+  int blksize = 4;
+  int teamsize = -1;
   bool precOn = false;
   bool polyPrec = false;
   int polyDeg = 25;
   bool polyRandomRhs = true; // if True, poly may be different on each run!
+  std::string jacobisolve("GEMV"); //Solve type for Jacobi prec- TRSV or GEMV. 
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("verboseTimes","quietTimes",&verbose,"Print timings at every Gmres run.");
   cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
+  cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
+  cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations.");
+  cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV.");
   cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
   cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
   cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
@@ -141,13 +146,13 @@ bool proc_verbose = false;
   OT numRows = crsMat.numRows();
 
   //Test code for ILU operator: 
-  RCP<Belos::KokkosILUOperator<ST, OT, EXSP>> ILUprec = 
-            rcp(new Belos::KokkosILUOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> JacobiPrec = 
+            rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize,jacobisolve,teamsize));
 
-  if(precOn) {
-  std::cout << "Setting up ILU prec: " << std::endl;
-  ILUprec->SetUpILU();
-  std::cout << "Exited ILU prec setup." << std::endl;
+  if(precOn) { 
+  std::cout << "Setting up Jacobi prec: " << std::endl;
+  JacobiPrec->SetUpJacobi();
+  std::cout << "Exited Jacobi prec setup." << std::endl;
   }
   
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
@@ -217,12 +222,12 @@ bool proc_verbose = false;
     innerList->set( "Maximum Degree", polyDeg );          // Maximum degree of the GMRES polynomial
     RCP<SOP> myPolyPrec = rcp(new SOP(innerProblem, innerList, innerSolverType));
     if(precOn){
-      innerProblem->setRightPrec(ILUprec);
+      innerProblem->setRightPrec(JacobiPrec);
     }
     problem1.setRightPrec(myPolyPrec);
   }
   else if(precOn) {
-    problem1.setRightPrec(ILUprec);
+    problem1.setRightPrec(JacobiPrec);
   }
   RCP< Belos::SolverManager<ST,KMV,KOP> > Solver1
     = rcp( new Belos::BlockGmresSolMgr<ST,KMV,KOP>(rcp(&problem1,false), rcp(&belosList,false)) );
