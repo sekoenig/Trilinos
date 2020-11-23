@@ -200,7 +200,7 @@ bool proc_verbose = false;
   // Create the timer if we need to.
   Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
     Teuchos::RCP<Belos::OutputManager<ST2> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST2>(Belos::TimingDetails,outputStream) );
-    std::string solveIRLabel ="JBelos: GmresIRSolMgr total solve time";
+    std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
 #ifdef BELOS_TEUCHOS_TIME_MONITOR
     Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
 #endif

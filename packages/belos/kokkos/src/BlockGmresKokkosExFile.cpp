@@ -156,6 +156,13 @@ bool proc_verbose = false;
   B->MvInit(1.0);
 
   proc_verbose = verbose;  /* Only print on the zero processor */
+  // Create the timer for outer iteration:
+  Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
+    Teuchos::RCP<Belos::OutputManager<ST> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST>(Belos::TimingDetails,outputStream) );
+    std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+    Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
+#endif
 
   //
   // ********Other information used by block solver***********
@@ -174,7 +181,7 @@ bool proc_verbose = false;
 
   if (verbose) {
     belosList.set( "Verbosity", Belos::Errors + Belos::Warnings +
-		   Belos::TimingDetails + Belos::StatusTestDetails + Belos::FinalSummary);
+		   Belos::StatusTestDetails + Belos::FinalSummary);// Removed Belos::TimingDetails to add my external timer.
     if (frequency > 0)
       belosList.set( "Output Frequency", frequency );
   }
@@ -235,7 +242,17 @@ bool proc_verbose = false;
   //
   // Perform solve
   //
-  Belos::ReturnType ret = newSolver->solve();
+  Belos::ReturnType ret;
+  { //scope guard for timer
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+  Teuchos::TimeMonitor slvtimer(*timerIRSolve_);
+#endif
+  ret = newSolver->solve();
+  } //end timer scope guard
+
+  //Print final timing details:
+  Teuchos::TimeMonitor::summarize( printer_->stream(Belos::TimingDetails) );
+
   //
   // Compute actual residuals.
   //
