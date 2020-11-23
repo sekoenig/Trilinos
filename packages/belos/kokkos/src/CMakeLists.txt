@@ -52,6 +52,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  SolverGmres
+  SOURCES SolverGmres.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   GEMMTest
   SOURCES GEMMTest.cpp
   COMM serial mpi
