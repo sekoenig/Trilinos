@@ -197,13 +197,14 @@ int main(int argc, char *argv[]) {
       //Update long solution and residual:
       VSub = Kokkos::subview(V,Kokkos::ALL,Kokkos::make_pair(0,j+1)); 
       Kokkos::deep_copy(Xiter,X); //Can't overwrite X with intermediate solution.
-      KokkosBlas::gemv ("N", 1.0, VSub, LsSolnSub, 1.0, Xiter); //x_iter = x + V(1:j+1)*lsSoln
+      auto LsSolnSub3 = Kokkos::subview(LsSoln,Kokkos::make_pair(0,j+1),0);
+      KokkosBlas::gemv ("N", 1.0, VSub, LsSolnSub3, 1.0, Xiter); //x_iter = x + V(1:j+1)*lsSoln
       KokkosSparse::spmv("N", 1.0, A, Xiter, 0.0, Wj); // wj = Ax
       Kokkos::deep_copy(Res,B); // Reset r=b.
       KokkosBlas::axpy(-1.0, Wj, Res); // r = b-Ax. 
       trueRes = KokkosBlas::nrm2(Res);
       relRes = trueRes/nrmB;
-      std::cout << "trueRes for iteration " << j+(cycle+50) << " is : " << trueRes << std::endl;
+      std::cout << "True relative residual for iteration " << j+(cycle*50) << " is : " << trueRes/nrmB << std::endl;
 
     }//end Arnoldi iter.
 
