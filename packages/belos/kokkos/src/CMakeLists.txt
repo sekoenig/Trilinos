@@ -57,11 +57,13 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
-TRIBITS_ADD_EXECUTABLE(
-  GEMMTest
-  SOURCES GEMMTest.cpp
-  COMM serial mpi
-  )
+# Commenting this one because it 
+# has problems for CPU builds.
+#TRIBITS_ADD_EXECUTABLE(
+  #GEMMTest
+  #SOURCES GEMMTest.cpp
+  #COMM serial mpi
+  #)
 
 TRIBITS_ADD_EXECUTABLE(
   KokkosMVOPTester
@@ -112,6 +114,24 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  CGKokkosEx
+  SOURCES CGKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  FLOATCGKokkosEx
+  SOURCES FLOATCGKokkosExFile.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  SpMVTester
+  SOURCES SpMVTester.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   FLOATBlockGmresKokkosEx
   SOURCES FLOATBlockGmresKokkosExFile.cpp
   COMM serial mpi
@@ -126,6 +146,12 @@ TRIBITS_ADD_EXECUTABLE(
 TRIBITS_ADD_EXECUTABLE(
   GmresIRKokkos
   SOURCES GmresIRKokkos.cpp 
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  CGIRKokkos
+  SOURCES CGIRKokkos.cpp 
   COMM serial mpi
   )
 
