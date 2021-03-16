@@ -103,7 +103,7 @@ bool proc_verbose = false;
   int blksize = 4;
   int teamsize = -1;
   bool precOn = false;
-  bool polyPrec = false;
+  std::string polyPrec = "none";
   int polyDeg = 25;
   bool polyRandomRhs = true; // if True, poly may be different on each run!
   std::string jacobisolve("GEMV"); //Solve type for Jacobi prec- TRSV or GEMV. 
@@ -115,7 +115,7 @@ bool proc_verbose = false;
   cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
   cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations.");
   cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV.");
-  cmdp.setOption("poly","nopoly",&polyPrec,"Use Poly preconditioning.");
+  cmdp.setOption("polyprec",&polyPrec,"Use Poly preconditioning. Options are 'none' or 'poly' ('single'=='poly' for GMRES-IR.)");
   cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
   cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
@@ -212,7 +212,7 @@ bool proc_verbose = false;
 
   Belos::LinearProblem<ST,KMV,KOP> problem1;
   problem1.setOperator(A1);
-  if(polyPrec){
+  if(polyPrec == "poly" || polyPrec == "single"){
     std::string innerSolverType = "GmresPoly";
 
     RCP<Belos::LinearProblem<ST,KMV,KOP>> innerProblem = rcp( new Belos::LinearProblem<ST,KMV,KOP>());
@@ -225,6 +225,10 @@ bool proc_verbose = false;
       innerProblem->setRightPrec(JacobiPrec);
     }
     problem1.setRightPrec(myPolyPrec);
+  }
+  else if(polyPrec != "none"){
+    TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
+        "BlockGmresKokksExFile: Invalid input for polyPrec.");
   }
   else if(precOn) {
     problem1.setRightPrec(JacobiPrec);
