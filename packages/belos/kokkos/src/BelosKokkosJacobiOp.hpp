@@ -71,8 +71,10 @@
     }
     numBlocks_ = ceil(numRows/blockSize_ ); // Need ceil for later if use uneven blocks.
     Kokkos::resize(Ablocks_, numBlocks_, blockSize_, blockSize_);
+    Kokkos::deep_copy(Ablocks_,0);
     if(solve_ == "GEMV"){
       Kokkos::resize(Sblocks_, numBlocks_, blockSize_, blockSize_);
+      Kokkos::deep_copy(Sblocks_,0);
     }
     else if (solve_ != "TRSV"){
       solve_ = "TRSV";
@@ -160,8 +162,6 @@
       KokkosMultiVec<ScalarType, Device> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>
             (&const_cast<MultiVec<ScalarType> &>(x));
       KokkosMultiVec<ScalarType, Device> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>(&y);
-
-      //TODO: should we store policy as part of the object so we dont' have to recreate for apply?
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
           policy = policy_type(numBlocks_, teamSize_);
@@ -207,11 +207,12 @@
            } 
            }*/
          KokkosBatched::TeamTrsv<member_type,KokkosBatched::Uplo::Lower,
-         KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::Unit,
-         KokkosBatched::Algo::Trsv::Unblocked> ::invoke(member, one, Asub, ysub);
+           KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::Unit,
+           KokkosBatched::Algo::Trsv::Unblocked> ::invoke(member, one, Asub, ysub);
+
          KokkosBatched::TeamTrsv<member_type,KokkosBatched::Uplo::Upper,
-         KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::NonUnit,
-         KokkosBatched::Algo::Trsv::Unblocked>::invoke(member, one, Asub, ysub);
+           KokkosBatched::Trans::NoTranspose,KokkosBatched::Diag::NonUnit,
+           KokkosBatched::Algo::Trsv::Unblocked>::invoke(member, one, Asub, ysub);
          });
 
       }
