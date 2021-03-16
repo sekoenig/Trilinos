@@ -80,9 +80,17 @@
       multivecCount++;
     }
 
-    //TODO: Do we need to implement this operator?  Like this??
     // Compiler default should give shallow copy.
-    //KokkosMultiVec& operator=(const KokkosMultiVec& pv) { Kokkos_MultiVector::operator=(pv); return *this; }
+    KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType, Device> & sourceVec) {
+      Kokkos::deep_copy(myView,sourceVec.myView);
+      return *this;
+    }
+    
+    template < class ScalarType2 >
+    KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType2, Device> & sourceVec) {
+      Kokkos::deep_copy(myView,sourceVec.myView);
+      return *this;
+    }
     
     //TODO: Would it be better if this was deep copy?  So we can't change the user's original data?  
     // And so the user can't change ours?
@@ -262,6 +270,22 @@
       }
       else{
         KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
+      }
+    }
+
+    //! *this <- alpha * A * B + beta * (*this)
+    void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
+                           const MultiVec<ScalarType>& B, const ScalarType beta ){
+      KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
+      KokkosMultiVec<ScalarType, Device> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(B));
+
+      if( myView.extent(1) == 1 ){ // Only 1 col
+        ConstViewVectorType Bsub = Kokkos::subview(B_vec->myView, Kokkos::ALL, 0);
+        ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
+        KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
+      }
+      else{
+        KokkosBlas::gemm("N", "N", alpha, A_vec->myView, B_vec->myView, beta, myView);
       }
     }
 
