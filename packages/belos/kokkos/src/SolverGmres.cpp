@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
   bool converged = false;
   int m = 50; //Max subspace size.
   double convTol = 1e-10; //Keep in double.
-  int cycLim = 30;
+  int cycLim = 50;
   int cycle = 0;
   
   //EXAMPLE: Parse cmnd line args: 
@@ -231,9 +231,7 @@ int main(int argc, char *argv[]) {
     Kokkos::deep_copy(H_copy_h,0);
     cycle++;
     //This is the end, or it's time to restart. Update solution to most recent vector.
-    if(cycle == cycLim && !converged){ 
-      Kokkos::deep_copy(X, Xiter);
-    }
+    Kokkos::deep_copy(X, Xiter);
   }
 
   std::cout << "Ending true residual is: " << trueRes << std::endl;
