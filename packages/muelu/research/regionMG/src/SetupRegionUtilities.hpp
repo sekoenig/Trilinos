@@ -1078,8 +1078,8 @@ void createRegionData(const int numDimensions,
   }
 
   // Have all the GIDs and LIDs we stort them in place with std::sort()
-  // Subsequently we bring unique values to the begin of the array with
-  // std::unique() and delente the duplicates with erase.
+  // Subsequently we bring unique values to the beginning of the array with
+  // std::unique() and delete the duplicates with erase.
   std::sort(interfaceLIDsData.begin(), interfaceLIDsData.end());
   interfaceLIDsData.erase(std::unique(interfaceLIDsData.begin(), interfaceLIDsData.end()),
                           interfaceLIDsData.end());
@@ -1091,7 +1091,7 @@ void createRegionData(const int numDimensions,
 
 template <class LocalOrdinal, class GlobalOrdinal, class Node>
 void MakeRegionPerGIDWithGhosts(const Teuchos::RCP<Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node> >& nodeMap,
-                                const Teuchos::RCP<Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node> >& regionRowMap,
+                                const Teuchos::RCP<const Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node> > regionRowMap,
                                 const Teuchos::RCP<Xpetra::Import<LocalOrdinal, GlobalOrdinal, Node> >& rowImport,
                                 const int maxRegPerGID,
                                 const LocalOrdinal numDofsPerNode,
@@ -1178,13 +1178,13 @@ refert to interface DOFs, so we can grab them and stick them into the list of \c
 */
 template <class LocalOrdinal, class GlobalOrdinal, class Node>
 void ExtractListOfInterfaceRegionGIDs(
-    std::vector<Teuchos::RCP<Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node> > >& regionRowMap,
+    Teuchos::RCP<const Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node> > regionRowMap,
     const Teuchos::Array<LocalOrdinal>& interfaceRegionLIDs, Teuchos::Array<GlobalOrdinal>& interfaceRegionGIDs)
 {
   interfaceRegionGIDs.resize(interfaceRegionLIDs.size());
   for(LocalOrdinal interfaceIdx = 0; interfaceIdx < static_cast<LocalOrdinal>(interfaceRegionLIDs.size()); ++interfaceIdx) {
     interfaceRegionGIDs[interfaceIdx] =
-      regionRowMap[0]->getGlobalElement(interfaceRegionLIDs[interfaceIdx]);
+      regionRowMap->getGlobalElement(interfaceRegionLIDs[interfaceIdx]);
   }
 } // ExtractListOfInterfaceRegionGIDs
 

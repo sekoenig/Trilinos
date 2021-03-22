@@ -11,7 +11,7 @@
 #include <random>
 
 namespace {
-  template <typename INT> bool verify_sorted(std::vector<INT> v)
+  template <typename INT> bool verify_sorted(const std::vector<INT> &v)
   {
     auto it = std::adjacent_find(v.begin(), v.end(), std::greater<INT>());
     if (it != v.end()) {
@@ -35,6 +35,7 @@ int main()
 
   for (size_t n : {100, 1023, 1024, 1025, (2 << 16) - 1, 2 << 16, (2 << 16) + 1}) {
     std::cerr << "\nSize: " << n << ": ";
+    // 'm' shapes the values in the vector; all sorts are on vectors of size 'n'
     for (size_t m = 1; m < 2 * n; m *= 2) {
       std::cerr << m;
       for (auto dist : {sawtooth, do_rand, stagger, plateau, shuffle}) {

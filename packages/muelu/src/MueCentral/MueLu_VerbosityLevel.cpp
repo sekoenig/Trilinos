@@ -107,6 +107,7 @@ namespace MueLu {
     verbMap["timings1"]       = Timings1;
     verbMap["timingsByLevel"] = TimingsByLevel;
     verbMap["external"]       = External;
+    verbMap["developer"]      = Developer;
     verbMap["debug"]          = Debug;
     verbMap["test"]           = Test;
 
@@ -116,6 +117,7 @@ namespace MueLu {
     verbMap["statistics"]     = Statistics;
     verbMap["timings"]        = Timings;
     verbMap["test"]           = Test;
+    verbMap["interfacetest"]  = InterfaceTest;
     //for users and developers
     verbMap["none"]           = None;
     verbMap["low"]            = Low;

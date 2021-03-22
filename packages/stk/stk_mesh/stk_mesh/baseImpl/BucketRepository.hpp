@@ -93,9 +93,6 @@ public:
 
   BulkData& mesh() const { return m_mesh; }
 
-  //------------------------------------
-  size_t total_field_data_footprint(const FieldBase &f, EntityRank rank) const;
-
   void set_needs_to_be_sorted(stk::mesh::Bucket &bucket, bool needsSorting);
   void internal_default_sort_bucket_entities(bool mustSortFacesByNodeIds=false);
   void internal_custom_sort_bucket_entities(const EntitySorterBase& sorter);
@@ -123,6 +120,18 @@ public:
   Partition *get_or_create_partition(const EntityRank arg_entity_rank ,
                                      const OrdinalVector &parts);
 
+  Partition *get_partition(const EntityRank arg_entity_rank ,
+                           const OrdinalVector &parts,
+                           std::vector<Partition*>::iterator& ik,
+                           PartOrdinal* keyPtr,
+                           PartOrdinal* keyEnd);
+
+  Partition *create_partition(const EntityRank arg_entity_rank ,
+                              const OrdinalVector &parts,
+                              std::vector<Partition*>::iterator& ik,
+                              PartOrdinal* keyPtr,
+                              PartOrdinal* keyEnd);
+
   // For use by BulkData::internal_modification_end().
   void internal_modification_end();
 
@@ -133,11 +142,15 @@ public:
   // Used in unit tests.  Returns the current partitions.
   std::vector<Partition *> get_partitions(EntityRank rank) const;
 
+  Partition* get_partition(const EntityRank arg_entity_rank, const OrdinalVector &parts);
+
   bool being_destroyed() const { return m_being_destroyed; }
 
   unsigned get_bucket_capacity() const { return m_bucket_capacity; }
 
   void delete_bucket(Bucket * bucket);
+
+  void set_need_sync_from_partitions(EntityRank entityRank) { m_need_sync_from_partitions[entityRank] = true; }
 
 private:
   BucketRepository();
@@ -151,6 +164,10 @@ private:
   void sync_bucket_ids(EntityRank entity_rank);
 
   void ensure_data_structures_sized();
+
+  void fill_key_ptr(const OrdinalVector& parts, PartOrdinal** keyPtr, PartOrdinal** keyEnd,
+                    const unsigned maxKeyTmpBufferSize, PartOrdinal* keyTmpBuffer, OrdinalVector& keyTmpVec);
+
 
   BulkData & m_mesh ; // Associated Bulk Data Aggregate
 

@@ -185,15 +185,24 @@ void StepperImplicit<Scalar>::setInitialConditions(
     else reldiff = Thyra::norm(*f)/normX;
 
     Scalar eps = Scalar(100.0)*std::abs(Teuchos::ScalarTraits<Scalar>::eps());
-    if (reldiff > eps) {
-      RCP<Teuchos::FancyOStream> out = this->getOStream();
-      Teuchos::OSTab ostab(out,1,"StepperImplicit::setInitialConditions()");
-      *out << "Info -- Failed consistency check but continuing!\n"
-         << "  ||f(x,xDot,t)||/||x|| > eps" << std::endl
-         << "  ||f(x,xDot,t)||       = " << Thyra::norm(*f) << std::endl
-         << "  ||x||                 = " << Thyra::norm(*x) << std::endl
-         << "  ||f(x,xDot,t)||/||x|| = " << reldiff         << std::endl
-         << "                    eps = " << eps             << std::endl;
+    RCP<Teuchos::FancyOStream> out = this->getOStream();
+    Teuchos::OSTab ostab(out,1,"StepperImplicit::setInitialConditions()");
+    if (reldiff < eps) {
+      *out << "\n---------------------------------------------------\n"
+           << "Info -- Stepper = " << this->getStepperType() << "\n"
+           << "  Initial condition PASSED consistency check!\n"
+           << "  (||f(x,xDot,t)||/||x|| = " << reldiff << ") < "
+           << "(eps = " << eps << ")"            << std::endl
+           << "---------------------------------------------------\n"<<std::endl;
+    } else {
+      *out << "\n---------------------------------------------------\n"
+           << "Info -- Stepper = " << this->getStepperType() << "\n"
+           << "  Initial condition FAILED consistency check but continuing!\n"
+           << "  (||f(x,xDot,t)||/||x|| = " << reldiff << ") > "
+           << "(eps = " << eps << ")" << std::endl
+           << "  ||f(x,xDot,t)|| = " << Thyra::norm(*f) << std::endl
+           << "  ||x||           = " << Thyra::norm(*x) << std::endl
+           << "---------------------------------------------------\n"<<std::endl;
     }
   }
 }
@@ -355,6 +364,39 @@ bool StepperImplicit<Scalar>::isValidSetup(Teuchos::FancyOStream & out) const
   }
 
   return isValidSetup;
+}
+
+
+template<class Scalar>
+void StepperImplicit<Scalar>::
+setStepperImplicitValues(
+  Teuchos::RCP<Teuchos::ParameterList> pl)
+{
+  if (pl != Teuchos::null) {
+    // Can not validate because of optional Parameters, e.g., 'Solver Name'.
+    //pl->validateParametersAndSetDefaults(*this->getValidParameters());
+    this->setStepperValues(pl);
+    this->setZeroInitialGuess(pl->get<bool>("Zero Initial Guess", false));
+  }
+  this->setStepperSolverValues(pl);
+}
+
+
+template<class Scalar>
+void StepperImplicit<Scalar>::
+setStepperSolverValues(Teuchos::RCP<Teuchos::ParameterList> pl)
+{
+  if (pl != Teuchos::null) {
+    setDefaultSolver();
+    std::string solverName = pl->get<std::string>("Solver Name");
+    if ( pl->isSublist(solverName) ) {
+      auto solverPL = Teuchos::parameterList();
+      solverPL = Teuchos::sublist(pl, solverName);
+      Teuchos::RCP<Teuchos::ParameterList> noxPL =
+        Teuchos::sublist(solverPL,"NOX",true);
+      getSolver()->setParameterList(noxPL);
+    }
+  }
 }
 
 

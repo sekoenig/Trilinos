@@ -277,12 +277,15 @@ bool Excn::ExodusFile::create_output(const SystemInterface &si, int cycle)
   // Did user specify it via -netcdf4 or -large_model argument...
   int mode = 0;
 
-  if (si.compress_data() > 0) {
+  if (si.compress_data() > 0 || si.szip()) {
     // Force netcdf-4 if compression is specified...
     mode |= EX_NETCDF4;
   }
   else if (si.use_netcdf4()) {
     mode |= EX_NETCDF4;
+  }
+  else if (si.use_netcdf5()) {
+    mode |= EX_64BIT_DATA;
   }
   else if (ex_large_model(fileids_[0]) == 1) {
     mode |= EX_LARGE_MODEL;
@@ -311,7 +314,13 @@ bool Excn::ExodusFile::create_output(const SystemInterface &si, int cycle)
     return false;
   }
 
-  if (si.compress_data() > 0) {
+  if (si.compress_data() > 0 || si.szip()) {
+    if (si.szip()) {
+      ex_set_option(outputId_, EX_OPT_COMPRESSION_TYPE, EX_COMPRESS_SZIP);
+    }
+    else if (si.zlib()) {
+      ex_set_option(outputId_, EX_OPT_COMPRESSION_TYPE, EX_COMPRESS_ZLIB);
+    }
     ex_set_option(outputId_, EX_OPT_COMPRESSION_LEVEL, si.compress_data());
     ex_set_option(outputId_, EX_OPT_COMPRESSION_SHUFFLE, 1);
   }

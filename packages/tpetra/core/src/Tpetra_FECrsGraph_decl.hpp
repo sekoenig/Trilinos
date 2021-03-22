@@ -44,11 +44,6 @@
 
 /// \file Tpetra_FECrsGraph_decl.hpp
 /// \brief Declaration of the Tpetra::FECrsGraph class
-///
-/// If you want to use Tpetra::FECrsGraph, include "Tpetra_FECrsGraph.hpp"
-/// (a file which CMake generates and installs for you).  If you only
-/// want the declaration of Tpetra::FECrsGraph, include this file
-/// (Tpetra_FECrsGraph_decl.hpp).
 
 #include "Tpetra_FECrsGraph_fwd.hpp"
 #include "Tpetra_CrsGraph_decl.hpp"
@@ -253,7 +248,7 @@ namespace Tpetra {
     ///   default values.
     FECrsGraph (const Teuchos::RCP<const map_type> & ownedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedRowMap,
-                const Kokkos::DualView<const size_t*, execution_space>& numEntPerRow,
+                const Kokkos::DualView<const size_t*, device_type>& numEntPerRow,
                 const Teuchos::RCP<const import_type> & ownedPlusSharedToOwnedimporter = Teuchos::null,
                 const Teuchos::RCP<const map_type> & domainMap = Teuchos::null,
                 const Teuchos::RCP<const map_type> & ownedRangeMap = Teuchos::null,
@@ -287,7 +282,7 @@ namespace Tpetra {
     ///   default values.
     FECrsGraph (const Teuchos::RCP<const map_type> & ownedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedRowMap,
-                const Kokkos::DualView<const size_t*, execution_space>& numEntPerRow,
+                const Kokkos::DualView<const size_t*, device_type>& numEntPerRow,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedDomainMap,
                 const Teuchos::RCP<const import_type> & ownedPlusSharedToOwnedimporter = Teuchos::null,
                 const Teuchos::RCP<const map_type> & ownedDomainMap = Teuchos::null,
@@ -393,7 +388,7 @@ namespace Tpetra {
     FECrsGraph (const Teuchos::RCP<const map_type> & ownedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedColMap,
-                const Kokkos::DualView<const size_t*, execution_space>& numEntPerRow,
+                const Kokkos::DualView<const size_t*, device_type>& numEntPerRow,
                 const Teuchos::RCP<const import_type> & ownedPlusSharedToOwnedimporter = Teuchos::null,
                 const Teuchos::RCP<const map_type> & domainMap = Teuchos::null,
                 const Teuchos::RCP<const map_type> & ownedRangeMap = Teuchos::null,
@@ -426,7 +421,7 @@ namespace Tpetra {
     FECrsGraph (const Teuchos::RCP<const map_type> & ownedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedRowMap,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedColMap,
-                const Kokkos::DualView<const size_t*, execution_space>& numEntPerRow,
+                const Kokkos::DualView<const size_t*, device_type>& numEntPerRow,
                 const Teuchos::RCP<const map_type> & ownedPlusSharedDomainMap,
                 const Teuchos::RCP<const import_type> & ownedPlusSharedToOwnedimporter = Teuchos::null,
                 const Teuchos::RCP<const map_type> & ownedDomainMap = Teuchos::null,

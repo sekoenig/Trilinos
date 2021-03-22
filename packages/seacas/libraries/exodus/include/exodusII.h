@@ -1,5 +1,5 @@
 /*
- * Copyright(C) 1999-2020 National Technology & Engineering Solutions
+ * Copyright(C) 1999-2021 National Technology & Engineering Solutions
  * of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
  * NTESS, the U.S. Government retains certain rights in this software.
  *
@@ -12,8 +12,8 @@
  *
  *****************************************************************************/
 
-#ifndef EXODUS_II_HDR
-#define EXODUS_II_HDR
+#ifndef EXODUSII_H
+#define EXODUSII_H
 
 #include "exodus_config.h"
 
@@ -21,6 +21,15 @@
 
 #if defined(NC_HAVE_META_H)
 #include "netcdf_meta.h"
+
+/* Bug in some versions of NetCDF where the netcdf_meta.h define of NC_HAS_SZIP_WRITE is bad */
+#if !defined(NC_HAS_SZIP_WRITE)
+#define NC_HAS_SZIP_WRITE 0
+#elif ~(~NC_HAS_SZIP_WRITE + 0) == 0 && ~(~NC_HAS_SZIP_WRITE + 1) == 1
+#undef NC_HAS_SZIP_WRITE
+#define NC_HAS_SZIP_WRITE 0
+#endif
+
 #if NC_HAS_PARALLEL
 #ifndef PARALLEL_AWARE_EXODUS
 #define PARALLEL_AWARE_EXODUS
@@ -45,15 +54,13 @@
 #endif
 
 /* EXODUS version number */
-#define EXODUS_VERSION "8.08"
+#define EXODUS_VERSION "8.09"
 #define EXODUS_VERSION_MAJOR 8
-#define EXODUS_VERSION_MINOR 8
+#define EXODUS_VERSION_MINOR 9
 #define EXODUS_RELEASE_DATE "September 2, 2020"
 
-#define EX_API_VERS 8.08f
-
+#define EX_API_VERS 8.09f
 #define EX_API_VERS_NODOT (100 * EXODUS_VERSION_MAJOR + EXODUS_VERSION_MINOR)
-
 #define EX_VERS EX_API_VERS
 
 /* Retained for backward compatibility */
@@ -525,7 +532,8 @@ EXODUS_EXPORT int64_t     ex_inquire_int(int exoid, ex_inquiry req_info);
 EXODUS_EXPORT int         ex_int64_status(int exoid);
 EXODUS_EXPORT int         ex_set_int64_status(int exoid, int mode);
 
-EXODUS_EXPORT void ex_print_config(void);
+EXODUS_EXPORT void        ex_print_config(void);
+EXODUS_EXPORT const char *ex_config(void);
 
 EXODUS_EXPORT int ex_set_max_name_length(int exoid, int length);
 

@@ -19,6 +19,7 @@
 #   ATDM_CONFIG_USE_CUDA
 #   ATDM_CONFIG_USE_PTHREADS
 #   ATDM_CONFIG_CUDA_RDC
+#   ATDM_CONFIG_ADDRESS_SANITIZER
 #   ATDM_CONFIG_FPIC
 #   ATDM_CONFIG_COMPLEX
 #   ATDM_CONFIG_SHARED_LIBS
@@ -68,7 +69,8 @@ export ATDM_CONFIG_USE_OPENMP=OFF
 export ATDM_CONFIG_USE_CUDA=OFF
 export ATDM_CONFIG_USE_PTHREADS=OFF
 export ATDM_CONFIG_CUDA_RDC=OFF
-export ATDM_CONFIG_FPIC=OFF
+export ATDM_CONFIG_ADDRESS_SANITIZER=OFF
+export ATDM_CONFIG_FPIC=ON
 export ATDM_CONFIG_COMPLEX=OFF
 export ATDM_CONFIG_SHARED_LIBS=OFF
 export ATDM_CONFIG_PT_PACKAGES=OFF
@@ -140,6 +142,8 @@ elif atdm_match_buildname_keyword clang-5.0.1; then
   export ATDM_CONFIG_COMPILER=CLANG-5.0.1
 elif atdm_match_buildname_keyword clang-7.0.1; then
   export ATDM_CONFIG_COMPILER=CLANG-7.0.1
+elif atdm_match_buildname_keyword clang-10.0.0; then
+  export ATDM_CONFIG_COMPILER=CLANG-10.0.0
 elif atdm_match_buildname_keyword clang; then
   export ATDM_CONFIG_COMPILER=CLANG
 else
@@ -215,8 +219,17 @@ elif atdm_match_buildname_keyword rdc; then
   export ATDM_CONFIG_CUDA_RDC=ON
 fi
 
+# Setup clan build to use address sanitizer or not
+if   atdm_match_buildname_keyword no-asan; then
+  export ATDM_CONFIG_ADDRESS_SANITIZER=OFF
+elif atdm_match_buildname_keyword asan; then
+  export ATDM_CONFIG_ADDRESS_SANITIZER=ON
+fi
+
 # Use -fPIC or not
-if atdm_match_buildname_keyword fpic; then
+if atdm_match_buildname_keyword no-fpic; then
+  export ATDM_CONFIG_FPIC=OFF
+elif atdm_match_buildname_keyword fpic; then
   export ATDM_CONFIG_FPIC=ON
 fi
 

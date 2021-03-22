@@ -29,8 +29,8 @@ IF(NOT KOKKOSKERNELS_HAS_TRILINOS)
     PROJECT(KokkosKernels CXX)
   ENDIF()
   SET(KokkosKernels_VERSION_MAJOR 3)
-  SET(KokkosKernels_VERSION_MINOR 2)
-  SET(KokkosKernels_VERSION_PATCH 0)
+  SET(KokkosKernels_VERSION_MINOR 3)
+  SET(KokkosKernels_VERSION_PATCH 1)
 ENDIF()
 
 IF(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.12.0")
@@ -88,7 +88,8 @@ IF (KokkosKernels_INSTALL_TESTING)
 ELSE()
   # Regular build, not install testing
   # Do all the regular option processing
-  IF (NOT KOKKOSKERNELS_HAS_TRILINOS)
+  IF (NOT KOKKOSKERNELS_HAS_TRILINOS AND NOT KOKKOSKERNELS_HAS_PARENT)
+   # This is a standalone build
    FIND_PACKAGE(Kokkos REQUIRED)
    MESSAGE(STATUS "Found Kokkos at ${Kokkos_DIR}")
    KOKKOS_CHECK(OPTIONS CUDA_UVM RETURN_VALUE KOKKOS_ENABLE_CUDA_UVM)
@@ -144,6 +145,15 @@ ELSE()
     BOOL
     "Whether to restrict testing to ETI types. Default: ON"
     )
+
+  KOKKOSKERNELS_ADD_OPTION(
+    ENABLED_COMPONENTS
+    "ALL"
+    STRING
+    "A list of components to enable in testing and building"
+    VALID_ENTRIES BATCHED BLAS GRAPH SPARSE ALL
+  )
+
   # ==================================================================
   # Enable Device Types for ETI (exec- + mem-space)
   # ==================================================================
@@ -164,7 +174,6 @@ ELSE()
   # Enable Layout Types for ETI
   # ==================================================================
   INCLUDE(cmake/kokkoskernels_eti_layouts.cmake)
-
   # ==================================================================
   # Enable Third Party Libraries
   # ==================================================================

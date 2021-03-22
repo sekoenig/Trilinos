@@ -362,12 +362,14 @@ namespace Ioex {
   public:
     Mesh() = default;
 
-    Mesh(int dim, char *the_title, bool file_pp) : dimensionality(dim), file_per_processor(file_pp)
+    Mesh(int dim, const char *the_title, const Ioss::ParallelUtils &util, bool file_pp)
+        : dimensionality(dim), file_per_processor(file_pp), parallelUtil(util)
     {
       Ioss::Utils::copy_string(title, the_title);
     }
 
     void populate(Ioss::Region *region);
+    void get_global_counts();
 
     char title[MAX_LINE_LENGTH + 1]{};
     int  dimensionality{};
@@ -386,6 +388,7 @@ namespace Ioex {
     std::vector<ElemSet>   elemsets{};
     std::vector<SideSet>   sidesets{};
     CommunicationMetaData  comm{};
+    Ioss::ParallelUtils    parallelUtil;
   };
 
   class Internals
@@ -396,20 +399,18 @@ namespace Ioex {
     Internals &operator=(const Internals &from) = delete;
 
     int initialize_state_file(Mesh &mesh, const ex_var_params &var_params,
-                              const std::string &base_file_name);
+                              const std::string &base_filename);
 
     int write_meta_data(Mesh &mesh);
 
     /* Special use for updating assembly data in-place in existing db file */
     /* See src/main/io_assembly.C for current use */
-    static void update_assembly_data(int filePtr, std::vector<Assembly> &assemblies, int stage = 0);
+    static void update_assembly_data(int exoid, std::vector<Assembly> &assemblies, int stage = 0);
 
     // Simple wrapper around `ex_copy`, but keeps users from including `exodusII.h`
     static void copy_database(int in_file, int out_file, bool transient_also = true);
 
   private:
-    void get_global_counts(Mesh &mesh);
-
     int put_metadata(const Mesh &mesh, const CommunicationMetaData &comm);
     int put_metadata(const std::vector<Assembly> &assemblies);
     int put_metadata(const std::vector<Blob> &blobs);

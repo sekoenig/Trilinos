@@ -100,6 +100,7 @@ namespace MueLu {
     SET_VALID_ENTRY("aggregation: enable phase 2b");
     SET_VALID_ENTRY("aggregation: enable phase 3");
     SET_VALID_ENTRY("aggregation: phase2a include root");
+    SET_VALID_ENTRY("aggregation: phase2a agg factor");
     SET_VALID_ENTRY("aggregation: preserve Dirichlet points");
     SET_VALID_ENTRY("aggregation: allow user-specified singletons");
     SET_VALID_ENTRY("aggregation: use interface aggregation");
@@ -261,7 +262,7 @@ namespace MueLu {
     GO numGlobalAggregatedPrev = 0, numGlobalAggsPrev = 0;
     for (size_t a = 0; a < algos_.size(); a++) {
       std::string phase = algos_[a]->description();
-      SubFactoryMonitor sfm(*this, "Algo \"" + phase + "\"", currentLevel);
+      SubFactoryMonitor sfm(*this, "Algo " + phase, currentLevel);
 
       int oldRank = algos_[a]->SetProcRankVerbose(this->GetProcRankVerbose());
       algos_[a]->BuildAggregates(pL, *graph, *aggregates, aggStat, numNonAggregatedNodes);

@@ -128,9 +128,9 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
   int     file_wordsize = 0;
   int     dim_str_name  = 0;
   int     int64_status  = 0;
-  int     is_hdf5       = 0;
-  int     is_pnetcdf    = 0;
-  int     in_redef      = 0;
+  bool    is_hdf5       = false;
+  bool    is_pnetcdf    = false;
+  bool    in_redef      = false;
 
   char errmsg[MAX_ERR_LENGTH];
 
@@ -158,6 +158,16 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
 
   if (mode & EX_WRITE) {
     nc_mode = (NC_WRITE | NC_MPIIO);
+#if NC_HAS_HDF5
+    if (mode & EX_NETCDF4) {
+      nc_mode |= NC_NETCDF4;
+    }
+#endif
+#if NC_HAS_CDF5
+    if (mode & EX_64BIT_DATA) {
+      nc_mode |= NC_64BIT_DATA;
+    }
+#endif
   }
   else {
     nc_mode = (NC_NOWRITE | NC_SHARE | NC_MPIIO);
@@ -267,7 +277,7 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
              "ERROR: failed to open %s for read/write. Either the file "
              "does not exist,\n\tor there is a permission or file format "
              "issue.",
-             path, type);
+             path);
     ex_err(__func__, errmsg, status);
     EX_FUNC_LEAVE(EX_FATAL);
   }
@@ -276,10 +286,10 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
   int type = 0;
   ex__check_file_type(path, &type);
   if (type == 5) {
-    is_hdf5 = 1;
+    is_hdf5 = true;
   }
   else if (type == 1 || type == 2 || type == 4) {
-    is_pnetcdf = 1;
+    is_pnetcdf = true;
   }
 
   if (mode & EX_WRITE) { /* Appending */
@@ -290,7 +300,7 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
         ex_err_fn(exoid, __func__, errmsg, status);
         EX_FUNC_LEAVE(EX_FATAL);
       }
-      in_redef = 1;
+      in_redef = true;
     }
 
     if ((status = nc_set_fill(exoid, NC_NOFILL, &old_fill)) != NC_NOERR) {
@@ -309,7 +319,7 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
           ex_err_fn(exoid, __func__, errmsg, status);
           EX_FUNC_LEAVE(EX_FATAL);
         }
-        in_redef = 1;
+        in_redef = true;
       }
       if (stat_att != NC_NOERR) {
         int max_so_far = 32;
@@ -329,7 +339,7 @@ int ex_open_par_int(const char *path, int mode, int *comp_ws, int *io_ws, float 
       if ((status = ex__leavedef(exoid, __func__)) != NC_NOERR) {
         EX_FUNC_LEAVE(EX_FATAL);
       }
-      in_redef = 0;
+      in_redef = false;
     }
 
     /* If this is a parallel execution and we are appending, then we

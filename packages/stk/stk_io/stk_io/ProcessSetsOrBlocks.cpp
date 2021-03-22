@@ -15,6 +15,7 @@
 #include "Ioss_NodeBlock.h"                        // for NodeBlock
 #include "Ioss_SideBlock.h"                        // for SideBlock
 #include "Ioss_SideSet.h"                          // for SideSet, etc
+#include "Ioss_Assembly.h"
 #include "StkIoUtils.hpp"
 #include "StkMeshIoBroker.hpp"                     // for StkMeshIoBroker, etc
 #include "stk_mesh/base/Bucket.hpp"                // for Bucket
@@ -119,7 +120,9 @@ void process_surface_entity(Ioss::SideSet *sset, stk::mesh::MetaData &meta)
     if (stk::io::include_entity(sb)) {
       stk::mesh::Part * const sb_part = meta.get_part(sb->name());
       STKIORequire(sb_part != nullptr);
-      meta.declare_part_subset(*ss_part, *sb_part);
+      if (ss_part->mesh_meta_data_ordinal() != sb_part->mesh_meta_data_ordinal()) {
+        meta.declare_part_subset(*ss_part, *sb_part);
+      }
 
       if (sb->field_exists("distribution_factors")) {
         if (!surface_df_defined) {
@@ -216,23 +219,21 @@ void process_surface_entity(const Ioss::SideSet* sset, stk::mesh::BulkData & bul
     const stk::mesh::MetaData &meta = bulk.mesh_meta_data();
 
     Ioss::Region *region = sset->get_database()->get_region();
-//    const std::string universalAlias = region->get_alias("universal_sideset");
-//    if (sset->name() == universalAlias)
-//        return;
 
     stk::mesh::SideSet *stkSideSet = nullptr;
     stk::mesh::Part *stkSideSetPart = get_part_for_grouping_entity(*region, meta, sset);
+    bool internalSidesetFlag = true;
 
-    if(nullptr != stkSideSetPart)
-    {
-        if(bulk.does_sideset_exist(*stkSideSetPart))
-        {
+    if(nullptr != stkSideSetPart) {
+        if(bulk.does_sideset_exist(*stkSideSetPart)) {
             stkSideSet = & bulk.get_sideset(*stkSideSetPart);
-        }
-        else
-        {
+            stkSideSet->set_from_input(true);
+        } else {
             stkSideSet = & bulk.create_sideset(*stkSideSetPart, true);
         }
+
+        internalSidesetFlag = stkSideSet->get_accept_all_internal_non_coincident_entries();
+        stkSideSet->set_accept_all_internal_non_coincident_entries(false);
     }
 
     size_t block_count = sset->block_count();
@@ -299,8 +300,7 @@ void process_surface_entity(const Ioss::SideSet* sset, stk::mesh::BulkData & bul
 
                     ThrowRequireMsg((par_dimen == 1) || (par_dimen == 2), "Invalid value for par_dimen:" << par_dimen);
 
-                    if(nullptr != stkSideSet)
-                    {
+                    if(nullptr != stkSideSet) {
                         stkSideSet->add({elem, side_ordinal});
                     }
 
@@ -317,6 +317,7 @@ void process_surface_entity(const Ioss::SideSet* sset, stk::mesh::BulkData & bul
     }
     if (stkSideSet != nullptr)
     {
+        stkSideSet->set_accept_all_internal_non_coincident_entries(internalSidesetFlag);
         stk::util::sort_and_unique(*stkSideSet);
     }
 }
@@ -402,7 +403,7 @@ void create_shared_edges(stk::mesh::BulkData& bulk, stk::mesh::Part* part)
     if(meta.side_rank() == stk::topology::EDGE_RANK) { return; }
 
     stk::mesh::EntityVector edges;
-    stk::mesh::get_selected_entities(*part, bulk.buckets(stk::topology::EDGE_RANK), edges);
+    stk::mesh::get_entities(bulk, stk::topology::EDGE_RANK, *part, edges);
     stk::mesh::EntityVector edgeNodes;
     std::vector<int> sharedProcs;
     stk::CommSparse commSparse(bulk.parallel());
@@ -624,6 +625,26 @@ void process_edge_blocks(Ioss::Region &region, stk::mesh::MetaData &meta)
 {
   const Ioss::EdgeBlockContainer& edge_blocks = region.get_edge_blocks();
   stk::io::default_part_processing(edge_blocks, meta);
+}
+
+void process_assemblies(Ioss::Region &region, stk::mesh::MetaData &meta)
+{
+  const Ioss::AssemblyContainer& assemblies = region.get_assemblies();
+  stk::io::default_part_processing(assemblies, meta);
+}
+
+void build_assembly_hierarchies(Ioss::Region &region, stk::mesh::MetaData &meta)
+{
+  const Ioss::AssemblyContainer& assemblies = region.get_assemblies();
+  for(const Ioss::Assembly* assembly : assemblies) {
+    const std::string& assemblyName = assembly->name();
+    stk::mesh::Part* assemblyPart = meta.get_part(assemblyName);
+    const Ioss::EntityContainer& members = assembly->get_members();
+    for(const Ioss::GroupingEntity* member : members) {
+      stk::mesh::Part* memberPart = meta.get_part(member->name());
+      meta.declare_part_subset(*assemblyPart, *memberPart);
+    }
+  }
 }
 
 void populate_hidden_nodesets(Ioss::Region &io, const stk::mesh::MetaData & meta, NodesetMap &nodesetMap)

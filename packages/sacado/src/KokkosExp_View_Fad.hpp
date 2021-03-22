@@ -412,50 +412,6 @@ void deep_copy(
   Impl::SacadoViewFill< View<DT,DP...> >( view , value );
 }
 
-
-/* Specialize for deep copy of FAD */
-template< class DT , class ... DP , class ST , class ... SP >
-inline
-void deep_copy( const View<DT,DP...> & dst ,
-                const View<ST,SP...> & src
-  , typename std::enable_if<(
-  ( std::is_same< typename ViewTraits<DT,DP...>::specialize
-                , Kokkos::Impl::ViewSpecializeSacadoFad >::value
-    ||
-    std::is_same< typename ViewTraits<DT,DP...>::specialize
-                , Kokkos::Impl::ViewSpecializeSacadoFadContiguous >::value )
-  &&
-  ( std::is_same< typename ViewTraits<ST,SP...>::specialize
-                , Kokkos::Impl::ViewSpecializeSacadoFad >::value
-    ||
-    std::is_same< typename ViewTraits<ST,SP...>::specialize
-                , Kokkos::Impl::ViewSpecializeSacadoFadContiguous >::value )
-  )>::type * = 0 )
-{
-  static_assert(
-    std::is_same< typename ViewTraits<DT,DP...>::value_type ,
-                  typename ViewTraits<DT,DP...>::non_const_value_type >::value
-    , "Deep copy destination must be non-const" );
-
-  static_assert(
-    ( unsigned(ViewTraits<DT,DP...>::rank) ==
-      unsigned(ViewTraits<ST,SP...>::rank) )
-    , "Deep copy destination and source must have same rank" );
-
-#if 0
-  // Current impl
-  typedef typename View<DT,DP...>::array_type dst_array_type;
-  typedef typename View<ST,SP...>::array_type src_array_type;
-  typename NaturalArrayType< dst_array_type >::type dst_array( dst );
-  typename NaturalArrayType< src_array_type >::type src_array( src );
-#else
-  // Copy-assign Views of FadType to Kokkos Views to use Kokkos' deep_copy routine
-  typename PODViewDeepCopyType< View<DT,DP...> >::type dst_array( dst );
-  typename PODViewDeepCopyType< View<ST,SP...> >::type src_array( src );
-#endif
-  Kokkos::deep_copy( dst_array , src_array );
-}
-
 /* Specialize for deep copy of FAD */
 template< class ExecSpace, class DT , class ... DP , class ST , class ... SP >
 inline
@@ -500,6 +456,31 @@ void deep_copy( const ExecSpace &,
   Kokkos::deep_copy( ExecSpace(), dst_array , src_array );
 }
 
+/* Specialize for deep copy of FAD */
+template< class DT , class ... DP , class ST , class ... SP >
+inline
+void deep_copy( const View<DT,DP...> & dst ,
+                const View<ST,SP...> & src
+  , typename std::enable_if<(
+  ( std::is_same< typename ViewTraits<DT,DP...>::specialize
+                , Kokkos::Impl::ViewSpecializeSacadoFad >::value
+    ||
+    std::is_same< typename ViewTraits<DT,DP...>::specialize
+                , Kokkos::Impl::ViewSpecializeSacadoFadContiguous >::value )
+  &&
+  ( std::is_same< typename ViewTraits<ST,SP...>::specialize
+                , Kokkos::Impl::ViewSpecializeSacadoFad >::value
+    ||
+    std::is_same< typename ViewTraits<ST,SP...>::specialize
+                , Kokkos::Impl::ViewSpecializeSacadoFadContiguous >::value )
+  )>::type * = 0 )
+{
+  using exec_space = typename View<DT,DP...>::execution_space;
+  Kokkos::fence();
+  Kokkos::deep_copy(exec_space(), dst, src);
+  Kokkos::fence();
+}
+
 template< class T , class ... P >
 inline
 typename Kokkos::View<T,P...>::HostMirror
@@ -540,29 +521,30 @@ create_mirror( const Kokkos::View<T,P...> & src
              )
 {
   typedef View<T,P...>                   src_type ;
+  typedef typename src_type::array_type  src_array_type ;
   typedef typename src_type::HostMirror  dst_type ;
 
   Kokkos::LayoutStride layout ;
 
-  layout.dimension[0] = src.extent(0);
-  layout.dimension[1] = src.extent(1);
-  layout.dimension[2] = src.extent(2);
-  layout.dimension[3] = src.extent(3);
-  layout.dimension[4] = src.extent(4);
-  layout.dimension[5] = src.extent(5);
-  layout.dimension[6] = src.extent(6);
-  layout.dimension[7] = src.extent(7);
+  // Use dimensions/strides from array_type to get hidden dim/stride
+  src_array_type src_array = src;
+  layout.dimension[0] = src_array.extent(0);
+  layout.dimension[1] = src_array.extent(1);
+  layout.dimension[2] = src_array.extent(2);
+  layout.dimension[3] = src_array.extent(3);
+  layout.dimension[4] = src_array.extent(4);
+  layout.dimension[5] = src_array.extent(5);
+  layout.dimension[6] = src_array.extent(6);
+  layout.dimension[7] = src_array.extent(7);
 
-  layout.stride[0] = src.stride_0();
-  layout.stride[1] = src.stride_1();
-  layout.stride[2] = src.stride_2();
-  layout.stride[3] = src.stride_3();
-  layout.stride[4] = src.stride_4();
-  layout.stride[5] = src.stride_5();
-  layout.stride[6] = src.stride_6();
-  layout.stride[7] = src.stride_7();
-
-  layout.dimension[src_type::rank] = Kokkos::dimension_scalar(src);
+  layout.stride[0] = src_array.stride_0();
+  layout.stride[1] = src_array.stride_1();
+  layout.stride[2] = src_array.stride_2();
+  layout.stride[3] = src_array.stride_3();
+  layout.stride[4] = src_array.stride_4();
+  layout.stride[5] = src_array.stride_5();
+  layout.stride[6] = src_array.stride_6();
+  layout.stride[7] = src_array.stride_7();
 
   return dst_type(std::string(src.label()).append("_mirror"), layout);
 }
@@ -1524,10 +1506,10 @@ public:
         "View assignment must have compatible layout" );
 
       static_assert(
-        std::is_same< typename DstTraits::scalar_array_type
-                    , typename SrcTraits::scalar_array_type >::value ||
-        std::is_same< typename DstTraits::scalar_array_type
-                    , typename SrcTraits::const_scalar_array_type >::value ,
+        std::is_same< typename DstTraits::value_type
+                    , typename SrcTraits::value_type >::value ||
+        std::is_same< typename DstTraits::value_type
+                    , typename SrcTraits::const_value_type >::value ,
         "View assignment must have same value type or const = non-const" );
 
       static_assert(

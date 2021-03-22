@@ -48,7 +48,6 @@ public:
     using stk::balance::GraphCreationSettings::getToleranceForFaceSearch;
 
     virtual double getGraphEdgeWeight(stk::topology element1Topology, stk::topology element2Topology) const { return 1.0; }
-    virtual bool areVertexWeightsProvidedInAVector() const { return false; }
     virtual bool areVertexWeightsProvidedViaFields() const { return true; }
     virtual bool includeSearchResultsInGraph() const { return true; }
     virtual bool getEdgesForParticlesUsingSearch() const { return true; }
@@ -95,7 +94,7 @@ protected:
     size_t calculate_migrated_elements()
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         size_t num_elements_migrated = 0;
         for(const stk::mesh::Entity& element : elements )
@@ -112,7 +111,7 @@ protected:
     void set_proc_owner_on_field()
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         for(const stk::mesh::Entity &element : elements )
         {
@@ -124,7 +123,7 @@ protected:
     void set_weights_on_elements(float weight = 9.0)
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         for(const stk::mesh::Entity &element : elements )
         {
@@ -136,7 +135,7 @@ protected:
     void set_weights_on_elements(const std::vector<stk::mesh::EntityId>& ids, float newWeight)
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         for(stk::mesh::EntityId id : ids )
         {
@@ -152,7 +151,7 @@ protected:
     void change_weights_on_elements()
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         double* data = stk::mesh::field_data(*weight_field, elements[0]);
         *data = 1;
@@ -172,9 +171,7 @@ protected:
     {
         if(numGlobalElements == 0)
         {
-            stk::mesh::EntityVector elements;
-            stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
-            size_t num_local_elements = elements.size();
+            size_t num_local_elements = stk::mesh::count_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part());
             stk::all_reduce_sum(get_comm(), &num_local_elements, &numGlobalElements, 1);
         }
         return numGlobalElements;
@@ -187,7 +184,7 @@ protected:
         const stk::mesh::FieldBase * coord = get_meta().get_field(stk::topology::NODE_RANK, coordinate_field_name);
 
         stk::mesh::EntityVector nodes;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part() | get_meta().globally_shared_part(), get_bulk().buckets(stk::topology::NODE_RANK), nodes);
+        stk::mesh::get_entities(get_bulk(), stk::topology::NODE_RANK, get_meta().locally_owned_part() | get_meta().globally_shared_part(), nodes);
 
         double rotation = 15 * M_PI / 180.0;
         double dx = 3;
@@ -209,7 +206,7 @@ protected:
     void print_locally_owned_elements(std::ostream& out)
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part(), elements);
 
         out << "P" << get_bulk().parallel_rank() << " locally owned elements = ";
         for(const stk::mesh::Entity &element : elements )
@@ -228,7 +225,7 @@ protected:
         out << "after mesh read:" << std::endl;
         print_locally_owned_elements(out);
 
-        stk::mesh::Selector selector = get_meta().locally_owned_part();
+        stk::mesh::Selector selector = get_meta().universal_part();
 
         set_proc_owner_on_field();
         set_weights_on_elements();
@@ -268,7 +265,7 @@ protected:
         const double defaultVertexWeight = 0.0;
         stk::balance::FieldVertexWeightSettings graphSettings(get_bulk(), *get_weight_field(), defaultVertexWeight);
         graphSettings.setDecompMethod(method);
-        stk::mesh::Selector selector = get_meta().locally_owned_part();
+        stk::mesh::Selector selector = get_meta().universal_part();
         stk::balance::balanceStkMesh(graphSettings, get_bulk(), {selector});
 
         out << "after first balance:" << std::endl;
@@ -305,7 +302,7 @@ protected:
         stk::balance::FieldVertexWeightSettings graphSettings(get_bulk(), *get_weight_field(), defaultVertexWeight);
         graphSettings.setDecompMethod(method1);
         if (get_bulk().parallel_rank()==0) std::cerr << "Decomposition method = " << method1 << std::endl;
-        stk::mesh::Selector selector = get_meta().locally_owned_part();
+        stk::mesh::Selector selector = get_meta().universal_part();
         stk::balance::balanceStkMesh(graphSettings, get_bulk(), {selector});
 
         out << "after first balance:" << std::endl;
@@ -315,6 +312,7 @@ protected:
         set_weights_on_elements({9, 10}, 2.0);
         set_proc_owner_on_field();
         graphSettings.setDecompMethod(method2);
+
         if (get_bulk().parallel_rank()==0) std::cerr << "Decomposition method = " << method2 << std::endl;
         stk::balance::balanceStkMesh(graphSettings, get_bulk(), {selector});
 
@@ -325,7 +323,12 @@ protected:
         out.close();
 
         size_t num_elements_migrated_to_me = calculate_migrated_elements();
-        EXPECT_EQ(12u, num_elements_migrated_to_me);
+        if (get_bulk().parallel_rank() == 0) {
+          EXPECT_EQ(24u, num_elements_migrated_to_me);
+        }
+        else {
+          EXPECT_EQ(12u, num_elements_migrated_to_me);
+        }
     }
 
     void decomposeWithRcbThenParmetisAndCheckMigration()
@@ -341,7 +344,7 @@ protected:
         const double defaultVertexWeight = 0.0;
         stk::balance::FieldVertexWeightSettings graphSettings(get_bulk(), *get_weight_field(), defaultVertexWeight);
         graphSettings.setDecompMethod("rcb");
-        stk::mesh::Selector selector = get_meta().locally_owned_part();
+        stk::mesh::Selector selector = get_meta().universal_part();
         stk::balance::balanceStkMesh(graphSettings, get_bulk(), {selector});
 
         out << "after first rebalance:" << std::endl;
@@ -363,9 +366,7 @@ protected:
     size_t count_global_non_particle_elements()
     {
         size_t numGlobalElements;
-        stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part() & !get_meta().get_topology_root_part(stk::topology::PARTICLE), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
-        size_t num_local_elements = elements.size();
+        size_t num_local_elements = stk::mesh::count_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part() & !get_meta().get_topology_root_part(stk::topology::PARTICLE));
         stk::all_reduce_sum(get_comm(), &num_local_elements, &numGlobalElements, 1);
         return numGlobalElements;
     }
@@ -387,15 +388,13 @@ protected:
 
     size_t count_local_elements()
     {
-        stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part(), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
-        return elements.size();
+        return stk::mesh::count_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part());
     }
 
     stk::mesh::EntityVector get_non_particle_elements_inside_sphere(double* center, double radius)
     {
         stk::mesh::EntityVector elements;
-        stk::mesh::get_selected_entities(get_meta().locally_owned_part() & !get_meta().get_topology_root_part(stk::topology::PARTICLE), get_bulk().buckets(stk::topology::ELEM_RANK), elements);
+        stk::mesh::get_entities(get_bulk(), stk::topology::ELEM_RANK, get_meta().locally_owned_part() & !get_meta().get_topology_root_part(stk::topology::PARTICLE), elements);
         stk::mesh::EntityVector selectedElements;
         for(size_t i=0 ; i<elements.size() ; ++i)
         {
@@ -455,7 +454,7 @@ protected:
         const double defaultVertexWeight = 0.0;
         FieldVertexWeightSettingsWithSearchForParticles graphSettings(get_bulk(), *get_weight_field(), defaultVertexWeight, incrementalRebalance);
         graphSettings.setDecompMethod(decompMethod);
-        stk::mesh::Selector selector = get_meta().locally_owned_part();
+        stk::mesh::Selector selector = get_meta().universal_part();
         stk::balance::balanceStkMesh(graphSettings, get_bulk(), {selector});
     }
 
@@ -642,10 +641,10 @@ TEST_F(IncrementalRebalance, parmetis_case1)
 }
 
 #if !defined(__APPLE__)
-TEST_F(IncrementalRebalance, rcb_then_parmetis_case2)
+TEST_F(IncrementalRebalance, rib_then_parmetis_case2)
 {
     if(stk::parallel_machine_size(get_comm())==3)
-        decompose1x9x9beamThenRebalanceWithLast2ElementChanges("rcb", "parmetis");
+        decompose1x9x9beamThenRebalanceWithLast2ElementChanges("rib", "parmetis");
 }
 #endif
 

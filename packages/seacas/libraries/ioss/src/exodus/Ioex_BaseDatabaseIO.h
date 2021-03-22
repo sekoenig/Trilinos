@@ -192,8 +192,8 @@ namespace Ioex {
     int64_t put_field_internal(const Ioss::Blob *blob, const Ioss::Field &field, void *data,
                                size_t data_size) const override             = 0;
 
-    virtual void write_meta_data() = 0;
-    void         write_results_metadata(bool gather_data = true);
+    virtual void write_meta_data(bool appending) = 0;
+    void         write_results_metadata(bool gather_data, bool appending);
 
     void openDatabase__() const override { get_file_pointer(); }
 
@@ -218,8 +218,7 @@ namespace Ioex {
     void put_info();
 
     template <typename T>
-    void internal_write_results_metadata(ex_entity_type type, std::vector<T *> entities,
-                                         int &glob_index);
+    void internal_write_results_metadata(ex_entity_type type, std::vector<T *> entities);
 
     void generate_sideset_truth_table();
 
@@ -265,9 +264,9 @@ namespace Ioex {
 
     // Private member data...
   protected:
-    mutable int         m_exodusFilePtr{-1};
+    mutable int m_exodusFilePtr{-1};
     // If using links to file-per-state, the file pointer for "base" file.
-    mutable int         m_exodusBasePtr{-1}; 
+    mutable int m_exodusBasePtr{-1};
 
     mutable std::string m_groupName;
 

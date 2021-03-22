@@ -16,7 +16,7 @@
 #include <vector>       // for vector
 
 namespace Excn {
-  typedef std::vector<std::pair<std::string, int>> StringIdVector;
+  using StringIdVector = std::vector<std::pair<std::string, int>>;
 
   class SystemInterface
   {
@@ -58,6 +58,7 @@ namespace Excn {
     bool add_processor_id_field() const { return addProcessorId_; }
     bool sum_shared_nodes() const { return sumSharedNodes_; }
     bool use_netcdf4() const { return useNetcdf4_; }
+    bool use_netcdf5() const { return useNetcdf5_; }
     void set_use_netcdf4() const { useNetcdf4_ = true; }
     bool append() const { return append_; }
     bool map_element_ids() const { return mapIds_; }
@@ -66,6 +67,8 @@ namespace Excn {
     bool int64() const { return intIs64Bit_; }
     void set_int64() const { intIs64Bit_ = true; }
     int  compress_data() const { return compressData_; }
+    bool zlib() const { return zlib_; }
+    bool szip() const { return szip_; }
     bool subcycle_join() const { return subcycleJoin_; }
     bool output_shared_nodes() const { return outputSharedNodes_; }
     bool is_auto() const { return auto_; }
@@ -128,12 +131,15 @@ namespace Excn {
     int          cycle_{-1};
     int          compressData_{0};
     int          maxOpenFiles_{0};
+    bool         zlib_{true};
+    bool         szip_{false};
     bool         sumSharedNodes_{false};
     bool         addProcessorId_{false};
     bool         mapIds_{true};
     bool         omitNodesets_{false};
     bool         omitSidesets_{false};
     mutable bool useNetcdf4_{false};
+    bool         useNetcdf5_{false};
     bool         append_{false};
     mutable bool intIs64Bit_{false};
     bool         subcycleJoin_{false};

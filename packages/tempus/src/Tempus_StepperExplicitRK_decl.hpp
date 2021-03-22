@@ -12,9 +12,6 @@
 #include "Tempus_config.hpp"
 #include "Tempus_StepperRKBase.hpp"
 #include "Tempus_StepperExplicit.hpp"
-#ifndef TEMPUS_HIDE_DEPRECATED_CODE
-  #include "Tempus_StepperRKObserverComposite.hpp"
-#endif
 
 
 namespace Tempus {
@@ -54,32 +51,37 @@ namespace Tempus {
  *  <b> Algorithm </b>
  *  The single-timestep algorithm for Explicit RK is
  *
- *  \f{algorithm}{
- *  \renewcommand{\thealgorithm}{}
- *  \caption{Explicit RK with the application-action locations indicated.}
- *  \begin{algorithmic}[1]
- *    \State $X \leftarrow x_{n-1}$ \Comment Set initial guess to last timestep.
- *    \State {\it appAction.execute(solutionHistory, stepper, BEGIN\_STEP)}
- *    \For {$i = 0 \ldots s-1$}
- *      \State $X \leftarrow x_{n-1}
- *                + \Delta t\,\sum_{j=1}^{i-1} a_{ij}\,\dot{X}_j$
- *      \State {\it appAction.execute(solutionHistory, stepper, BEGIN\_STAGE)}
- *      \State {\it appAction.execute(solutionHistory, stepper, BEFORE\_SOLVE)}
- *      \State {\it appAction.execute(solutionHistory, stepper, AFTER\_SOLVE)}
- *      \State {\it appAction.execute(solutionHistory, stepper, BEFORE\_EXPLICIT\_EVAL)}
- *      \If { i==0 and useFSAL and (previous step not failed) }
- *        \State tmp = $\dot{X}_0$
- *        \State $\dot{X}_0 = \dot{X}_s$
- *        \State $\dot{X}_s$ = tmp
- *        \State {\bf continue}
- *      \Else
- *        \State $\dot{X}_i \leftarrow \bar{f}(X_i,t_{n-1}+c_i\Delta t)$
- *      \EndIf
- *      \State {\it appAction.execute(solutionHistory, stepper, END\_STAGE)}
- *    \EndFor
- *    \State $x_n \leftarrow x_{n-1} + \Delta t\,\sum_{i=1}^{s}b_i\,\dot{X}_i$
- *    \State {\it appAction.execute(solutionHistory, stepper, END\_STEP)}
- *  \end{algorithmic}
+ *  \f{center}{
+ *    \parbox{5in}{
+ *    \rule{5in}{0.4pt} \\
+ *    {\bf Algorithm} Explicit RK \\
+ *    \rule{5in}{0.4pt} \vspace{-15pt}
+ *    \begin{enumerate}
+ *      \setlength{\itemsep}{0pt} \setlength{\parskip}{0pt} \setlength{\parsep}{0pt}
+ *      \item $X \leftarrow x_{n-1}$
+ *      \item {\it appAction.execute(solutionHistory, stepper, BEGIN\_STEP)}
+ *      \item {\bf for {$i = 0 \ldots s-1$}}
+ *      \item \quad $X \leftarrow x_{n-1}
+ *                    + \Delta t\,\sum_{j=1}^{i-1} a_{ij}\,\dot{X}_j$
+ *      \item \quad {\it appAction.execute(solutionHistory, stepper, BEGIN\_STAGE)}
+ *      \item \quad {\it appAction.execute(solutionHistory, stepper, BEFORE\_SOLVE)}
+ *      \item \quad {\it appAction.execute(solutionHistory, stepper, AFTER\_SOLVE)}
+ *      \item \quad {\it appAction.execute(solutionHistory, stepper, BEFORE\_EXPLICIT\_EVAL)}
+ *      \item \quad {\bf if (i=0 and useFSAL and (previous step not failed)) then}
+ *      \item \qquad  tmp = $\dot{X}_0$
+ *      \item \qquad  $\dot{X}_0 = \dot{X}_s$
+ *      \item \qquad  $\dot{X}_s$ = tmp
+ *      \item \qquad  {\bf continue}
+ *      \item \quad {\bf else}
+ *      \item \qquad  $\dot{X}_i \leftarrow \bar{f}(X_i,t_{n-1}+c_i\Delta t)$
+ *      \item \quad {\bf endif}
+ *      \item \quad {\it appAction.execute(solutionHistory, stepper, END\_STAGE)}
+ *      \item {\bf end for}
+ *      \item $x_n \leftarrow x_{n-1} + \Delta t\,\sum_{i=1}^{s}b_i\,\dot{X}_i$
+ *      \item {\it appAction.execute(solutionHistory, stepper, END\_STEP)}
+ *    \end{enumerate}
+ *    \vspace{-10pt} \rule{5in}{0.4pt}
+ *    }
  *  \f}
  *
  *   For Explicit RK, FSAL requires \f$c_1 = 0\f$, \f$c_s = 1\f$, and
@@ -103,13 +105,6 @@ public:
 
   /// \name Basic stepper methods
   //@{
-#ifndef TEMPUS_HIDE_DEPRECATED_CODE
-    virtual void setObserver(
-      Teuchos::RCP<StepperObserver<Scalar> > obs = Teuchos::null);
-
-    virtual Teuchos::RCP<StepperObserver<Scalar> > getObserver() const
-    { return this->stepperObserver_; }
-#endif
     /// Initialize during construction and after changing input parameters.
     virtual void initialize();
 
@@ -156,15 +151,6 @@ protected:
   virtual void setupDefault();
 
   /// Setup for constructor.
-#ifndef TEMPUS_HIDE_DEPRECATED_CODE
-  virtual void setup(
-    const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
-    const Teuchos::RCP<StepperRKObserverComposite<Scalar> >& obs,
-    bool useFSAL,
-    std::string ICConsistency,
-    bool ICConsistencyCheck,
-    bool useEmbedded);
-#endif
   virtual void setup(
     const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel,
     bool useFSAL,
@@ -177,10 +163,6 @@ protected:
 
 
   std::vector<Teuchos::RCP<Thyra::VectorBase<Scalar> > > stageXDot_;
-
-#ifndef TEMPUS_HIDE_DEPRECATED_CODE
-  Teuchos::RCP<StepperRKObserverComposite<Scalar> >      stepperObserver_;
-#endif
 
 };
 

@@ -12,13 +12,13 @@
 #include <cassert>
 #include <cstddef> // for size_t
 
-#define USE_ROBIN
-#if defined USE_STD
+#define FG_USE_ROBIN
+#if defined FG_USE_STD
 #include <unordered_set>
-#elif defined USE_HOPSCOTCH
-#include <hash/hopscotch_set.h>
-#elif defined USE_ROBIN
-#include <hash/robin_set.h>
+#elif defined FG_USE_HOPSCOTCH
+#include <hopscotch_set.h>
+#elif defined FG_USE_ROBIN
+#include <robin_set.h>
 #endif
 
 #include <utility>
@@ -30,7 +30,7 @@ namespace Ioss {
   {
   public:
     Face() = default;
-    Face(size_t id, std::array<size_t, 4> conn) : hashId_(id), connectivity_(std::move(conn)) {}
+    Face(size_t id, std::array<size_t, 4> conn) : hashId_(id), connectivity_(conn) {}
     Face(std::array<size_t, 4> conn);
 
     void add_element(size_t element_id) const
@@ -60,9 +60,9 @@ namespace Ioss {
     // you could recover element_id and local_face and then set up
     // parallel communication maps.  May need to save the proc it is
     // shared with also (which is available in git history)
-    mutable size_t        element[2]{};
-    mutable int           elementCount_{0}; // Should be max of 2 solid elements...
-    std::array<size_t, 4> connectivity_{};
+    mutable std::array<size_t, 2> element{};
+    mutable int                   elementCount_{0}; // Should be max of 2 solid elements...
+    std::array<size_t, 4>         connectivity_{};
   };
 
   struct FaceHash
@@ -94,12 +94,12 @@ namespace Ioss {
     }
   };
 
-#if defined USE_STD
+#if defined FG_USE_STD
   using FaceUnorderedSet = std::unordered_set<Face, FaceHash, FaceEqual>;
-#elif defined USE_HOPSCOTCH
+#elif defined FG_USE_HOPSCOTCH
   using FaceUnorderedSet = tsl::hopscotch_set<Face, FaceHash, FaceEqual>;
   // using FaceUnorderedSet = tsl::hopscotch_pg_set<Face, FaceHash, FaceEqual>;
-#elif defined USE_ROBIN
+#elif defined FG_USE_ROBIN
   using FaceUnorderedSet = tsl::robin_set<Face, FaceHash, FaceEqual>;
   // using FaceUnorderedSet = tsl::robin_pg_set<Face, FaceHash, FaceEqual>;
 #endif

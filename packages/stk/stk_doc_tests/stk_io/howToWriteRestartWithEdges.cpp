@@ -29,12 +29,12 @@ TEST(StkIoHowTo, WriteRestartWithEdges)
         stk::mesh::Field<double>& edgeField = meta.declare_field<stk::mesh::Field<double> >(stk::topology::EDGE_RANK, "edgeField", numStates);
         stk::mesh::put_field_on_mesh(edgeField, meta.universal_part(),
                                     (stk::mesh::FieldTraits<stk::mesh::Field<double> >::data_type*) nullptr);
-        stk::io::put_io_part_attribute(*part);
+        stk::io::put_edge_block_io_part_attribute(*part);
         stk::io::fill_mesh("generated:1x1x1", bulk);
         stk::mesh::create_edges(bulk, meta.universal_part(), part);
 
         stk::mesh::EntityVector edges;
-        stk::mesh::get_selected_entities(meta.universal_part(), bulk.buckets(stk::topology::EDGE_RANK), edges);
+        stk::mesh::get_entities(bulk, stk::topology::EDGE_RANK, meta.universal_part(), edges);
 
         for(auto edge : edges) {
           double* data = reinterpret_cast<double*>(stk::mesh::field_data(edgeField, edge));
@@ -44,7 +44,6 @@ TEST(StkIoHowTo, WriteRestartWithEdges)
 
         stk::io::StkMeshIoBroker ioBroker;
         ioBroker.set_bulk_data(bulk);
-        ioBroker.enable_edge_io();
         stk::io::write_mesh_with_fields(filename, ioBroker, outputTimeStep, outputTime, stk::io::WRITE_RESTART);
     }
 

@@ -50,7 +50,7 @@ MESSAGE("*******************************")
 MESSAGE("")
 
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.10.0 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.17.0 FATAL_ERROR)
 
 SET(THIS_CMAKE_CURRENT_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
@@ -570,6 +570,21 @@ INCLUDE(${CMAKE_CURRENT_LIST_DIR}/TribitsCTestDriverCoreHelpers.cmake)
 #     EX packages that should be tested in a PT build
 #     (e.g. ``${PROJECT_NAME}_ENABLE_SECONDARY_TESTED_CODE=FALSE``.  The
 #     default value is empty "".
+#
+#  ``${PROJECT_NAME}_PACKAGE_ENABLES_FILE=<filepath>``
+#
+#    A file that is expected to define a set to `set()` statements to enable a
+#    set of packages.  The set of packages enabled will determine what
+#    packages are specifically processed and tested (according to other
+#    options as well).  NOTE: To get this set of enables passed to inner
+#    configure, also list this file in the inner configure cache variable
+#    `${PROJECT_NAME}_CONFIGURE_OPTIONS_FILE`_ (see passing such options
+#    through in `Setting variables in the inner CMake configure
+#    (TRIBITS_CTEST_DRIVER())`_).  This is used instead of the variable
+#    ``${PROJECT_NAME}_PACKAGES`` to specify the set of packages to enable and
+#    test.  (If both ``${PROJECT_NAME}_PACKAGES`` and
+#    ``${PROJECT_NAME}_PACKAGE_ENABLES_FILE`` are both set, then a fatal error
+#    will occur.  The default value is empty "".
 #
 #   .. _${PROJECT_NAME}_ENABLE_ALL_FORWARD_DEP_PACKAGES:
 #
@@ -1185,16 +1200,9 @@ INCLUDE(${CMAKE_CURRENT_LIST_DIR}/TribitsCTestDriverCoreHelpers.cmake)
 # packages and therefore is more robust.  But the package-by-package mode is
 # more expensive in several respects for many projects.
 #
-# For versions of CMake 3.10.0 and above and newer versions of CDash, the
+# For versions of CMake 3.17.0 and above and newer versions of CDash, the
 # CDash server for the all-at-once mode will break down build and test results
 # on a package-by-package basis on CDash together.
-#
-# **NOTE:** It has been confirmed that older versions of CDash can accept and
-# display results from newer CMake/CTest versions when
-# ``${PROJECT_NAME}_CTEST_USE_NEW_AAO_FEATURES`` set to ``TRUE``.  It is just
-# that for older versions of CDash that it will not break down results on a
-# package-by-package basis on CDash and all of the build warnings and errors
-# and tests will be all globed together on CDash.
 #
 # .. _Mutiple ctest -S invocations (TRIBITS_CTEST_DRIVER()):
 #
@@ -1561,11 +1569,6 @@ FUNCTION(TRIBITS_CTEST_DRIVER)
 
   # Flags used on update when doing a Git update
   SET_DEFAULT_AND_FROM_ENV( CTEST_UPDATE_OPTIONS "")
-
-  # If doing all-at-one approach, use new CMake/CTest/CDash features to allow
-  # it to split out results into different rows on CDash like the
-  # package-by-packages approach.
-  SET_DEFAULT_AND_FROM_ENV( ${PROJECT_NAME}_CTEST_USE_NEW_AAO_FEATURES  FALSE )
  
   # Do all-at-once configure, build, test and submit (or package-by-package)
   IF ("${${PROJECT_NAME}_CTEST_DO_ALL_AT_ONCE_DEFAULT}" STREQUAL "")
@@ -1696,6 +1699,21 @@ FUNCTION(TRIBITS_CTEST_DRIVER)
   # available).  This will override any disabled packages but not those
   # disabled by ${PROJECT_NAME}_EXCLUDE_PACKAGES.
   SET_DEFAULT_AND_FROM_ENV( ${PROJECT_NAME}_PACKAGES "" )
+
+  # Also allow the package enables to be set in a CMake fragment file
+  SET_DEFAULT_AND_FROM_ENV( ${PROJECT_NAME}_PACKAGE_ENABLES_FILE "" )
+
+  IF (
+      (NOT "${${PROJECT_NAME}_PACKAGES}" STREQUAL "")
+      AND
+      (NOT "${${PROJECT_NAME}_PACKAGE_ENABLES_FILE}" STREQUAL "")
+    )
+    MESSAGE(FATAL_ERROR "ERROR: Both"
+      " ${PROJECT_NAME}_PACKAGES and ${PROJECT_NAME}_PACKAGE_ENABLES_FILE"
+      " cannot be non-empty!  Set one or the other to select the set of"
+      " packages to be processed/tested.")
+  ENDIF()
+
   SET(${PROJECT_NAME}_PACKAGES_USER_SELECTED ${${PROJECT_NAME}_PACKAGES})
   SPLIT("${${PROJECT_NAME}_PACKAGES_USER_SELECTED}" ","
     ${PROJECT_NAME}_PACKAGES_USER_SELECTED)
@@ -1704,6 +1722,7 @@ FUNCTION(TRIBITS_CTEST_DRIVER)
   # backward compatibility of this CTest script but we want to let
   # ${PROJECT_NAME}_PACKAGES always be the full set of packages as defined by
   # the basic readin process.
+
 
   # Set the file that the extra repos will be read from
   #
@@ -2119,7 +2138,6 @@ FUNCTION(TRIBITS_CTEST_DRIVER)
       "\n***\n")
     ENABLE_ONLY_MODIFIED_PACKAGES()
   ENDIF()
-
 
   MESSAGE(
     "\n***"

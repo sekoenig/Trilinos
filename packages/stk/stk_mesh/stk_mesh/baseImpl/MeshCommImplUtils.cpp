@@ -38,7 +38,6 @@
 #include <stk_util/parallel/Parallel.hpp>
 #include <stk_util/parallel/CommSparse.hpp>
 #include <stk_util/parallel/ParallelComm.hpp>
-#include <stk_util/parallel/ParallelReduce.hpp>
 #include <stk_util/util/SameType.hpp>
 #include <stk_util/util/SortAndUnique.hpp>
 #include <stk_util/util/StaticAssert.hpp>
@@ -57,11 +56,11 @@ bool shared_with_proc(const EntityCommListInfo& info, int proc) {
     if(info.entity_comm != nullptr)
     {    
         const EntityCommInfoVector& comm_vec = info.entity_comm->comm_map;
-        for(size_t i=0; i<comm_vec.size(); ++i) {
-            if (comm_vec[i].ghost_id!=BulkData::SHARED) {
+        for(const EntityCommInfo& item : comm_vec) {
+            if (item.ghost_id!=BulkData::SHARED) {
                 return false;
             }
-            if (comm_vec[i].proc == proc) {
+            if (item.proc == proc) {
                 return true;
             }
         }
@@ -74,31 +73,34 @@ void pack_induced_memberships_for_entities_less_than_element_rank(
          stk::CommSparse& comm,
          const EntityCommListInfoVector & entityCommListInfoVec )
 {
+    const int thisProc = comm.parallel_rank();
     OrdinalVector induced;
-    for(size_t i = 0; i < entityCommListInfoVec.size(); ++i) 
+    for(const EntityCommListInfo& info : entityCommListInfoVec) 
     {
-        stk::mesh::Entity entity = entityCommListInfoVec[i].entity;
+        stk::mesh::Entity entity = info.entity;
         const int owner = bulk_data.parallel_owner_rank(entity);
+        if (owner == thisProc) {
+          continue;
+        }
 
-        if (bulk_data.entity_rank(entity) < stk::topology::ELEM_RANK && shared_with_proc(entityCommListInfoVec[i], owner) )
+        if (bulk_data.entity_rank(entity) < stk::topology::ELEM_RANK && shared_with_proc(info, owner) )
         {
             const EntityState state = bulk_data.state(entity);
             if(state == stk::mesh::Modified || state == stk::mesh::Created)
             {
                 induced.clear();
 
-                induced_part_membership(bulk_data, entityCommListInfoVec[i].entity, induced);
+                induced_part_membership(bulk_data, info.entity, induced);
 
                 CommBuffer & buf = comm.send_buffer(owner);
 
                 unsigned tmp = induced.size();
 
-                buf.pack<stk::mesh::EntityKey>(entityCommListInfoVec[i].key);
+                buf.pack<stk::mesh::EntityKey>(info.key);
                 buf.pack<unsigned>(tmp);
 
-                for(size_t j = 0; j < induced.size(); ++j) 
-                {
-                    buf.pack<unsigned>(induced[j]);
+                for(unsigned ord : induced) {
+                    buf.pack<unsigned>(ord);
                 }    
             }    
         }    
@@ -210,6 +212,7 @@ void unpack_induced_parts_from_sharers(OrdinalVector& induced_parts,
     for(PairIterEntityComm ec = shared_comm_info_range(entity_comm_info); !ec.empty(); ++ec)
     {
         CommBuffer & buf = comm.recv_buffer(ec->proc);
+        ThrowRequireMsg(buf.remaining(), "P"<<comm.parallel_rank()<<" empty buf, expected to recv parts for: "<<expected_key<<" from proc "<<ec->proc);
 
         unsigned count = 0;
         stk::mesh::EntityKey key;
@@ -256,6 +259,61 @@ bool pack_and_send_modified_shared_entity_states(stk::CommSparse& comm,
                }
              }
          });
+}
+
+void pack_entity_keys_to_send(stk::CommSparse &comm,
+                              const std::vector<stk::mesh::EntityKeyProc> &entities_to_send_data)
+{
+  for(size_t i=0;i<entities_to_send_data.size();++i)
+  {
+    stk::mesh::EntityKey entityKeyToSend = entities_to_send_data[i].first;
+    int destinationProc = entities_to_send_data[i].second;
+    comm.send_buffer(destinationProc).pack(entityKeyToSend);
+  }
+}
+
+void unpack_entity_keys_from_procs(stk::CommSparse &comm,
+                                   std::vector<stk::mesh::EntityKey> &receivedEntityKeys)
+{
+  for(int procId = comm.parallel_size() - 1; procId >= 0; --procId) {    
+    if(procId != comm.parallel_rank()) {    
+      CommBuffer & buf = comm.recv_buffer(procId);
+      while(buf.remaining()) {    
+        stk::mesh::EntityKey entityKey;
+        buf.unpack<stk::mesh::EntityKey>(entityKey);
+        receivedEntityKeys.push_back(entityKey);
+      }        
+    }
+  }        
+}
+
+void unpack_shared_entities(const BulkData& mesh,
+                            stk::CommSparse &comm,
+                            std::vector< std::pair<int, shared_entity_type> > &shared_entities_and_proc)
+{
+    for(int ip = mesh.parallel_size() - 1; ip >= 0; --ip)
+    {
+        if(ip != mesh.parallel_rank())
+        {
+            CommBuffer & buf = comm.recv_buffer(ip);
+            while(buf.remaining())
+            {
+                shared_entity_type sentity(stk::mesh::EntityKey(), stk::mesh::Entity(), stk::topology::INVALID_TOPOLOGY);
+
+                buf.unpack<stk::topology::topology_t>(sentity.topology);
+                stk::topology entity_topology(sentity.topology);
+                size_t num_nodes_on_entity = entity_topology.num_nodes();
+                sentity.nodes.resize(num_nodes_on_entity);
+                for (size_t i = 0; i < num_nodes_on_entity; ++i )
+                {
+                    buf.unpack<EntityKey>(sentity.nodes[i]);
+                }
+                buf.unpack<EntityKey>(sentity.global_key);
+
+                shared_entities_and_proc.emplace_back(ip, sentity);
+            }
+        }
+    }
 }
 
 void filter_out_unneeded_induced_parts(const BulkData& bulkData, stk::mesh::Entity entity,

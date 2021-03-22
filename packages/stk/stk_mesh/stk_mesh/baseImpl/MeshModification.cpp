@@ -17,6 +17,10 @@ bool MeshModification::modification_begin(const std::string description)
     {
         m_bulkData.mesh_meta_data().set_mesh_on_fields(&m_bulkData);
         m_bulkData.m_entity_repo->update_num_ranks(m_bulkData.mesh_meta_data().entity_rank_count());
+        const unsigned numRanks = m_bulkData.mesh_meta_data().entity_rank_count(); 
+        if (numRanks > m_bulkData.m_selector_to_buckets_maps.size()) {
+          m_bulkData.m_selector_to_buckets_maps.resize(numRanks);
+        }
     }
 
     if ( this->in_modifiable_state() ) return false ;
@@ -37,8 +41,12 @@ bool MeshModification::modification_begin(const std::string description)
     this->set_sync_state_modifiable();
     this->reset_shared_entity_changed_parts();
 
-    for (FieldBase * stkField : m_bulkData.mesh_meta_data().get_fields()) {
+    const stk::mesh::FieldVector allFields = m_bulkData.mesh_meta_data().get_fields();
+    for (FieldBase * stkField : allFields) {
       stkField->sync_to_host();
+      if (stkField->has_ngp_field()) {
+        impl::get_ngp_field(*stkField)->debug_modification_begin();
+      }
     }
 
     this->increment_sync_count();

@@ -419,7 +419,7 @@ void internal_generate_parallel_change_lists( const BulkData & mesh ,
           ip = local_change.begin() ; ip != local_change.end() ; ++ip ) {
       Entity entity      = ip->first ;
       int new_owner = ip->second;
-      mesh.comm_procs( mesh.entity_key(entity) , procs );
+      mesh.comm_procs( entity , procs );
       for ( std::vector<int>::iterator
             j = procs.begin() ; j != procs.end() ; ++j )
       {
@@ -1533,6 +1533,40 @@ void check_size_of_types()
 #endif
 }
 
+void require_valid_relation(const char action[],
+                            const BulkData& mesh,
+                            const Entity e_from,
+                            const Entity e_to)
+{
+  const bool error_rank      = !(mesh.entity_rank(e_from) > mesh.entity_rank(e_to));
+  const bool error_nil_from  = !mesh.is_valid(e_from);
+  const bool error_nil_to    = !mesh.is_valid(e_to);
+
+  if ( error_rank || error_nil_from || error_nil_to ) {
+    std::ostringstream msg ;
+
+    msg << "Could not " << action << " relation from entity "
+        << mesh.entity_key(e_from) << " to entity " << mesh.entity_key(e_to) << "\n";
+
+    ThrowErrorMsgIf( error_nil_from  || error_nil_to,
+                     msg.str() << ", entity was destroyed");
+    ThrowErrorMsgIf( error_rank, msg.str() <<
+                     "A relation must be from higher to lower ranking entity");
+  }
+}
+
+bool is_good_rank_and_id(const MetaData& meta,
+                         EntityRank rank,
+                         EntityId id)
+{
+  const size_t rank_count = meta.entity_rank_count();
+  const bool ok_id   = EntityKey::is_valid_id(id);
+  const bool ok_rank = rank < rank_count &&
+                 !(rank == stk::topology::FACE_RANK && meta.spatial_dimension() == 2);
+
+  return ok_id && ok_rank;
+}
+
 EntityId get_global_max_id_in_use(const BulkData& mesh,
                                   EntityRank rank,
                                   const std::list<Entity::entity_value_type>& deletedEntitiesCurModCycle)
@@ -1609,6 +1643,28 @@ void connect_face_to_elements(stk::mesh::BulkData& bulk, stk::mesh::Entity face)
                   "Face with id: " << bulk.identifier(face) << " has no valid connectivity to elements");
 }
 
+bool has_upward_connectivity(const stk::mesh::BulkData &bulk, stk::mesh::Entity entity)
+{
+  if(!bulk.is_valid(entity))
+    return false;
+
+  const stk::mesh::EntityRank entityRank = bulk.entity_rank(entity);
+  const stk::mesh::EntityRank endRank = static_cast<stk::mesh::EntityRank>(bulk.mesh_meta_data().entity_rank_count());
+  for(stk::mesh::EntityRank conRank = static_cast<stk::mesh::EntityRank>(entityRank + 1); conRank <= endRank; ++conRank)
+  {
+    unsigned numConnected = bulk.num_connectivity(entity, conRank);
+    if(numConnected > 0)
+      return true;
+  }
+
+  return false;
+}
+
+bool can_destroy_entity(const stk::mesh::BulkData &bulk, stk::mesh::Entity entity)
+{
+  return bulk.is_valid(entity) && !impl::has_upward_connectivity(bulk, entity);
+}
+  
 } // namespace impl
 } // namespace mesh
 } // namespace stk

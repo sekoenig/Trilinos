@@ -91,8 +91,6 @@ public:
 
   bool needs_to_be_sorted() const { return m_updated_since_sort; }
 
-  size_t field_data_footprint(const FieldBase &f) const;
-
   ////
   //// This part of the interface exposes the Buckets that are currently a part of
   //// the implementation.
@@ -132,7 +130,13 @@ public:
   std::ostream &dumpit(std::ostream &os) const;
   std::string dumpit() const;
 
-  void delete_bucket(Bucket * bucket);
+  void delete_bucket(Bucket* bucket);
+
+  void remove_bucket(Bucket* bucket);
+
+  void add_bucket(Bucket* bucket);
+
+  void reset_partition_key(const std::vector<unsigned>& newKey);
 
 private:
   BulkData& m_mesh;

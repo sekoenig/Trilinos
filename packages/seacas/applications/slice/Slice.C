@@ -62,10 +62,10 @@ size_t partial_count = 1000000000;
 namespace {
   void progress(const std::string &output)
   {
-    static auto start = std::chrono::high_resolution_clock::now();
+    static auto start = std::chrono::steady_clock::now();
 
     if ((debug_level & 1) != 0) {
-      auto                          now  = std::chrono::high_resolution_clock::now();
+      auto                          now  = std::chrono::steady_clock::now();
       std::chrono::duration<double> diff = now - start;
       fmt::print(stderr, " [{:.2f} - {:L}]\t{}\n", diff.count(), Ioss::Utils::get_memory_info(),
                  output);
@@ -243,7 +243,7 @@ namespace {
     auto & ebs   = region.get_element_blocks();
     for (const auto &eb : ebs) {
       size_t element_count = eb->entity_count();
-      size_t element_nodes = eb->get_property("topology_node_count").get_int();
+      size_t element_nodes = eb->topology()->number_nodes();
       sum += element_count * element_nodes;
       count += element_count;
     }
@@ -257,7 +257,7 @@ namespace {
     for (const auto &eb : ebs) {
       eb->get_field_data("connectivity_raw", connectivity);
       size_t element_count = eb->entity_count();
-      size_t element_nodes = eb->get_property("topology_node_count").get_int();
+      size_t element_nodes = eb->topology()->number_nodes();
 
       size_t el = 0;
       for (size_t j = 0; j < element_count; j++) {
@@ -1002,7 +1002,7 @@ namespace {
     progress("\tReserve processor coordinate vectors");
 
     Ioss::DatabaseIO *db    = region.get_database();
-    Ioex::DatabaseIO *ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
+    auto *            ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
 
     size_t node_count = region.get_property("node_count").get_int();
 
@@ -1090,7 +1090,7 @@ namespace {
     std::vector<std::vector<double>> coordinates(processor_count);
 
     Ioss::DatabaseIO *db    = region.get_database();
-    Ioex::DatabaseIO *ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
+    auto *            ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
 
     size_t node_count = region.get_property("node_count").get_int();
 
@@ -1183,7 +1183,7 @@ namespace {
     size_t processor_count = proc_region.size();
 
     Ioss::DatabaseIO *db    = region.get_database();
-    Ioex::DatabaseIO *ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
+    auto *            ex_db = dynamic_cast<Ioex::DatabaseIO *>(db);
 
     std::vector<INT> glob_conn;
     size_t           offset = 0;
@@ -1191,13 +1191,13 @@ namespace {
     for (size_t b = 0; b < block_count; b++) {
       std::vector<std::vector<INT>> connectivity(processor_count);
       size_t                        element_count = ebs[b]->entity_count();
-      size_t element_nodes = ebs[b]->get_property("topology_node_count").get_int();
-      size_t block_id      = ebs[b]->get_property("id").get_int();
+      size_t                        element_nodes = ebs[b]->topology()->number_nodes();
+      size_t                        block_id      = ebs[b]->get_property("id").get_int();
 
       for (size_t p = proc_begin; p < proc_begin + proc_size; p++) {
         const auto &pebs           = proc_region[p]->get_element_blocks();
         size_t      pelement_count = pebs[b]->entity_count();
-        size_t      pelement_nodes = pebs[b]->get_property("topology_node_count").get_int();
+        size_t      pelement_nodes = pebs[b]->topology()->number_nodes();
         connectivity[p].reserve(pelement_count * pelement_nodes); // Use reserve, not resize
       }
 
@@ -1224,6 +1224,9 @@ namespace {
                 connectivity[p].push_back(glob_conn[el++]);
               }
             }
+            else {
+              el += element_nodes;
+            }
           }
           offset += count;
         }
@@ -1238,6 +1241,9 @@ namespace {
             for (size_t k = 0; k < element_nodes; k++) {
               connectivity[p].push_back(glob_conn[el++]);
             }
+          }
+          else {
+            el += element_nodes;
           }
         }
         offset += element_count;
@@ -1313,7 +1319,7 @@ namespace {
 
     size_t            sum_on_proc_count = 0;
     Ioss::DatabaseIO *db                = region.get_database();
-    Ioex::DatabaseIO *ex_db             = dynamic_cast<Ioex::DatabaseIO *>(db);
+    auto *            ex_db             = dynamic_cast<Ioex::DatabaseIO *>(db);
 
     auto & ebs         = region.get_element_blocks();
     size_t block_count = ebs.size();
@@ -1323,7 +1329,7 @@ namespace {
     for (size_t b = 0; b < block_count; b++) {
       std::vector<INT> glob_conn;
       size_t           element_count = ebs[b]->entity_count();
-      size_t           element_nodes = ebs[b]->get_property("topology_node_count").get_int();
+      size_t           element_nodes = ebs[b]->topology()->number_nodes();
       size_t           block_id      = ebs[b]->get_property("id").get_int();
 
       // Do a 'partial_count' elements at a time...
@@ -1453,11 +1459,18 @@ namespace {
       properties.add(Ioss::Property("FILE_TYPE", "netcdf5"));
     }
 
-    if (interFace.compressionLevel_ > 0 || interFace.shuffle_) {
+    if (interFace.compressionLevel_ > 0 || interFace.shuffle_ || interFace.szip_) {
       properties.add(Ioss::Property("FILE_TYPE", "netcdf4"));
       properties.add(Ioss::Property("COMPRESSION_LEVEL", interFace.compressionLevel_));
       properties.add(Ioss::Property("COMPRESSION_SHUFFLE", static_cast<int>(interFace.shuffle_)));
+      if (interFace.szip_) {
+        properties.add(Ioss::Property("COMPRESSION_METHOD", "szip"));
+      }
+      else if (interFace.zlib_) {
+        properties.add(Ioss::Property("COMPRESSION_METHOD", "zlib"));
+      }
     }
+
     if (interFace.ints64Bit_) {
       properties.add(Ioss::Property("INTEGER_SIZE_DB", 8));
       properties.add(Ioss::Property("INTEGER_SIZE_API", 8));
@@ -1500,14 +1513,13 @@ namespace {
       auto & ebs = region.get_element_blocks();
       size_t bc  = ebs.size();
       for (size_t b = 0; b < bc; b++) {
-        std::string type = ebs[b]->get_property("topology_type").get_string();
+        std::string type = ebs[b]->topology()->name();
         auto *eb = new Ioss::ElementBlock(proc_region[p]->get_database(), ebs[b]->name(), type,
                                           proc_elem_block_cnt[b][p]);
         proc_region[p]->add(eb);
       }
     }
 
-    start = seacas_timer();
     // Now that we have the elements on each processor and the element
     // blocks those elements are in, can generate the node to proc list...
     start = seacas_timer();

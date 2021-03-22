@@ -60,6 +60,10 @@ namespace Ioss {
   public:
     friend class SerializeIO;
 
+    DatabaseIO()                   = delete;
+    DatabaseIO(const DatabaseIO &) = delete;
+    DatabaseIO &operator=(const DatabaseIO &) = delete;
+
     /** \brief Check to see if database state is OK.
      *
      *  \param[in] write_message If true, then output a warning message indicating the problem.
@@ -623,7 +627,7 @@ namespace Ioss {
     mutable int overlayCount{0};
 
     /*! Scale the time read/written from/to the file by the specified
-      scaleFactor.  If the datbase times are 0.1, 0.2, 0.3 and the
+      scaleFactor.  If the database times are 0.1, 0.2, 0.3 and the
       scaleFactor is 20, then the application will think that the
       times read are 20, 40, 60.
 
@@ -789,10 +793,6 @@ namespace Ioss {
     virtual int64_t put_field_internal(const StructuredBlock * /*sb*/, const Field & /*field*/,
                                        void * /*data*/, size_t /*data_size*/) const = 0;
 
-    DatabaseIO()                   = delete;
-    DatabaseIO(const DatabaseIO &) = delete;
-    DatabaseIO &operator=(const DatabaseIO &) = delete;
-
     mutable std::map<std::string, AxisAlignedBoundingBox> elementBlockBoundingBoxes;
 
     Ioss::ParallelUtils util_; // Encapsulate parallel and other utility functions.
@@ -824,7 +824,7 @@ namespace Ioss {
 
     bool m_timeStateInOut{false};
     bool m_enableTracing{false};
-    std::chrono::time_point<std::chrono::high_resolution_clock>
+    std::chrono::time_point<std::chrono::steady_clock>
         m_stateStart; // Used for optional output step timing.
   };
 } // namespace Ioss

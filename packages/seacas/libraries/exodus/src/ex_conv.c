@@ -108,7 +108,7 @@ int ex__check_valid_file_id(int exoid, const char *func)
 }
 
 int ex__conv_init(int exoid, int *comp_wordsize, int *io_wordsize, int file_wordsize,
-                  int int64_status, int is_parallel, int is_hdf5, int is_pnetcdf, int is_write)
+                  int int64_status, bool is_parallel, bool is_hdf5, bool is_pnetcdf, bool is_write)
 {
   char                  errmsg[MAX_ERR_LENGTH];
   struct ex__file_item *new_file;
@@ -146,9 +146,11 @@ int ex__conv_init(int exoid, int *comp_wordsize, int *io_wordsize, int file_word
    *
    * \param is_parallel   1 if parallel file; 0 if serial
    *
-   * \param is_hdf5      1 if parallel netcdf-4 mode; 0 if not.
+   * \param is_hdf5       1 if parallel netcdf-4 mode; 0 if not.
    *
    * \param is_pnetcdf    1 if parallel PNetCDF file; 0 if not.
+   *
+   * \param is_write      1 if output file; 0 if readonly
    *
    * word size parameters are specified in bytes. valid values are 0, 4, and 8:
    */
@@ -329,7 +331,7 @@ nc_type nc_flt_code(int exoid)
     char errmsg[MAX_ERR_LENGTH];
     snprintf(errmsg, MAX_ERR_LENGTH, "ERROR: unknown file id %d for nc_flt_code().", exoid);
     ex_err(__func__, errmsg, EX_BADFILEID);
-    return ((nc_type)-1);
+    EX_FUNC_LEAVE((nc_type)-1);
   }
   EX_FUNC_LEAVE(file->netcdf_type_code);
 }
@@ -431,13 +433,27 @@ int ex_set_option(int exoid, ex_option_type option, int option_value)
     /* Check whether file type supports compression... */
     if (file->is_hdf5) {
       int value = option_value;
-      if (value > 9) {
-        value = 9;
+      if (file->compression_algorithm == EX_COMPRESS_ZLIB) {
+        if (value > 9) {
+          value = 9;
+        }
+        if (value < 0) {
+          value = 0;
+        }
       }
-      if (value < 0) {
-        value = 0;
+      else if (file->compression_algorithm == EX_COMPRESS_SZIP) {
+        if (value % 2 != 0 || value < 4 || value > 32) {
+          char errmsg[MAX_ERR_LENGTH];
+          snprintf(errmsg, MAX_ERR_LENGTH,
+                   "ERROR: invalid value %d for SZIP Compression.  Must be even and 4 <= value <= "
+                   "32. Ignoring.",
+                   value);
+          ex_err_fn(exoid, __func__, errmsg, EX_BADPARAM);
+          EX_FUNC_LEAVE(EX_FATAL);
+        }
       }
       file->compression_level = value;
+      assert(value == file->compression_level);
     }
     else {
       file->compression_level = 0;
