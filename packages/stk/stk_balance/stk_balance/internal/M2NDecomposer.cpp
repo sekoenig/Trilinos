@@ -51,13 +51,22 @@ M2NDecomposer::M2NDecomposer(stk::mesh::BulkData & bulkData,
 {
 }
 
+unsigned
+M2NDecomposer::num_required_subdomains_for_each_proc()
+{
+  const unsigned numInitialSubdomains = m_bulkData.parallel_size();
+  const unsigned numFinalSubdomains = m_parsedOptions.targetNumProcs;
+  return (numFinalSubdomains / numInitialSubdomains) + (numFinalSubdomains % numInitialSubdomains > 0);
+}
+
 stk::mesh::EntityProcVec
 M2NDecomposer::get_partition()
 {
   stk::mesh::EntityProcVec decomp;
   std::vector<stk::mesh::Selector> selectors = { m_bulkData.mesh_meta_data().universal_part() };
-  stk::balance::internal::calculateGeometricOrGraphBasedDecomp(m_balanceSettings, m_parsedOptions.targetNumProcs,
-                                                               decomp, m_bulkData, selectors);
+  stk::balance::internal::calculateGeometricOrGraphBasedDecomp(m_bulkData, selectors,
+                                                               m_bulkData.parallel(), m_parsedOptions.targetNumProcs,
+                                                               m_balanceSettings, decomp);
   return decomp;
 }
 
@@ -73,7 +82,6 @@ M2NDecomposer::map_new_subdomains_to_original_processors()
   }
   return targetSubdomainsToProc;
 }
-
 
 M2NDecomposerNested::M2NDecomposerNested(stk::mesh::BulkData & bulkData,
                                          const stk::balance::BalanceSettings & balanceSettings,
@@ -95,18 +103,19 @@ M2NDecomposerNested::get_partition()
   declare_all_initial_subdomain_parts();
   move_entities_into_initial_subdomain_part();
 
-  const int numInitialSubdomains = m_bulkData.parallel_size();
   stk::mesh::EntityProcVec decomp;
+  std::vector<stk::mesh::Selector> selectors = { *m_bulkData.mesh_meta_data().get_part(get_initial_subdomain_part_name(m_bulkData.parallel_rank())) };
+  const unsigned numLocalElems = stk::mesh::count_entities(m_bulkData, stk::topology::ELEM_RANK, selectors[0]);
 
-  for (int initialSubdomain = 0; initialSubdomain < numInitialSubdomains; ++initialSubdomain) {
-    stk::mesh::EntityProcVec subdomainDecomp = get_partition_for_subdomain(initialSubdomain);
-    if (initialSubdomain == m_bulkData.parallel_rank()) {
-      decomp = subdomainDecomp;
-      for (stk::mesh::EntityProc & entityProc : decomp) {
-        int & targetProc = entityProc.second;
-        targetProc += initialSubdomain*m_numFinalSubdomainsPerProc;
-      }
-    }
+  if (numLocalElems > 0) {
+    stk::balance::internal::calculateGeometricOrGraphBasedDecomp(m_bulkData, selectors,
+                                                                 MPI_COMM_SELF, m_numFinalSubdomainsPerProc,
+                                                                 m_balanceSettings, decomp);
+  }
+
+  for (stk::mesh::EntityProc & entityProc : decomp) {
+    int & targetProc = entityProc.second;
+    targetProc += m_bulkData.parallel_rank()*m_numFinalSubdomainsPerProc;
   }
 
   return decomp;
@@ -117,8 +126,9 @@ M2NDecomposerNested::get_partition_for_subdomain(int subdomainId)
 {
   stk::mesh::EntityProcVec decomp;
   std::vector<stk::mesh::Selector> selectors = { *m_bulkData.mesh_meta_data().get_part(get_initial_subdomain_part_name(subdomainId)) };
-  stk::balance::internal::calculateGeometricOrGraphBasedDecomp(m_balanceSettings, m_numFinalSubdomainsPerProc,
-                                                               decomp, m_bulkData, selectors);
+  stk::balance::internal::calculateGeometricOrGraphBasedDecomp(m_bulkData, selectors,
+                                                               m_bulkData.parallel(), m_numFinalSubdomainsPerProc,
+                                                               m_balanceSettings, decomp);
   return decomp;
 }
 
