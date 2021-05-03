@@ -45,6 +45,12 @@ ASSERT_DEFINED(Belos_SOURCE_DIR)
 
 
 TRIBITS_ADD_EXECUTABLE(
+  SpmvVsDot
+  SOURCES SpmvVsDot.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   GmresIRStart
   SOURCES TpetraGmresIRStartScript.cpp
   COMM serial mpi
