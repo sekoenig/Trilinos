@@ -51,6 +51,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  GaleriMatrixCreator
+  SOURCES GaleriMatrixCreator.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   GmresIRStart
   SOURCES TpetraGmresIRStartScript.cpp
   COMM serial mpi
