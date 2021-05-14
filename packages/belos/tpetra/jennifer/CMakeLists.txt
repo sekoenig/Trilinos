@@ -62,6 +62,12 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
+TRIBITS_ADD_EXECUTABLE(
+  GmresPolyTpetra
+  SOURCES BlockGmresPolyTpetraJ.cpp
+  COMM serial mpi
+  )
+
 TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyTpetraMatrixMarketFiles
   SOURCE_DIR ${Belos_SOURCE_DIR}/tpetra/jennifer/
   SOURCE_FILES bcsstk13.mtx bcsstk12.mtx orsirr_1.mtx
