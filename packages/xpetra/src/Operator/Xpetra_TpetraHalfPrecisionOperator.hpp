@@ -56,6 +56,7 @@
 
 namespace Xpetra {
 
+  // Converts a matrix to a matrix with half that precision.
   template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
   RCP<Xpetra::Matrix<typename Teuchos::ScalarTraits<Scalar>::halfPrecision, LocalOrdinal, GlobalOrdinal, Node> >
   convertToHalfPrecision(RCP<Xpetra::Matrix<Scalar, LocalOrdinal, GlobalOrdinal, Node> >& A) {
@@ -75,6 +76,7 @@ namespace Xpetra {
     return newA;
   }
 
+  // Converts an Xpetra Multivec to one with half that precision
   template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
   RCP<Xpetra::MultiVector<typename Teuchos::ScalarTraits<Scalar>::halfPrecision, LocalOrdinal, GlobalOrdinal, Node> >
   convertToHalfPrecision(RCP<Xpetra::MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >& X) {
