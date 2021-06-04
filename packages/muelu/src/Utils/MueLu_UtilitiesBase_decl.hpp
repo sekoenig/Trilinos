@@ -261,6 +261,32 @@ tol = 0.;
       return diag;
     }
 
+    /*! @brief Return vector containing: max_{i\not=k}(-a_ik), for each for i in the matrix
+     *
+     * @param[in] A: input matrix
+     * @ret: vector containing max_{i\not=k}(-a_ik)
+    */
+
+    static Teuchos::ArrayRCP<Magnitude> GetMatrixMaxMinusOffDiagonal(const Xpetra::Matrix<Scalar,LocalOrdinal,GlobalOrdinal,Node>& A) { 
+      size_t numRows = A.getRowMap()->getNodeNumElements();
+      Magnitude ZERO = Teuchos::ScalarTraits<Magnitude>::zero();
+      Teuchos::ArrayRCP<Magnitude> maxvec(numRows);
+      Teuchos::ArrayView<const LocalOrdinal> cols;
+      Teuchos::ArrayView<const Scalar> vals;
+      for (size_t i = 0; i < numRows; ++i) {
+        A.getLocalRowView(i, cols, vals);
+        Magnitude mymax = ZERO;
+        for (LocalOrdinal j=0; j < cols.size(); ++j) {
+          if (Teuchos::as<size_t>(cols[j]) != i) {
+            mymax = std::max(mymax,-Teuchos::ScalarTraits<Scalar>::real(vals[j]));
+          }
+        }          
+        maxvec[i] = mymax;
+      }
+      return maxvec;
+    }
+
+
     /*! @brief Return vector containing inverse of input vector
      *
      * @param[in] v: input vector
@@ -611,6 +637,21 @@ tol = 0.;
       return Teuchos::ScalarTraits<Scalar>::magnitude(d);
     }
 
+    /*! @brief Weighted squared distance between two rows in a multivector
+
+       Used for coordinate vectors.
+    */
+    static typename Teuchos::ScalarTraits<Scalar>::magnitudeType Distance2(const Teuchos::ArrayView<double> & weight,const Teuchos::Array<Teuchos::ArrayRCP<const Scalar>> &v, LocalOrdinal i0, LocalOrdinal i1) {
+      const size_t numVectors = v.size();
+
+      Scalar d = Teuchos::ScalarTraits<Scalar>::zero();
+      for (size_t j = 0; j < numVectors; j++) {
+        d += weight[j]*(v[j][i0] - v[j][i1])*(v[j][i0] - v[j][i1]);
+      }
+      return Teuchos::ScalarTraits<Scalar>::magnitude(d);
+    }
+
+
     /*! @brief Detect Dirichlet rows
 
         The routine assumes, that if there is only one nonzero per row, it is on the diagonal and therefore a DBC.
@@ -706,6 +747,38 @@ tol = 0.;
       return boundaryNodes;
     }
 
+   /*! @brief Apply Rowsum Criterion
+
+        Flags a row i as dirichlet if:
+    
+        \sum_{j\not=i} A_ij > A_ii * tol
+
+        @param[in] A matrix
+        @param[in] rowSumTol See above
+        @param[in/out] dirichletRows boolean array.  The ith entry is true if the above criterion is satisfied (or if it was already set to true)
+
+    */
+    static void                                                                  ApplyRowSumCriterion(const Xpetra::Matrix<Scalar,LocalOrdinal,GlobalOrdinal,Node>& A, const Magnitude rowSumTol, Teuchos::ArrayRCP<bool>& dirichletRows) {
+      typedef Teuchos::ScalarTraits<Scalar> STS;
+      RCP<const Xpetra::Map<LocalOrdinal,GlobalOrdinal,Node>> rowmap = A.getRowMap();
+      for (LocalOrdinal row = 0; row < Teuchos::as<LocalOrdinal>(rowmap->getNodeNumElements()); ++row) {
+        size_t nnz = A.getNumEntriesInLocalRow(row);
+        ArrayView<const LocalOrdinal> indices;
+        ArrayView<const Scalar> vals;
+        A.getLocalRowView(row, indices, vals);
+        
+        Scalar rowsum = STS::zero();
+        Scalar diagval = STS::zero();
+        for (LocalOrdinal colID = 0; colID < Teuchos::as<LocalOrdinal>(nnz); colID++) {
+          LocalOrdinal col = indices[colID];
+          if (row == col)
+            diagval = vals[colID];
+          rowsum += vals[colID];
+        }
+        if (STS::real(rowsum) > STS::magnitude(diagval) * rowSumTol)
+          dirichletRows[row] = true;
+      }
+    }
 
     /*! @brief Detect Dirichlet columns based on Dirichlet rows
 

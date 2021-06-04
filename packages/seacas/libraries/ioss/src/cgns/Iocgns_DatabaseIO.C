@@ -13,6 +13,7 @@
 #include <cgns/Iocgns_Defines.h>
 
 #include <Ioss_CodeTypes.h>
+#include <Ioss_Sort.h>
 #include <Ioss_Utils.h>
 #include <bitset>
 #include <cgns/Iocgns_DatabaseIO.h>
@@ -43,7 +44,7 @@
 #include "Ioss_SmartAssert.h"
 #include "Ioss_SubSystem.h"
 
-extern char hdf5_access[64];
+//extern char hdf5_access[64];
 
 namespace {
   size_t global_to_zone_local_idx(size_t i, const Ioss::Map *block_map, const Ioss::Map &nodeMap,
@@ -577,10 +578,17 @@ namespace Iocgns {
   void DatabaseIO::openDatabase__() const
   {
     if (m_cgnsFilePtr < 0) {
+#if 0
+      // This is currently disabled due to a recent change in CGNS
+      // that changed how `hdf5_access` was dealt with...  Since
+      // memory_read and memory_write are experimental in SEACAS/IOSS,
+      // I disabled until we can determine how best to handle this in
+      // current CGNS.
       if ((is_input() && properties.exists("MEMORY_READ")) ||
           (!is_input() && properties.exists("MEMORY_WRITE"))) {
-        Ioss::Utils::copy_string(hdf5_access, "PARALLEL");
+	Ioss::Utils::copy_string(hdf5_access, "PARALLEL");
       }
+#endif
 
       CGCHECKM(cg_set_file_type(CG_FILE_HDF5));
 
@@ -592,7 +600,8 @@ namespace Iocgns {
         }
         else {
           // Check whether appending to existing file...
-          if (open_create_behavior() == Ioss::DB_APPEND) {
+          if (open_create_behavior() == Ioss::DB_APPEND ||
+              open_create_behavior() == Ioss::DB_MODIFY) {
             // Append to file if it already exists -- See if the file exists.
             Ioss::FileInfo file = Ioss::FileInfo(decoded_filename());
             if (file.exists()) {
@@ -611,10 +620,12 @@ namespace Iocgns {
 #endif
       // Will not return if error...
       check_valid_file_open(ierr);
+#if 0
       if ((is_input() && properties.exists("MEMORY_READ")) ||
           (!is_input() && properties.exists("MEMORY_WRITE"))) {
         Ioss::Utils::copy_string(hdf5_access, "NATIVE");
       }
+#endif
 
       if (properties.exists("INTEGER_SIZE_API")) {
         int isize = properties.get("INTEGER_SIZE_API").get_int();
@@ -833,7 +844,7 @@ namespace Iocgns {
       all_adj.shrink_to_fit();
 
       // Sort blocks to get similar zones adjacent -- will have same name, but different proc
-      std::sort(blocks.begin(), blocks.end(), [](const SBlock &b1, const SBlock &b2) {
+      Ioss::sort(blocks.begin(), blocks.end(), [](const SBlock &b1, const SBlock &b2) {
         return (b1.name == b2.name ? b1.proc < b2.proc : b1.name < b2.name);
       });
 
@@ -1066,10 +1077,10 @@ namespace Iocgns {
         }
       }
 
-      std::sort(block->m_boundaryConditions.begin(), block->m_boundaryConditions.end(),
-                [](const Ioss::BoundaryCondition &b1, const Ioss::BoundaryCondition &b2) {
-                  return (b1.m_bcName < b2.m_bcName);
-                });
+      Ioss::sort(block->m_boundaryConditions.begin(), block->m_boundaryConditions.end(),
+                 [](const Ioss::BoundaryCondition &b1, const Ioss::BoundaryCondition &b2) {
+                   return (b1.m_bcName < b2.m_bcName);
+                 });
     }
 
     // Need to iterate the blocks again and make the assembly information consistent
@@ -1481,6 +1492,7 @@ namespace Iocgns {
     }
 
     get_step_times__();
+
     if (open_create_behavior() == Ioss::DB_APPEND) {
       return;
     }
@@ -1679,17 +1691,25 @@ namespace Iocgns {
     // Transitioning out of state 'state'
     switch (state) {
     case Ioss::STATE_DEFINE_MODEL:
-      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND) {
+      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND &&
+          open_create_behavior() != Ioss::DB_MODIFY) {
         write_meta_data();
       }
+      if (!is_input() && (open_create_behavior() == Ioss::DB_APPEND ||
+                          open_create_behavior() == Ioss::DB_MODIFY)) {
+        Utils::update_db_zone_property(m_cgnsFilePtr, get_region(), myProcessor, isParallel, false);
+      }
+
       break;
     case Ioss::STATE_MODEL:
-      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND) {
+      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND &&
+          open_create_behavior() != Ioss::DB_MODIFY) {
         write_adjacency_data();
       }
       break;
     case Ioss::STATE_DEFINE_TRANSIENT:
-      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND) {
+      if (!is_input() && open_create_behavior() != Ioss::DB_APPEND &&
+          open_create_behavior() != Ioss::DB_MODIFY) {
         write_results_meta_data();
       }
       break;

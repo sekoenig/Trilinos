@@ -22,7 +22,6 @@ Ioss::PropertyManager::PropertyManager(const PropertyManager &from)
 Ioss::PropertyManager::~PropertyManager()
 {
   try {
-    IOSS_FUNC_ENTER(m_);
     m_properties.clear();
   }
   catch (...) {
@@ -50,7 +49,6 @@ void Ioss::PropertyManager::add(const Ioss::Property &new_prop)
  */
 bool Ioss::PropertyManager::exists(const std::string &property_name) const
 {
-  IOSS_FUNC_ENTER(m_);
   return (m_properties.find(property_name) != m_properties.end());
 }
 
@@ -86,6 +84,17 @@ int64_t Ioss::PropertyManager::get_optional(const std::string &property_name,
     return optional_value;
   }
   return (*iter).second.get_int();
+}
+
+std::string Ioss::PropertyManager::get_optional(const std::string &property_name,
+                                                const std::string &optional_value) const
+{
+  IOSS_FUNC_ENTER(m_);
+  auto iter = m_properties.find(property_name);
+  if (iter == m_properties.end()) {
+    return optional_value;
+  }
+  return (*iter).second.get_string();
 }
 
 /** \brief Remove a property from the property manager.

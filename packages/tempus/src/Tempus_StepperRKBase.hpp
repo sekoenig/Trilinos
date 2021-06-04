@@ -43,7 +43,13 @@ public:
   virtual int getStageNumber() const { return stageNumber_; }
   virtual void setStageNumber(int s) { stageNumber_ = s; }
 
-  virtual void setUseEmbedded(bool a) { useEmbedded_ = a; }
+  virtual void setUseEmbedded(bool a)
+  {
+    useEmbedded_ = a;
+    this->setEmbeddedMemory();
+    this->isInitialized_ = false;
+  }
+
   virtual bool getUseEmbedded() const { return useEmbedded_; }
 
   virtual void setAppAction(Teuchos::RCP<StepperRKAppAction<Scalar> > appAction)
@@ -150,7 +156,7 @@ public:
         c(i) = values[i];
     }
 
-    if (tableauPL->isParameter("bstar") and
+    if (tableauPL->isParameter("bstar") &&
         tableauPL->get<std::string>("bstar") != "") {
       bstar.size(Teuchos::as<int>(numStages));
       // read in the bstar vector
@@ -180,6 +186,8 @@ public:
 
 
 protected:
+
+  virtual void setEmbeddedMemory() {}
 
   Teuchos::RCP<RKButcherTableau<Scalar> >   tableau_;
 

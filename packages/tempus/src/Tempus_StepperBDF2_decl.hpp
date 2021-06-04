@@ -63,7 +63,7 @@ namespace Tempus {
  *  The startup stepper allows BDF2 to use user-specified Stepper for the
  *  first timestep in order to populate the SolutionHistory with past states.
  *  A one-step startup stepper is perfect for this situation, e.g., Backward
- *  Euler or RK4.  The default startup stepper is 'IRK 1 Stage Theta Method',
+ *  Euler or RK4.  The default startup stepper is 'DIRK 1 Stage Theta Method',
  *  which is second order accurate and allows an overall second-order solution.
  *
  *  The First-Same-As-Last (FSAL) principle is not needed for BDF2.
@@ -152,7 +152,7 @@ public:
   virtual bool isExplicit()         const {return false;}
   virtual bool isImplicit()         const {return true;}
   virtual bool isExplicitImplicit() const
-  {return isExplicit() and isImplicit();}
+  {return isExplicit() && isImplicit();}
   virtual bool isOneStepMethod()   const {return false;}
   virtual bool isMultiStepMethod() const {return !isOneStepMethod();}
   virtual OrderODE getOrderODE()   const {return FIRST_ORDER_ODE;}

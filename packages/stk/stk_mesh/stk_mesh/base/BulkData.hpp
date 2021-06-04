@@ -45,6 +45,7 @@
 #include <list>                         // for list
 #include <map>                          // for map, map<>::value_compare
 #include <set>
+#include <stk_mesh/base/EntityIterator.hpp>
 #include <stk_mesh/base/Entity.hpp>     // for Entity, etc
 #include <stk_mesh/base/EntityCommDatabase.hpp>  // for EntityCommDatabase
 #include <stk_mesh/base/Ghosting.hpp>   // for Ghosting
@@ -960,17 +961,7 @@ protected: //functions
   PairIterEntityComm internal_entity_comm_map(Entity entity, const Ghosting & sub ) const
   {
     if (m_entitycomm[entity.local_offset()] != nullptr) {
-      const EntityCommInfoVector& vec = m_entitycomm[entity.local_offset()]->comm_map;
-      const EntityCommInfo s_begin( sub.ordinal() ,     0 );
-      const EntityCommInfo s_end(   sub.ordinal() + 1 , 0 );
-    
-      EntityCommInfoVector::const_iterator i = vec.begin();
-      EntityCommInfoVector::const_iterator e = vec.end();
-    
-      i = std::lower_bound( i , e , s_begin );
-      e = std::lower_bound( i , e , s_end );
-    
-      return PairIterEntityComm( i , e );
+      return ghost_info_range(m_entitycomm[entity.local_offset()]->comm_map, sub);
     }
     return PairIterEntityComm();
   }
@@ -1629,7 +1620,6 @@ private: // data
   stk::mesh::impl::SideSetImpl<unsigned> m_sideSetData;
   mutable stk::mesh::NgpMeshBase* m_ngpMeshBase;
   mutable bool m_isDeviceMeshRegistered;
-  mutable Kokkos::View<uint8_t*, MemSpace> m_ngpFieldSyncBuffer;
   mutable size_t m_ngpFieldSyncBufferModCount;
   bool m_runConsistencyCheck;
 

@@ -66,8 +66,8 @@ observeEndTimeStep(const Integrator<Scalar>& integrator){
   using Teuchos::RCP;
   auto cs = integrator.getSolutionHistory()->getCurrentState();
 
-  if ((cs->getOutputScreen() == true) or
-      (cs->getOutput() == true) or
+  if ((cs->getOutputScreen() == true) ||
+      (cs->getOutput() == true) ||
       (cs->getTime() == integrator.getTimeStepControl()->getFinalTime())) {
 
      const Scalar steppertime = integrator.getStepperTimer()->totalElapsedTime();
@@ -76,7 +76,7 @@ observeEndTimeStep(const Integrator<Scalar>& integrator){
 
      const Teuchos::RCP<Teuchos::FancyOStream> out = integrator.getOStream();
      out->setOutputToRootOnly(0);
-     Teuchos::OSTab ostab(out,0,"ScreenOutput");
+     Teuchos::OSTab ostab(out, 0, "ScreenOutput");
      *out<<std::scientific
         <<std::setw( 6)<<std::setprecision(3)<<cs->getIndex()
         <<std::setw(11)<<std::setprecision(3)<<cs->getTime()
@@ -98,7 +98,7 @@ observeEndIntegrator(const Integrator<Scalar>& integrator){
   std::string exitStatus;
   //const Scalar runtime = integrator.getIntegratorTimer()->totalElapsedTime();
   if (integrator.getSolutionHistory()->getCurrentState()->getSolutionStatus() ==
-      Status::FAILED or integrator.getStatus() == Status::FAILED) {
+      Status::FAILED || integrator.getStatus() == Status::FAILED) {
     exitStatus = "Time integration FAILURE!";
   } else {
     exitStatus = "Time integration complete.";

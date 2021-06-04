@@ -22,13 +22,14 @@ class ExplicitODEParameters
     ExplicitODEParameters()
       : timeStepSize_(Scalar(0.0)), stageNumber_(0)
     {}
+
     /// Constructor
     ExplicitODEParameters(Scalar timeStepSize, int stageNumber = 0)
       : timeStepSize_(timeStepSize), stageNumber_(stageNumber)
     {}
 
-    Scalar                                timeStepSize_;
-    int                                   stageNumber_;
+    Scalar timeStepSize_;
+    int    stageNumber_;
 };
 
 
@@ -45,11 +46,13 @@ public:
 
   /// \name Basic explicit stepper methods
   //@{
+    /// Set model
     virtual void setModel(
       const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel);
 
+    /// Return the application ModelEvaluator.
     virtual Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >
-      getModel(){return appModel_;}
+      getModel() const {return appModel_;}
 
     virtual Scalar getInitTimeStep(
         const Teuchos::RCP<SolutionHistory<Scalar> >& /* solutionHistory */) const
@@ -73,7 +76,7 @@ public:
     virtual bool isExplicit()         const {return true;}
     virtual bool isImplicit()         const {return false;}
     virtual bool isExplicitImplicit() const
-      {return isExplicit() and isImplicit();}
+      {return isExplicit() && isImplicit();}
     virtual bool isOneStepMethod()    const {return true;}
     virtual bool isMultiStepMethod()  const {return !isOneStepMethod();}
 

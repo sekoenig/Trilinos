@@ -1,4 +1,4 @@
-// Copyright(C) 1999-2020 National Technology & Engineering Solutions
+// Copyright(C) 1999-2021 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
 //
@@ -11,6 +11,7 @@
 #include "Ioss_Property.h"       // for Property
 #include "Ioss_Region.h"         // for Region, etc
 #include "Ioss_SmartAssert.h"
+#include "Ioss_Sort.h"
 #include <algorithm> // for sort, unique
 #include <cstddef>   // for size_t
 #include <fmt/ostream.h>
@@ -162,7 +163,7 @@ void build_reverse_node_map(Ioss::Region & /*global*/, RegionVector &part_mesh,
           auto iter = std::lower_bound(global_node_map.begin(), global_node_map.end(), global_node);
           if (iter == global_node_map.end()) {
             INT n = global_node;
-            fmt::print("{:n}\n", n);
+            fmt::print("{:L}\n", n);
             SMART_ASSERT(iter != global_node_map.end());
           }
           cur_pos = iter;
@@ -297,7 +298,7 @@ void generate_element_ids(RegionVector &part_mesh, const std::vector<INT> &local
       index[i] = std::make_pair(global_element_map[i], (INT)i);
     }
 
-    std::sort(index.begin(), index.end());
+    Ioss::sort(index.begin(), index.end());
 
     INT max_id = index[index.size() - 1].first + 1;
 

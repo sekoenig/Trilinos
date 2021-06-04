@@ -50,7 +50,7 @@
 #include "Xpetra_MultiVector_decl.hpp"
 
 #ifdef HAVE_XPETRA_TPETRA
-#include "Xpetra_TpetraMultiVector_decl.hpp"
+#include "Xpetra_TpetraMultiVector.hpp"
 #endif
 
 #ifdef HAVE_XPETRA_EPETRA
@@ -102,6 +102,10 @@ class MultiVectorFactory
     Build(const Teuchos::RCP<const Map<LocalOrdinal, GlobalOrdinal, Node>>& map,
           const Teuchos::ArrayView<const Teuchos::ArrayView<const Scalar>>& ArrayOfPtrs,
           size_t                                                            NumVectors);
+
+    static Teuchos::RCP<MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >
+    Build(const Teuchos::RCP<const MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node > > &source,
+        Teuchos::DataAccess copyOrView);
 };
 
 
@@ -139,6 +143,10 @@ class MultiVectorFactory<double, int, int, EpetraNode>
     Build(const Teuchos::RCP<const Map<LocalOrdinal, GlobalOrdinal, Node>>& map,
           const Teuchos::ArrayView<const Teuchos::ArrayView<const Scalar>>& ArrayOfPtrs,
           size_t                                                            NumVectors);
+
+    static Teuchos::RCP<MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >
+    Build(const Teuchos::RCP<const MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node > > &source,
+        Teuchos::DataAccess copyOrView);
 };
 
 
@@ -167,6 +175,10 @@ class MultiVectorFactory<int, int, int, EpetraNode>
     Build(const Teuchos::RCP<const Map<LocalOrdinal, GlobalOrdinal, Node>>& map,
           const Teuchos::ArrayView<const Teuchos::ArrayView<const Scalar>>& ArrayOfPtrs,
           size_t                                                            NumVectors);
+
+    static Teuchos::RCP<MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >
+    Build(const Teuchos::RCP<const MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node > > &source,
+          Teuchos::DataAccess copyOrView);
 };
 
 
@@ -200,6 +212,10 @@ public:
         const Teuchos::ArrayView< const Teuchos::ArrayView< const Scalar > > &ArrayOfPtrs,
         size_t NumVectors);
 
+  static Teuchos::RCP<MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >
+  Build(const Teuchos::RCP<const MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node > > &source,
+        Teuchos::DataAccess copyOrView);
+
 };
 
 
@@ -229,6 +245,10 @@ public:
   Build(const Teuchos::RCP< const Map< LocalOrdinal, GlobalOrdinal, Node > > &map,
         const Teuchos::ArrayView< const Teuchos::ArrayView< const Scalar > > &ArrayOfPtrs,
         size_t NumVectors);
+
+  static Teuchos::RCP<MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node> >
+  Build(const Teuchos::RCP<const MultiVector<Scalar, LocalOrdinal, GlobalOrdinal, Node > > &source,
+        Teuchos::DataAccess copyOrView);
 
 };
 

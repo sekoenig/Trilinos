@@ -55,47 +55,38 @@ namespace internal {
 class MtoNRebalancer
 {
 public:
-    MtoNRebalancer(stk::mesh::BulkData &bulkData,
-                   stk::mesh::Field<double> &targetField,
-                   M2NDecomposer &decomposer,
-                   const stk::balance::M2NParsedOptions &num_target_procs);
     MtoNRebalancer(stk::io::StkMeshIoBroker& ioBroker,
-                   stk::mesh::Field<double> &targetField,
+                   stk::mesh::Field<unsigned> &targetField,
                    M2NDecomposer &decomposer,
-                   const stk::balance::M2NParsedOptions &num_target_procs);
-    virtual ~MtoNRebalancer();
+                   const M2NBalanceSettings &balanceSettings);
+
+    ~MtoNRebalancer() = default;
+
+    void rebalance(int numSteps, double timeStep);
 
     void decompose_mesh();
-    std::vector<unsigned> map_new_subdomains_to_original_processors();
+    void map_new_subdomains_to_original_processors();
+    std::vector<std::vector<unsigned>> get_target_subdomains_for_each_batch();
 
-    void move_subdomains_such_that_entire_subdomain_doesnt_span_proc_boundaries(const std::vector<unsigned>& target_proc_to_starting_proc);
-    stk::io::EntitySharingInfo get_node_sharing_info(unsigned subdomain);
-    void create_subdomain_and_write(const std::string &filename,
-                                    unsigned subdomain,
-                                    int global_num_nodes,
-                                    int global_num_elems,
-                                    const stk::io::EntitySharingInfo &nodeSharingInfo,
-                                    int numSteps = -1,
-                                    double timeStep = 0.0);
-    bool does_this_proc_own_subdomain(unsigned subdomainOwner);
+    void store_final_decomp_on_elements();
+
+    OutputMesh clone_target_subdomains(const std::vector<unsigned> & targetSubdomains);
+
+    void move_subdomain_to_owning_processor(OutputMesh & outputMesh);
+
+    void create_subdomain_and_write(const std::string &filename, const std::vector<unsigned> & targetSubdomains,
+                                    OutputMesh & outputMesh,  int numSteps = -1, double timeStep = 0.0);
 
     stk::mesh::MetaData& get_meta();
     stk::mesh::BulkData& get_bulk();
+    SubdomainCreator& get_subdomain_creator();
 
     int get_num_target_subdomains();
 
+    const std::vector<unsigned> & get_owner_for_each_final_subdomain() const { return m_ownerForEachFinalSubdomain; }
+
 private:
-    void move_entities_into_mapped_subdomain_parts(const std::vector<unsigned>& mappings);
-    void change_parts_on_entities_on_all_subdomains(const std::vector<unsigned>& subdomain_proc_mapping);
-    std::vector<stk::mesh::Entity> get_entities_for_subdomain(size_t subdomain_num);
-    stk::mesh::EntityVector get_entitites_for_subdomain_using_field_from_buckets(size_t subdomain_num,
-                                                                                 const stk::mesh::BucketVector& buckets);
-    void add_owned_entities_from_bucket_using_target_decomp_field(const stk::mesh::Bucket& bucket,
-                                                                  size_t subdomain_num,
-                                                                  stk::mesh::EntityVector& entities);
-    void add_entities_from_bucket_using_target_decomp_field(const stk::mesh::Bucket& bucket,
-                                                            size_t subdomain_num,
-                                                            stk::mesh::EntityVector& entities);
+    void move_entities_into_mapped_subdomain_parts();
     void store_off_target_proc_on_elements_before_moving_subdomains();
 
     MtoNRebalancer( const MtoNRebalancer& other );
@@ -104,9 +95,12 @@ private:
     stk::mesh::BulkData &m_bulkData;
     SubdomainCreator m_subdomainCreator;
     M2NDecomposer &m_decomposer;
-    stk::mesh::Field<double> &m_targetDecompField;
-    const stk::balance::M2NParsedOptions &m_parsedOptions;
+    stk::mesh::Field<unsigned> &m_inputMeshTargetDecompField;
+    const M2NBalanceSettings &m_balanceSettings;
     stk::mesh::EntityProcVec m_decomp;
+    std::vector<unsigned> m_ownerForEachFinalSubdomain;
+    int m_globalNumNodes;
+    int m_globalNumElems;
 };
 
 }}}

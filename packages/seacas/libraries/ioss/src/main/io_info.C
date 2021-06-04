@@ -1,4 +1,4 @@
-// Copyright(C) 1999-2020 National Technology & Engineering Solutions
+// Copyright(C) 1999-2021 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
 //
@@ -6,6 +6,7 @@
 
 #include "io_info.h"
 #include <Ioss_Hex8.h>
+#include <Ioss_Sort.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #if defined(SEACAS_HAVE_CGNS)
@@ -162,7 +163,7 @@ namespace {
   {
     int64_t num_nodes  = nb.entity_count();
     int64_t num_attrib = nb.get_property("attribute_count").get_int();
-    fmt::print("\n{}{} {:14n} nodes, {:3d} attributes.\n", prefix, name(&nb), num_nodes,
+    fmt::print("\n{}{} {:14L} nodes, {:3d} attributes.\n", prefix, name(&nb), num_nodes,
                num_attrib);
     if (interFace.check_node_status()) {
       std::vector<char>    node_status;
@@ -224,7 +225,7 @@ namespace {
                    sb->get_property("offset_k").get_int());
       }
 
-      fmt::print("  {:14n} cells, {:14n} nodes ", num_cell, num_node);
+      fmt::print("  {:14L} cells, {:14L} nodes ", num_cell, num_node);
 
       info_aliases(region, sb, true, false);
       Ioss::Utils::info_fields(sb, Ioss::Field::TRANSIENT, "\n\tTransient:  ");
@@ -243,10 +244,10 @@ namespace {
         // NOTE: The sort here is just to make io_info more useful for regression testing.
         //       With the sort, we get more reproducible output.  For now, only needed for BC...
         auto sb_bc = sb->m_boundaryConditions;
-        std::sort(sb_bc.begin(), sb_bc.end(),
-                  [](const Ioss::BoundaryCondition &a, const Ioss::BoundaryCondition &b) {
-                    return a.m_bcName < b.m_bcName;
-                  });
+        Ioss::sort(sb_bc.begin(), sb_bc.end(),
+                   [](const Ioss::BoundaryCondition &a, const Ioss::BoundaryCondition &b) {
+                     return a.m_bcName < b.m_bcName;
+                   });
 
         for (const auto &bc : sb_bc) {
           fmt::print("{}\n", bc);
@@ -310,7 +311,7 @@ namespace {
 
       std::string type       = eb->topology()->name();
       int64_t     num_attrib = eb->get_property("attribute_count").get_int();
-      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14n} elements, {:3d} attributes.", name(eb),
+      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14L} elements, {:3d} attributes.", name(eb),
                  id(eb), type, num_elem, num_attrib);
 
       info_aliases(region, eb, true, false);
@@ -346,7 +347,7 @@ namespace {
 
       std::string type       = eb->topology()->name();
       int64_t     num_attrib = eb->get_property("attribute_count").get_int();
-      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14n} edges, {:3d} attributes.\n", name(eb),
+      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14L} edges, {:3d} attributes.\n", name(eb),
                  id(eb), type, num_edge, num_attrib);
 
       info_aliases(region, eb, false, true);
@@ -374,7 +375,7 @@ namespace {
 
       std::string type       = eb->topology()->name();
       int64_t     num_attrib = eb->get_property("attribute_count").get_int();
-      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14n} faces, {:3d} attributes.\n", name(eb),
+      fmt::print("\n{} id: {:6d}, topology: {:>10s}, {:14L} faces, {:3d} attributes.\n", name(eb),
                  id(eb), type, num_face, num_attrib);
 
       info_aliases(region, eb, false, true);
@@ -424,7 +425,7 @@ namespace {
         int64_t count      = fb->entity_count();
         int64_t num_attrib = fb->get_property("attribute_count").get_int();
         int64_t num_dist   = fb->get_property("distribution_factor_count").get_int();
-        fmt::print("\t{}, {:8n} sides, {:3d} attributes, {:8n} distribution factors.\n", name(fb),
+        fmt::print("\t{}, {:8L} sides, {:3d} attributes, {:8L} distribution factors.\n", name(fb),
                    count, num_attrib, num_dist);
         info_df(fb, "\t\t");
         Ioss::Utils::info_fields(fb, Ioss::Field::TRANSIENT, "\t\tTransient: ");
@@ -440,7 +441,7 @@ namespace {
       int64_t count      = ns->entity_count();
       int64_t num_attrib = ns->get_property("attribute_count").get_int();
       int64_t num_dist   = ns->get_property("distribution_factor_count").get_int();
-      fmt::print("\n{} id: {:6d}, {:8n} nodes, {:3d} attributes, {:8n} distribution factors.\n",
+      fmt::print("\n{} id: {:6d}, {:8L} nodes, {:3d} attributes, {:8L} distribution factors.\n",
                  name(ns), id(ns), count, num_attrib, num_dist);
       info_aliases(region, ns, false, true);
       info_df(ns, "\t");
@@ -456,7 +457,7 @@ namespace {
     for (auto ns : nss) {
       int64_t count      = ns->entity_count();
       int64_t num_attrib = ns->get_property("attribute_count").get_int();
-      fmt::print("\n{} id: {:6d}, {:8n} edges, {:3d} attributes.\n", name(ns), id(ns), count,
+      fmt::print("\n{} id: {:6d}, {:8L} edges, {:3d} attributes.\n", name(ns), id(ns), count,
                  num_attrib);
       info_aliases(region, ns, false, true);
       info_df(ns, "\t");
@@ -472,7 +473,7 @@ namespace {
     for (auto fs : fss) {
       int64_t count      = fs->entity_count();
       int64_t num_attrib = fs->get_property("attribute_count").get_int();
-      fmt::print("\n{} id: {:6d}, {:8n} faces, {:3d} attributes.\n", name(fs), id(fs), count,
+      fmt::print("\n{} id: {:6d}, {:8L} faces, {:3d} attributes.\n", name(fs), id(fs), count,
                  num_attrib);
       info_aliases(region, fs, false, true);
       info_df(fs, "\t");
@@ -487,7 +488,7 @@ namespace {
     const Ioss::ElementSetContainer &ess = region.get_elementsets();
     for (auto es : ess) {
       int64_t count = es->entity_count();
-      fmt::print("\n{} id: {:6d}, {:8n} elements.\n", name(es), id(es), count);
+      fmt::print("\n{} id: {:6d}, {:8L} elements.\n", name(es), id(es), count);
       info_aliases(region, es, false, true);
       info_df(es, "\t");
       Ioss::Utils::info_fields(es, Ioss::Field::ATTRIBUTE, "\tAttributes: ");

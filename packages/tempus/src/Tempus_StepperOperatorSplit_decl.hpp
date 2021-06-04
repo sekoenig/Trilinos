@@ -90,8 +90,7 @@ public:
     virtual void setModel(
       const Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >& appModel);
 
-    virtual Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> >
-      getModel();
+    virtual Teuchos::RCP<const Thyra::ModelEvaluator<Scalar> > getModel() const;
 
     virtual void setSolver(
         Teuchos::RCP<Thyra::NonlinearSolverBase<Scalar> > solver);
@@ -156,7 +155,7 @@ public:
       return isImplicit;
     }
     virtual bool isExplicitImplicit() const
-      {return isExplicit() and isImplicit();}
+      {return isExplicit() && isImplicit();}
     virtual bool isOneStepMethod()   const
     {
       bool isOneStepMethod = true;

@@ -237,7 +237,7 @@ int main (int argc, char* argv[]) {
     // then construct a View of it.  (Note that a row offset needs to
     // have a type that can contain the sum of the row counts.)
     using row_offset_type =
-      Tpetra::CrsMatrix<double>::local_matrix_type::row_map_type::non_const_value_type;
+      Tpetra::CrsMatrix<double>::local_matrix_device_type::row_map_type::non_const_value_type;
 
     // Use a parallel scan (prefix sum) over the array of row counts, to
     // compute the array of row offsets for the sparse graph.
@@ -423,21 +423,18 @@ int main (int argc, char* argv[]) {
     typedef dual_view_type::t_dev::memory_space memory_space;
     typedef Kokkos::RangePolicy<execution_space, LO> policy_type;
 
-    x_exact.sync<memory_space> ();
-    x_exact.modify<memory_space> ();
-
     // Slight breakage with respect to GCC < 4.8.
     // mfh 20 Aug 2017: See also GitHub issue #1629.
 #if defined(__GNUC__)
 #  if __GNUC__ == 4 && __GNUC_MINOR__ <= 7
-    auto x_exact_lcl = x_exact.getLocalView<memory_space> ();
+    auto x_exact_lcl = x_exact.getLocalView<memory_space> (Tpetra::Access::ReadWrite);
 #  elif __GNUC__ == 4 && __GNUC_MINOR__ > 7 // GCC >= 4.8
-    auto x_exact_lcl = x_exact.template getLocalView<memory_space> ();
+    auto x_exact_lcl = x_exact.template getLocalView<memory_space> (Tpetra::Access::ReadWrite);
 #  else // GCC >= 5
-    auto x_exact_lcl = x_exact.getLocalView<memory_space> ();
+    auto x_exact_lcl = x_exact.getLocalView<memory_space> (Tpetra::Access::ReadWrite);
 #  endif // __GNUC__ == 4 && __GNUC_MINOR__ <= 7
 #else // ! defined(__GNUC__)
-    auto x_exact_lcl = x_exact.template getLocalView<memory_space> ();
+    auto x_exact_lcl = x_exact.template getLocalView<memory_space> (Tpetra::Access::ReadWrite);
 #endif // defined(__GNUC__)
 
     Kokkos::parallel_for ("Compare solutions",

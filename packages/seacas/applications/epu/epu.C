@@ -8,6 +8,7 @@
 // concatenates EXODUS/GENESIS output from parallel processors to a single file
 
 #include <algorithm>
+#include <array>
 #include <cfloat>
 #include <climits>
 #include <cmath>
@@ -28,6 +29,9 @@
 #include <vector>
 
 #include "copy_string_cpp.h"
+#if !USE_STD_SORT
+#include "pdqsort.h"
+#endif
 // Enable SMART_ASSERT even in Release mode...
 #define SMART_ASSERT_DEBUG_MODE 1
 #include "smart_assert.h"
@@ -89,7 +93,8 @@ public:
   int epu_proc_count{1};
 };
 
-using ExodusIdVector = std::vector<ex_entity_id>;
+using ExodusIdVector                          = std::vector<ex_entity_id>;
+template <typename T> using MasterValueVector = std::vector<std::vector<std::vector<T>>>;
 
 extern double seacas_timer();
 namespace {
@@ -182,12 +187,15 @@ namespace {
         exodus_error(__LINE__);
       }
 
-      if (map_count == 1 && case_compare(names[0], "original_global_id_map") == 0) {
-        error = ex_get_num_map(exoid, type, 1, ids.data());
-        if (error < 0) {
-          exodus_error(__LINE__);
+      for (int i = 0; i < map_count; i++) {
+        if (case_compare(names[i], "original_global_id_map") == 0) {
+          error = ex_get_num_map(exoid, type, i + 1, ids.data());
+          if (error < 0) {
+            exodus_error(__LINE__);
+          }
+          map_read = true;
+          break;
         }
-        map_read = true;
       }
       free_name_array(names, map_count);
     }
@@ -215,15 +223,27 @@ namespace {
   {
     if (out.empty())
       return 0;
+    size_t i    = 1;
     size_t pos  = 1;
     T      oldv = out[0];
-    for (size_t i = 1; i < out.size(); ++i) {
+    for (; i < out.size(); ++i) {
       T newv   = out[i];
       out[pos] = newv;
       pos += (newv != oldv);
       oldv = newv;
     }
     return pos;
+  }
+
+  template <typename T> static void uniquify(std::vector<T> &vec)
+  {
+#if USE_STD_SORT
+    std::sort(vec.begin(), vec.end());
+#else
+    pdqsort(vec.begin(), vec.end());
+#endif
+    vec.resize(unique(vec));
+    vec.shrink_to_fit();
   }
 
   void compress_white_space(char *str);
@@ -245,6 +265,12 @@ namespace {
                        const std::vector<std::vector<INT>> &local_node_to_global, int proc,
                        std::vector<T> &x, std::vector<T> &y, std::vector<T> &z);
 
+  template <typename INT>
+  void get_put_nodal_communication_map(Excn::Mesh &global, int start_part, int part_count,
+                                       std::vector<Excn::Mesh> &            local_mesh,
+                                       const std::vector<std::vector<INT>> &local_node_to_global,
+                                       const std::vector<int> &processor_map, int output_processor);
+
   StringVector get_exodus_variable_names(int id, ex_entity_type elType, int var_count);
 
   template <typename T>
@@ -261,26 +287,23 @@ namespace {
 
   template <typename T, class U>
   void clear_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                           std::vector<U> &glob_sets, T ***master_values);
+                           std::vector<U> &glob_sets, MasterValueVector<T> &master_values);
 
   template <typename T, typename U, typename INT>
-  void read_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                          std::vector<U> &global_sets, std::vector<Excn::Mesh> &local_mesh,
-                          std::vector<std::vector<U>> &local_sets, T ***master_values,
-                          std::vector<T> &values, int part_count, int time_step,
-                          const std::vector<std::vector<INT>> &local_element_to_global);
+  void
+  read_master_values(Excn::Variables &vars, const Excn::Mesh &global, std::vector<U> &global_sets,
+                     std::vector<Excn::Mesh> &local_mesh, std::vector<std::vector<U>> &local_sets,
+                     MasterValueVector<T> &master_values, std::vector<T> &values, int part_count,
+                     int time_step, const std::vector<std::vector<INT>> &local_element_to_global);
 
   template <typename T, typename U>
   void output_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                            std::vector<U> &glob_sets, T ***master_values, int time_step);
+                            std::vector<U> &glob_sets, MasterValueVector<T> &master_values,
+                            int time_step);
 
   template <typename T, typename U>
   void allocate_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                              std::vector<U> &glob_sets, T ***&master_values);
-
-  template <typename T>
-  void deallocate_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                                T ***&master_values);
+                              std::vector<U> &glob_sets, MasterValueVector<T> &master_values);
 
   void get_variable_params(int id, Excn::Variables &vars,
                            const Excn::StringIdVector &variable_list);
@@ -337,6 +360,12 @@ namespace {
   get_put_sidesets(int part_count, const std::vector<std::vector<INT>> &local_element_to_global,
                    std::vector<std::vector<Excn::SideSet<INT>>> &sets,
                    std::vector<Excn::SideSet<INT>> &glob_ssets, Excn::SystemInterface &interFace);
+
+  template <typename INT>
+  void add_processor_map(int id_out, int part_count, int start_part, const Excn::Mesh &global,
+                         std::vector<std::vector<Excn::Block>> &blocks,
+                         const std::vector<Excn::Block> &       glob_blocks,
+                         const std::vector<std::vector<INT>> &  local_element_to_global);
 
   template <typename T, typename INT>
   void add_processor_variable(int id_out, int part_count, int start_part, const Excn::Mesh &global,
@@ -884,6 +913,11 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
 
       get_put_assemblies(ExodusFile(0), ExodusFile::output(), global);
 
+      if (interFace.add_processor_id_map()) {
+        add_processor_map(ExodusFile::output(), part_count, start_part, global, blocks, glob_blocks,
+                          local_element_to_global);
+      }
+
       // Output bulk mesh data....
       put_nodesets(glob_nsets);
 
@@ -927,6 +961,22 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
     LOG("\n\n**** GET COORDINATE INFO ****\n");
     get_put_coordinates(global, part_count, local_mesh, local_node_to_global, (T)0.0);
     LOG("Wrote coordinate information...\n");
+  }
+
+  if (interFace.add_nodal_communication_map() && interFace.subcycle() > 0) {
+    LOG("\n\n**** GET NODAL COMMUNICATION MAP INFO ****\n");
+    // Need a mapping from processors in the original mesh parts to
+    // processors in the subcycle output...
+    auto proc_count = interFace.processor_count();
+
+    std::vector<int> processor_map(proc_count);
+    auto             orig_part_count = interFace.part_count();
+    for (int i = 0; i < proc_count; i++) {
+      processor_map[i] = i / orig_part_count;
+    }
+    get_put_nodal_communication_map(global, start_part, part_count, local_mesh,
+                                    local_node_to_global, processor_map, cycle);
+    LOG("Wrote nodal communication map information...\n");
   }
 
   // ####################TRANSIENT DATA SECTION###########################
@@ -1062,19 +1112,19 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
   std::vector<T> global_values(global_vars.count(InOut::IN));
   std::vector<T> output_global_values(global_vars.count(InOut::OUT));
 
-  auto master_nodal_values = new T *[nodal_vars.count(InOut::OUT)];
+  std::vector<std::vector<T>> master_nodal_values(nodal_vars.count(InOut::OUT));
   for (int i = 0; i < nodal_vars.count(InOut::OUT); i++) {
-    master_nodal_values[i] = new T[global.nodeCount];
+    master_nodal_values[i].resize(global.nodeCount);
   }
 
   // TODO(gdsjaar): Handle variables via a class instead of 3-D array.
-  T ***master_element_values;
+  MasterValueVector<T> master_element_values;
   allocate_master_values(element_vars, global, glob_blocks, master_element_values);
 
-  T ***master_sideset_values;
+  MasterValueVector<T> master_sideset_values;
   allocate_master_values(sideset_vars, global, glob_ssets, master_sideset_values);
 
-  T ***master_nodeset_values;
+  MasterValueVector<T> master_nodeset_values;
   allocate_master_values(nodeset_vars, global, glob_nsets, master_nodeset_values);
 
   // Determine maximum number of entities on any processor...
@@ -1253,7 +1303,7 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
     }
     if (debug_level & 2) {
       for (int i = 0; i < nodal_vars.count(InOut::OUT); i++) {
-        std::fill(&master_nodal_values[i][0], &master_nodal_values[i][global.nodeCount], T(0.0));
+        std::fill(master_nodal_values[i].begin(), master_nodal_values[i].end(), T(0.0));
       }
     }
 
@@ -1283,7 +1333,7 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
             }
 
             T *local_nodal_values  = values.data();
-            T *global_nodal_values = &master_nodal_values[i_out][0];
+            T *global_nodal_values = master_nodal_values[i_out].data();
             if (interFace.sum_shared_nodes()) {
               // sum values into master nodal value information. Note
               // that for non-shared nodes, this will be the same as a
@@ -1308,7 +1358,7 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
       // output nodal variable info. for specified time step
       for (int i = 0; i < nodal_vars.count(InOut::OUT); i++) {
         error = ex_put_var(ExodusFile::output(), time_step_out, EX_NODAL, i + 1, 0,
-                           global.nodeCount, &master_nodal_values[i][0]);
+                           global.nodeCount, master_nodal_values[i].data());
         if (error < 0) {
           exodus_error(__LINE__);
         }
@@ -1401,23 +1451,13 @@ int epu(SystemInterface &interFace, int start_part, int part_count, int cycle, T
     double time_per_step       = elapsed / time_step_out;
     double percentage_done     = (time_step_out * 100.0) / output_steps;
     double estimated_remaining = time_per_step * (output_steps - time_step_out);
-    fmt::print("Wrote step {:6n}, time {:8.4e}\t\t[{:5.1f}%, Elapsed={}, ETA={}]    \r",
+    fmt::print("Wrote step {:6L}, time {:8.4e}\t\t[{:5.1f}%, Elapsed={}, ETA={}]    \r",
                time_step + 1, time_val, percentage_done, format_time(elapsed),
                format_time(estimated_remaining));
     if (debug_level & 1) {
       fmt::print("\n");
     }
   }
-
-  for (int n = 0; n < nodal_vars.count(InOut::OUT); n++) {
-    delete[] master_nodal_values[n];
-  }
-  delete[] master_nodal_values;
-
-  deallocate_master_values(element_vars, global, master_element_values);
-  deallocate_master_values(sideset_vars, global, master_sideset_values);
-  deallocate_master_values(nodeset_vars, global, master_nodeset_values);
-
   /*************************************************************************/
   // FINALIZE program
   if (debug_level & 1) {
@@ -1622,6 +1662,85 @@ namespace {
     free_name_array(coordinate_names, dimensionality);
   }
 
+  template <typename INT>
+  void get_put_nodal_communication_map(Excn::Mesh &global, int start_part, int part_count,
+                                       std::vector<Excn::Mesh> &            local_mesh,
+                                       const std::vector<std::vector<INT>> &local_node_to_global,
+                                       const std::vector<int> &processor_map, int output_processor)
+  {
+    int                              error = 0;
+    std::vector<std::pair<INT, int>> node_cmap;
+    for (int p = 0; p < part_count; p++) {
+      INT num_int_nodes, num_bor_nodes, num_ext_nodes, num_int_elems, num_bor_elems;
+      INT num_node_cmaps, num_elem_cmaps;
+      ex_get_loadbal_param(ExodusFile(p), &num_int_nodes, &num_bor_nodes, &num_ext_nodes,
+                           &num_int_elems, &num_bor_elems, &num_node_cmaps, &num_elem_cmaps, p);
+
+      std::vector<INT> nodeCmapIds(num_node_cmaps);
+      std::vector<INT> nodeCmapNodeCnts(num_node_cmaps);
+      ex_get_cmap_params(ExodusFile(p), nodeCmapIds.data(), nodeCmapNodeCnts.data(), nullptr,
+                         nullptr, p);
+
+      int64_t my_node_count =
+          std::accumulate(nodeCmapNodeCnts.begin(), nodeCmapNodeCnts.end(), int64_t(0));
+      std::vector<INT> nodes(my_node_count);
+      std::vector<INT> procs(my_node_count);
+
+      int64_t cm_offset = 0;
+      for (INT i = 0; i < num_node_cmaps; i++) {
+        ex_get_node_cmap(ExodusFile(p), nodeCmapIds[i], &nodes[cm_offset], &procs[cm_offset], p);
+        cm_offset += nodeCmapNodeCnts[i];
+      }
+      for (size_t i = 0; i < nodes.size(); i++) {
+        auto output_proc = processor_map[procs[i]];
+        if (output_proc != output_processor) {
+          node_cmap.emplace_back(local_node_to_global[p][nodes[i] - 1] + 1,
+                                 processor_map[procs[i]]);
+        }
+      }
+    } // end for p=0..part_count
+    uniquify(node_cmap);
+
+    std::vector<INT> gnodes;
+    std::vector<INT> gprocs;
+    gnodes.reserve(node_cmap.size());
+    gprocs.reserve(node_cmap.size());
+
+    for (auto &np : node_cmap) {
+      gnodes.push_back(np.first);
+      gprocs.push_back(np.second);
+    }
+
+    // NOTE: This is inefficient in general since going in and out of define mode.
+    //       Would be better to do this at file-creation time, but this encapsulates all
+    //       code related to node communication map output to this routine...
+
+    // Write out nodal communication map information
+    error = ex_put_init_info(ExodusFile::output(), processor_map.back() + 1, 1, (char *)"P");
+    if (error < 0) {
+      exodus_error(__LINE__);
+    }
+
+    error = ex_put_loadbal_param(ExodusFile::output(), 0, 0, 0, 0, 0, 1, 0, output_processor);
+    if (error < 0) {
+      exodus_error(__LINE__);
+    }
+
+    std::array<INT, 1> ids{1};
+    std::array<INT, 1> cnts{(INT)gnodes.size()};
+    error = ex_put_cmap_params(ExodusFile::output(), ids.data(), cnts.data(), nullptr, nullptr,
+                               output_processor);
+    if (error < 0) {
+      exodus_error(__LINE__);
+    }
+
+    error =
+        ex_put_node_cmap(ExodusFile::output(), 1, gnodes.data(), gprocs.data(), output_processor);
+    if (error < 0) {
+      exodus_error(__LINE__);
+    }
+  }
+
   template <typename T, typename INT>
   void get_coordinates(int id, int dimensionality, size_t num_nodes,
                        const std::vector<std::vector<INT>> &local_node_to_global, int proc,
@@ -1648,7 +1767,7 @@ namespace {
           if (x[node] != FillValue && y[node] != FillValue && z[node] != FillValue) {
             if (x[node] != local_x[i] || y[node] != local_y[i] || z[node] != local_z[i]) {
               fmt::print(stderr,
-                         "\nWARNING: Node {:n} has different coordinates in at least two files.\n"
+                         "\nWARNING: Node {:L} has different coordinates in at least two files.\n"
                          "         cur value = {:14.6e} {:14.6e} {:14.6e}\n"
                          "         new value = {:14.6e} {:14.6e} {:14.6e} from processor {}\n",
                          node + 1, x[node], y[node], z[node], local_x[i], local_y[i], local_z[i],
@@ -1675,7 +1794,7 @@ namespace {
           if (x[node] != FillValue && y[node] != FillValue) {
             if (x[node] != local_x[i] || y[node] != local_y[i]) {
               fmt::print(stderr,
-                         "\nWARNING: Node {:n} has different coordinates in at least two files.\n"
+                         "\nWARNING: Node {:L} has different coordinates in at least two files.\n"
                          "         cur value = {:14.6e} {:14.6e}\n"
                          "         new value = {:14.6e} {:14.6e} from processor {}\n",
                          node + 1, x[node], y[node], local_x[i], local_y[i], proc);
@@ -1693,14 +1812,14 @@ namespace {
         y[node] = local_y[i];
       }
     }
-    else {
+    else { // dimensionality == 1
       if (debug_level & 8) {
         for (size_t i = 0; i < num_nodes; i++) {
           size_t node = local_node_to_global[proc][i];
           if (x[node] != FillValue && y[node] != FillValue) {
             if (x[node] != local_x[i]) {
               fmt::print(stderr,
-                         "\nWARNING: Node {:n} has different coordinates in at least two files.\n"
+                         "\nWARNING: Node {:L} has different coordinates in at least two files.\n"
                          "         cur value = {:14.6e}\tnew value = {:14.6e} from processor {}\n",
                          node + 1, x[node], local_x[i], proc);
             }
@@ -1785,12 +1904,12 @@ namespace {
 
         blocks[p][b].id = block_id[b];
         if (name[0] != '\0') {
-          blocks[p][b].name_ = &name[0];
+          blocks[p][b].name_ = name.data();
         }
         if (p == 0) {
           glob_blocks[b].id = block_id[b];
           if (name[0] != '\0') {
-            glob_blocks[b].name_ = &name[0];
+            glob_blocks[b].name_ = name.data();
           }
         }
 
@@ -1824,7 +1943,7 @@ namespace {
           free_name_array(names, temp_block.num_attribute);
         }
         if ((debug_level & 4) != 0U) {
-          fmt::print(", Name = '{}', Elements = {:12n}, Nodes/element = {}, Attributes = {}\n",
+          fmt::print(", Name = '{}', Elements = {:12L}, Nodes/element = {}, Attributes = {}\n",
                      blocks[p][b].name_, blocks[p][b].entity_count(), blocks[p][b].nodesPerElement,
                      blocks[p][b].attributeCount);
         }
@@ -1852,8 +1971,8 @@ namespace {
     SMART_ASSERT(sizeof(T) == ExodusFile::io_word_size());
     int global_num_blocks = glob_blocks.size();
 
-    auto linkage    = new INT *[global_num_blocks];
-    auto attributes = new T *[global_num_blocks];
+    std::vector<std::vector<INT>> linkage(global_num_blocks);
+    std::vector<std::vector<T>>   attributes(global_num_blocks);
 
     LOG("\nReading and Writing element connectivity & attributes\n");
 
@@ -1861,7 +1980,7 @@ namespace {
 
       if (debug_level & 4) {
         fmt::print("\nOutput element block info for...\n"
-                   "Block {}, Id = {}, Name = '{}', Elements = {:12n}, Nodes/element = {}, "
+                   "Block {}, Id = {}, Name = '{}', Elements = {:12L}, Nodes/element = {}, "
                    "Attributes = {}\n"
                    "B{}:\t",
                    b, glob_blocks[b].id, glob_blocks[b].name_, glob_blocks[b].entity_count(),
@@ -1871,19 +1990,12 @@ namespace {
       size_t max_nodes = glob_blocks[b].entity_count();
       max_nodes *= glob_blocks[b].nodesPerElement;
 
-      if (max_nodes > 0) {
-        linkage[b] = new INT[max_nodes];
-      }
-      else {
-        linkage[b] = nullptr;
-      }
-      INT *block_linkage = linkage[b];
+      linkage[b].resize(max_nodes);
+      INT *block_linkage = linkage[b].data();
 
       // Initialize attributes list, if it exists
-      if (glob_blocks[b].attributeCount > 0) {
-        attributes[b] = new T[static_cast<size_t>(glob_blocks[b].attributeCount) *
-                              glob_blocks[b].entity_count()];
-      }
+      attributes[b].resize(static_cast<size_t>(glob_blocks[b].attributeCount) *
+                           glob_blocks[b].entity_count());
 
       int error = 0;
       for (int p = 0; p < part_count; p++) {
@@ -1960,29 +2072,26 @@ namespace {
       // Write out block info
       int id_out = ExodusFile::output(); // output file identifier
 
-      if (linkage[b] != nullptr) {
-        error = ex_put_conn(id_out, EX_ELEM_BLOCK, glob_blocks[b].id, linkage[b], nullptr, nullptr);
+      if (!linkage[b].empty()) {
+        error = ex_put_conn(id_out, EX_ELEM_BLOCK, glob_blocks[b].id, linkage[b].data(), nullptr,
+                            nullptr);
         if (error < 0) {
           exodus_error(__LINE__);
         }
-        delete[] linkage[b];
       }
 
       // Write out attributes list if it exists
       if (glob_blocks[b].attributeCount > 0) {
-        error = ex_put_attr(id_out, EX_ELEM_BLOCK, glob_blocks[b].id, attributes[b]);
+        error = ex_put_attr(id_out, EX_ELEM_BLOCK, glob_blocks[b].id, attributes[b].data());
         if (error < 0) {
           exodus_error(__LINE__);
         }
-        delete[] attributes[b];
       } // end for b=0..global_num_blocks-1
       if (debug_level & 4) {
         fmt::print("\n");
       }
     }
     fmt::print("\n");
-    delete[] linkage;
-    delete[] attributes;
   }
 
   template <typename T, typename INT>
@@ -2009,7 +2118,7 @@ namespace {
 
       if (debug_level & 4) {
         fmt::print("\nOutput element block info for...\n"
-                   "Block {}, Id = {}, Name = '{}', Elements = {:12n}, Nodes/element = {}, "
+                   "Block {}, Id = {}, Name = '{}', Elements = {:12L}, Nodes/element = {}, "
                    "Attributes = {}\n",
                    b, glob_blocks[b].id, glob_blocks[b].name_, glob_blocks[b].entity_count(),
                    glob_blocks[b].nodesPerElement, glob_blocks[b].attributeCount);
@@ -2113,7 +2222,11 @@ namespace {
     }
 
     // Now, sort the global_element_map array.
+#if USE_STD_SORT
     std::sort(global_element_map.begin(), global_element_map.end());
+#else
+    pdqsort(global_element_map.begin(), global_element_map.end());
+#endif
 
     global->elementCount = global_element_map.size();
 
@@ -2289,7 +2402,11 @@ namespace {
     }
 
     // Now, sort the global_node_map array and remove duplicates...
+#if USE_STD_SORT
     std::sort(global_node_map.begin(), global_node_map.end());
+#else
+    pdqsort(global_node_map.begin(), global_node_map.end());
+#endif
     global_node_map.resize(unique(global_node_map));
     global_node_map.shrink_to_fit();
 
@@ -2532,13 +2649,13 @@ namespace {
 
     if (rank == 0) {
       fmt::print(" Title: {}\n\n"
-                 " Number of coordinates per node       = {:15n}\n"
-                 " Number of nodes                      = {:15n}\n"
-                 " Number of elements                   = {:15n}\n"
-                 " Number of element blocks             = {:15n}\n"
-                 " Number of assemblies                 = {:15n}\n\n"
-                 " Number of nodal point sets           = {:15n}\n"
-                 " Number of element side sets          = {:15n}\n\n",
+                 " Number of coordinates per node       = {:15L}\n"
+                 " Number of nodes                      = {:15L}\n"
+                 " Number of elements                   = {:15L}\n"
+                 " Number of element blocks             = {:15L}\n"
+                 " Number of assemblies                 = {:15L}\n\n"
+                 " Number of nodal point sets           = {:15L}\n"
+                 " Number of element side sets          = {:15L}\n\n",
                  global.title, global.dimensionality, global.nodeCount, global.elementCount,
                  global.count(Excn::ObjectType::EBLK), global.count(Excn::ObjectType::ASSM),
                  global.count(Excn::ObjectType::NSET), global.count(Excn::ObjectType::SSET));
@@ -2632,7 +2749,7 @@ namespace {
           exodus_error(__LINE__);
         }
         if (name[0] != '\0') {
-          nodesets[p][iset].name_ = &name[0];
+          nodesets[p][iset].name_ = name.data();
         }
 
         if (nodesets[p][iset].dfCount != 0 &&
@@ -2727,7 +2844,7 @@ namespace {
         // distFactors is a vector of 'char' to allow storage of either float or double.
         glob_sets[ns].distFactors.resize(glob_sets[ns].dfCount * ExodusFile::io_word_size());
 
-        T *    glob_df = (T *)(&glob_sets[ns].distFactors[0]);
+        T *    glob_df = (T *)(glob_sets[ns].distFactors.data());
         size_t j       = 0;
         for (size_t i = 1; i <= total_node_count; i++) {
           if (glob_ns_nodes[i] == 1) {
@@ -2894,14 +3011,14 @@ namespace {
           glob_ssets[i].dfCount += sets[p][i].dfCount;
 
           std::vector<char> name(Excn::ExodusFile::max_name_length() + 1);
-          error = ex_get_name(id, EX_SIDE_SET, sets[p][i].id, &name[0]);
+          error = ex_get_name(id, EX_SIDE_SET, sets[p][i].id, name.data());
           if (error < 0) {
             exodus_error(__LINE__);
           }
           if (name[0] != '\0') {
-            sets[p][i].name_ = &name[0];
+            sets[p][i].name_ = name.data();
             if (p == 0) {
-              glob_ssets[i].name_ = &name[0];
+              glob_ssets[i].name_ = name.data();
             }
           }
 
@@ -3015,14 +3132,14 @@ namespace {
       int exoid = ExodusFile::output(); // output file identifier
       for (auto &glob_sset : glob_ssets) {
         int error =
-            ex_put_set(exoid, EX_SIDE_SET, glob_sset.id, const_cast<INT *>(&glob_sset.elems[0]),
-                       const_cast<INT *>(&glob_sset.sides[0]));
+            ex_put_set(exoid, EX_SIDE_SET, glob_sset.id, const_cast<INT *>(glob_sset.elems.data()),
+                       const_cast<INT *>(glob_sset.sides.data()));
         if (error < 0) {
           exodus_error(__LINE__);
         }
         if (glob_sset.dfCount > 0) {
           error = ex_put_set_dist_fact(exoid, EX_SIDE_SET, glob_sset.id,
-                                       reinterpret_cast<void *>(&glob_sset.distFactors[0]));
+                                       reinterpret_cast<void *>(glob_sset.distFactors.data()));
           if (error < 0) {
             exodus_error(__LINE__);
           }
@@ -3061,6 +3178,37 @@ namespace {
       if (error < 0) {
         exodus_error(__LINE__);
       }
+    }
+  }
+
+  template <typename INT>
+  void add_processor_map(int id_out, int part_count, int start_part, const Mesh &global,
+                         std::vector<std::vector<Block>> &    blocks,
+                         const std::vector<Block> &           glob_blocks,
+                         const std::vector<std::vector<INT>> &local_element_to_global)
+  {
+    std::vector<INT> proc(global.elementCount);
+
+    for (size_t b = 0; b < global.count(Excn::ObjectType::EBLK); b++) {
+      proc.resize(glob_blocks[b].entity_count());
+      for (int p = 0; p < part_count; p++) {
+        size_t boffset       = blocks[p][b].offset_;
+        size_t element_count = blocks[p][b].entity_count();
+        for (size_t e = 0; e < element_count; e++) {
+          size_t global_elem_pos = local_element_to_global[p][(e + boffset)];
+          proc[global_elem_pos]  = p + start_part;
+        }
+      }
+    }
+
+    if (ex_put_map_param(id_out, 0, 1) < 0) {
+      exodus_error(__LINE__);
+    }
+    if (ex_put_num_map(id_out, EX_ELEM_MAP, 1, proc.data()) < 0) {
+      exodus_error(__LINE__);
+    }
+    if (ex_put_name(id_out, EX_ELEM_MAP, 1, "processor_id") < 0) {
+      exodus_error(__LINE__);
     }
   }
 
@@ -3424,7 +3572,7 @@ namespace {
 
   template <typename T, typename U>
   void clear_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                           std::vector<U> &glob_sets, T ***master_values)
+                           std::vector<U> &glob_sets, MasterValueVector<T> &master_values)
   {
     for (int i = 0; i < vars.count(InOut::IN); i++) {
       if (vars.index_[i] > 0) {
@@ -3434,8 +3582,7 @@ namespace {
         for (size_t b = 0; b < global.count(vars.objectType); b++) {
           int output_truth_table_loc = (b * vars.count(InOut::OUT)) + ivar;
           if (global.truthTable[static_cast<int>(vars.objectType)][output_truth_table_loc]) {
-            std::fill(&master_values[ivar][b][0],
-                      &master_values[ivar][b][glob_sets[b].entity_count()], T(0.0));
+            std::fill(master_values[ivar][b].begin(), master_values[ivar][b].end(), T(0.0));
           }
         }
       }
@@ -3447,7 +3594,7 @@ namespace {
                         T *global_values, const std::vector<INT> &proc_loc_elem_to_global)
   {
     // copy values to master element value information
-    T *local_values = &values[0];
+    T *local_values = values.data();
     for (size_t j = 0; j < entity_count; j++) {
       size_t global_block_pos         = proc_loc_elem_to_global[(j + loffset)] - goffset;
       global_values[global_block_pos] = local_values[j];
@@ -3459,7 +3606,7 @@ namespace {
                         T *global_values)
   {
     // copy values to master sideset value information
-    T *local_values = &values[0];
+    T *local_values = values.data();
     for (size_t j = 0; j < entity_count; j++) {
       global_values[j + loffset] = local_values[j];
     }
@@ -3478,7 +3625,7 @@ namespace {
                         double *global_values)
   {
     // copy values to master nodeset value information
-    double *local_values = &values[0];
+    double *local_values = values.data();
     for (size_t j = 0; j < entity_count; j++) {
       size_t global_loc = local_set.nodeOrderMap[j];
       SMART_ASSERT(global_loc < glob_entity_count);
@@ -3491,7 +3638,7 @@ namespace {
                         size_t glob_entity_count, std::vector<float> &values, float *global_values)
   {
     // copy values to master nodeset value information
-    float *local_values = &values[0];
+    float *local_values = values.data();
     for (size_t j = 0; j < entity_count; j++) {
       size_t global_loc = local_set.nodeOrderMap[j];
       SMART_ASSERT(global_loc < glob_entity_count);
@@ -3500,11 +3647,11 @@ namespace {
   }
 
   template <typename T, typename U, typename INT>
-  void read_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                          std::vector<U> &global_sets, std::vector<Excn::Mesh> &local_mesh,
-                          std::vector<std::vector<U>> &local_sets, T ***master_values,
-                          std::vector<T> &values, int part_count, int time_step,
-                          const std::vector<std::vector<INT>> &local_element_to_global)
+  void
+  read_master_values(Excn::Variables &vars, const Excn::Mesh &global, std::vector<U> &global_sets,
+                     std::vector<Excn::Mesh> &local_mesh, std::vector<std::vector<U>> &local_sets,
+                     MasterValueVector<T> &master_values, std::vector<T> &values, int part_count,
+                     int time_step, const std::vector<std::vector<INT>> &local_element_to_global)
   {
     int  error = 0;
     bool is_sidenodeset =
@@ -3530,7 +3677,7 @@ namespace {
             if (global.truthTable[static_cast<int>(vars.objectType)][output_truth_table_loc] &&
                 local_sets[p][b].entity_count() > 0) {
 
-              T *    iv_block_mev = master_values[ivar][b];
+              T *    iv_block_mev = master_values[ivar][b].data();
               size_t entity_count = local_sets[p][b].entity_count();
 
               if (local_mesh[p]
@@ -3567,7 +3714,8 @@ namespace {
 
   template <typename T, typename U>
   void output_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                            std::vector<U> &glob_sets, T ***master_values, int time_step)
+                            std::vector<U> &glob_sets, MasterValueVector<T> &master_values,
+                            int time_step)
   {
     int id_out = ExodusFile::output(); // output file identifier
     for (int i = 0; i < vars.count(InOut::IN); i++) {
@@ -3577,9 +3725,9 @@ namespace {
           int truth_table_loc = (b * vars.count(InOut::OUT)) + ivar;
 
           if (global.truthTable[static_cast<int>(vars.objectType)][truth_table_loc]) {
-            int error =
-                ex_put_var(id_out, time_step, exodus_object_type(vars.objectType), ivar + 1,
-                           glob_sets[b].id, glob_sets[b].entity_count(), master_values[ivar][b]);
+            int error = ex_put_var(id_out, time_step, exodus_object_type(vars.objectType), ivar + 1,
+                                   glob_sets[b].id, glob_sets[b].entity_count(),
+                                   master_values[ivar][b].data());
             if (error < 0) {
               exodus_error(__LINE__);
             }
@@ -3591,41 +3739,22 @@ namespace {
 
   template <typename T, typename U>
   void allocate_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                              std::vector<U> &glob_sets, T ***&master_values)
+                              std::vector<U> &glob_sets, MasterValueVector<T> &master_values)
   {
-    master_values = new T **[vars.count(InOut::OUT)];
+    master_values.resize(vars.count(InOut::OUT));
     for (int i = 0; i < vars.count(InOut::IN); i++) {
       if (vars.index_[i] > 0) {
-        int ivar            = vars.index_[i] - 1;
-        master_values[ivar] = new T *[global.count(vars.objectType)];
+        int ivar = vars.index_[i] - 1;
+        master_values[ivar].resize(global.count(vars.objectType));
         for (size_t b = 0; b < global.count(vars.objectType); b++) {
           int output_truth_table_loc = (b * vars.count(InOut::OUT)) + ivar;
           if (global.truthTable[static_cast<int>(vars.objectType)][output_truth_table_loc] &&
               glob_sets[b].entity_count() > 0) {
-            master_values[ivar][b] = new T[glob_sets[b].entity_count()];
-          }
-          else {
-            master_values[ivar][b] = nullptr;
+            master_values[ivar][b].resize(glob_sets[b].entity_count());
           }
         }
       }
     }
-  }
-
-  template <typename T>
-  void deallocate_master_values(Excn::Variables &vars, const Excn::Mesh &global,
-                                T ***&master_values)
-  {
-    for (int i = 0; i < vars.count(InOut::IN); i++) {
-      if (vars.index_[i] > 0) {
-        int ivar = vars.index_[i] - 1;
-        for (size_t b = 0; b < global.count(vars.objectType); b++) {
-          delete[] master_values[ivar][b];
-        }
-        delete[] master_values[ivar];
-      }
-    }
-    delete[] master_values;
   }
 
   template <typename U>

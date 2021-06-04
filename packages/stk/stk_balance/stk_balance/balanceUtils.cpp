@@ -117,18 +117,6 @@ bool BalanceSettings::isMultiCriteriaRebalance() const
     return false;
 }
 
-#ifndef STK_HIDE_DEPRECATED_CODE  // Delete after April 2021
-STK_DEPRECATED bool BalanceSettings::areVertexWeightsProvidedInAVector() const
-{
-    return false;
-}
-
-STK_DEPRECATED std::vector<double> BalanceSettings::getVertexWeightsViaVector() const
-{
-    return std::vector<double>();
-}
-#endif
-
 bool BalanceSettings::areVertexWeightsProvidedViaFields() const
 {
     return false;
@@ -181,13 +169,13 @@ bool BalanceSettings::setVertexWeightsBasedOnNumberAdjacencies() const
     return false;
 }
 
-// For graph based methods (parmetis) only
+// For graph based methods only
 bool BalanceSettings::allowModificationOfVertexWeightsForSmallMeshes() const
 {
     return true;
 }
 
-// For graph based methods (parmetis) only
+// For graph based methods only
 bool BalanceSettings::shouldFixMechanisms() const
 {
     return false;

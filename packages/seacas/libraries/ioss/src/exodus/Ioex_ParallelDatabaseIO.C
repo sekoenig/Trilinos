@@ -5,7 +5,7 @@
 //    strange cases
 //
 //
-// Copyright(C) 1999-2020 National Technology & Engineering Solutions
+// Copyright(C) 1999-2021 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
 //
@@ -332,9 +332,10 @@ namespace Ioex {
     }
 
     if (!is_input()) {
-      // Check whether appending to existing file...
+      // Check whether appending to or modifying existing file...
       if (open_create_behavior() == Ioss::DB_APPEND ||
-          open_create_behavior() == Ioss::DB_APPEND_GROUP) {
+          open_create_behavior() == Ioss::DB_APPEND_GROUP ||
+          open_create_behavior() == Ioss::DB_MODIFY) {
         // Append to file if it already exists -- See if the file exists.
         Ioss::FileInfo file = Ioss::FileInfo(get_filename());
         fileExists          = file.exists();
@@ -347,8 +348,6 @@ namespace Ioex {
       }
     }
   }
-
-  ParallelDatabaseIO::~ParallelDatabaseIO() = default;
 
   void ParallelDatabaseIO::release_memory__()
   {
@@ -454,7 +453,7 @@ namespace Ioex {
     Ioss::FileInfo file(filename);
     std::string    path = file.pathname();
     filename            = file.tailname();
-    char *current_cwd = getcwd(nullptr, 0);
+    char *current_cwd   = getcwd(nullptr, 0);
     chdir(path.c_str());
 #endif
 
@@ -549,7 +548,7 @@ namespace Ioex {
     Ioss::FileInfo file(filename);
     std::string    path = file.pathname();
     filename            = file.tailname();
-    char *current_cwd = getcwd(nullptr, 0);
+    char *current_cwd   = getcwd(nullptr, 0);
     chdir(path.c_str());
 #endif
 
@@ -887,7 +886,7 @@ namespace Ioex {
           // worst case...
           fmt::print(
               Ioss::WARNING(),
-              "Skipping step {:n} at time {} in database file\n\t{}.\nThe data for that step "
+              "Skipping step {:L} at time {} in database file\n\t{}.\nThe data for that step "
               "is possibly corrupt.\n",
               i + 1, tsteps[i], get_filename());
         }
@@ -2356,11 +2355,14 @@ int64_t ParallelDatabaseIO::get_field_internal(const Ioss::ElementSet *ns, const
 }
 
 int64_t ParallelDatabaseIO::get_field_internal(const Ioss::SideSet *fs, const Ioss::Field &field,
-                                               void * /* data */, size_t data_size) const
+                                               void *data, size_t data_size) const
 {
   size_t num_to_get = field.verify(data_size);
   if (field.get_name() == "ids") {
     // Do nothing, just handles an idiosyncrasy of the GroupingEntity
+    // However, make sure that the caller gets a consistent answer, i.e., don't leave the buffer
+    // full of junk
+    memset(data, 0x00, data_size);
   }
   else {
     num_to_get = Ioss::Utils::field_warning(fs, field, "input");
@@ -4099,7 +4101,7 @@ void ParallelDatabaseIO::write_nodal_transient_field(ex_entity_type /* type */,
         fmt::print(errmsg,
                    "ERROR: Problem outputting nodal variable '{}' with index = {} to file '{}' on "
                    "processor {}\n"
-                   "\tShould have output {:n} values, but instead only output {:n} values.\n",
+                   "\tShould have output {:L} values, but instead only output {:L} values.\n",
                    var_name, var_index, get_filename(), myProcessor, nodeCount, num_out);
         IOSS_ERROR(errmsg);
       }
@@ -4233,7 +4235,7 @@ void ParallelDatabaseIO::write_entity_transient_field(ex_entity_type type, const
 
       if (ierr < 0) {
         std::ostringstream extra_info;
-        fmt::print(extra_info, "Outputting component {} of field '{}' at step {:n} on {} '{}'.", i,
+        fmt::print(extra_info, "Outputting component {} of field '{}' at step {:L} on {} '{}'.", i,
                    field_name, step, ge->type_string(), ge->name());
         Ioex::exodus_error(get_file_pointer(), __LINE__, __func__, __FILE__, extra_info.str());
       }
@@ -4596,10 +4598,10 @@ int64_t ParallelDatabaseIO::put_field_internal(const Ioss::SideBlock *fb, const 
   return num_to_get;
 }
 
-void ParallelDatabaseIO::write_meta_data(bool appending)
+void ParallelDatabaseIO::write_meta_data(Ioss::IfDatabaseExistsBehavior behavior)
 {
   Ioss::Region *region = get_region();
-  common_write_meta_data();
+  common_write_meta_data(behavior);
 
   char the_title[max_line_length + 1];
 
@@ -4616,7 +4618,7 @@ void ParallelDatabaseIO::write_meta_data(bool appending)
   Ioex::Mesh mesh(spatialDimension, the_title, util(), file_per_processor);
   mesh.populate(region);
 
-  if (!appending) {
+  if (behavior != Ioss::DB_APPEND && behavior != Ioss::DB_MODIFY) {
     if (!properties.exists("OMIT_QA_RECORDS")) {
       put_qa();
     }
@@ -4641,7 +4643,7 @@ void ParallelDatabaseIO::write_meta_data(bool appending)
   // processor begins...
   update_processor_offset_property(region, mesh);
 
-  if (!appending) {
+  if (behavior != Ioss::DB_APPEND && behavior != Ioss::DB_MODIFY) {
     output_node_map();
     output_other_meta_data();
   }

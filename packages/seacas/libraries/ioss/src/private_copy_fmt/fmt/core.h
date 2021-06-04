@@ -21,7 +21,6 @@
 #define FMT_HEADER_ONLY
 #endif
 #define FMT_STATIC_THOUSANDS_SEPARATOR ','
-#define FMT_DEPRECATED_N_SPECIFIER
 
 // The fmt library version in the form major * 10000 + minor * 100 + patch.
 #define FMT_VERSION 70103
@@ -1074,8 +1073,8 @@ template <typename Context> class value {
     named_arg_value<char_type> named_args;
   };
 
-  constexpr FMT_INLINE value(int val = 0) : int_value(val) {}
-  constexpr FMT_INLINE value(unsigned val) : uint_value(val) {}
+  FMT_INLINE value(int val = 0) : int_value(val) {}
+  FMT_INLINE value(unsigned val) : uint_value(val) {}
   FMT_INLINE value(long long val) : long_long_value(val) {}
   FMT_INLINE value(unsigned long long val) : ulong_long_value(val) {}
   FMT_INLINE value(int128_t val) : int128_value(val) {}

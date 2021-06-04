@@ -1,4 +1,4 @@
-// Copyright(C) 1999-2020 National Technology & Engineering Solutions
+// Copyright(C) 1999-2021 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
 //
@@ -64,8 +64,6 @@ namespace Iogn {
   }
 
   GeneratedMesh::GeneratedMesh() { initialize(); }
-
-  GeneratedMesh::~GeneratedMesh() = default;
 
   void GeneratedMesh::initialize()
   {
@@ -376,12 +374,12 @@ namespace Iogn {
                  "\tX = {} * (0..{}) + {}\tRange: {} <= X <= {}\n"
                  "\tY = {} * (0..{}) + {}\tRange: {} <= Y <= {}\n"
                  "\tZ = {} * (0..{}) + {}\tRange: {} <= Z <= {}\n\n"
-                 "\tNode Count (total)    = {:12n}\n"
-                 "\tElement Count (total) = {:12n}\n"
-                 "\tBlock Count           = {:12n}\n"
-                 "\tNodeSet Count         = {:12n}\n"
-                 "\tSideSet Count         = {:12n}\n"
-                 "\tTimestep Count        = {:12n}\n\n",
+                 "\tNode Count (total)    = {:12L}\n"
+                 "\tElement Count (total) = {:12L}\n"
+                 "\tBlock Count           = {:12L}\n"
+                 "\tNodeSet Count         = {:12L}\n"
+                 "\tSideSet Count         = {:12L}\n"
+                 "\tTimestep Count        = {:12L}\n\n",
                  numX, numY, numZ, sclX, numX, offX, offX, offX + numX * sclX, sclY, numY, offY,
                  offY, offY + numY * sclY, sclZ, numZ, offZ, offZ, offZ + numZ * sclZ, node_count(),
                  element_count(), block_count(), nodeset_count(), sideset_count(),

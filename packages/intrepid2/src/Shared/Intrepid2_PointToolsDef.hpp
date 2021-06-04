@@ -48,6 +48,13 @@
 #ifndef __INTREPID2_POINTTOOLS_DEF_HPP__
 #define __INTREPID2_POINTTOOLS_DEF_HPP__
 
+#if defined(_MSC_VER) || defined(_WIN32) && defined(__ICL)
+// M_PI, M_SQRT2, etc. are hidden in MSVC by #ifdef _USE_MATH_DEFINES
+  #ifndef _USE_MATH_DEFINES
+  #define _USE_MATH_DEFINES
+  #endif
+  #include <math.h>
+#endif
 
 namespace Intrepid2 {
 
@@ -551,7 +558,7 @@ getWarpBlendLatticeTriangle( Kokkos::DynRankView<pointValueType,pointProperties.
 
    Kokkos::DynRankView<pointValueType, Kokkos::DefaultHostExecutionSpace> refPts("refPts", 1, N,2);
 
-   Intrepid2::CellTools<Kokkos::DefaultHostExecutionSpace>::mapToReferenceFrame( refPts ,
+   Intrepid2::CellTools<Kokkos::HostSpace>::mapToReferenceFrame( refPts ,
                                               warXY ,
                                               warburtonVerts ,
                                               shards::getCellTopologyData< shards::Triangle<3> >()
@@ -892,7 +899,7 @@ getWarpBlendLatticeTetrahedron(Kokkos::DynRankView<pointValueType,pointPropertie
 
    // now we convert to Pavel's reference triangle!
    Kokkos::DynRankView<pointValueType,Kokkos::DefaultHostExecutionSpace> refPts("refPts",1,N,3);
-   CellTools<Kokkos::DefaultHostExecutionSpace>::mapToReferenceFrame( refPts ,updatedPoints ,
+   CellTools<Kokkos::HostSpace>::mapToReferenceFrame( refPts ,updatedPoints ,
                                            warVerts_ ,
                                            shards::getCellTopologyData<shards::Tetrahedron<4> >()
                                            );
