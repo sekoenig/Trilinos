@@ -103,6 +103,19 @@ ENDIF()
 # We split the CrsMatrix_WithGraph test by execution space.
 # This speeds up the build.
 
+ASSERT_DEFINED (Tpetra_INST_SYCL)
+IF (Tpetra_INST_SYCL)
+  TRIBITS_ADD_EXECUTABLE_AND_TEST(
+	  CrsMatrix_WithGraph_SYCL
+    SOURCES
+      CrsMatrix_WithGraph_SYCL
+    ${TEUCHOS_STD_UNIT_TEST_MAIN}
+    ARGS ${ARGS}
+    COMM serial mpi
+    STANDARD_PASS_OUTPUT
+    )
+ENDIF ()
+
 ASSERT_DEFINED (Tpetra_INST_CUDA)
 IF (Tpetra_INST_CUDA)
   TRIBITS_ADD_EXECUTABLE_AND_TEST(
@@ -394,14 +407,16 @@ TRIBITS_ADD_EXECUTABLE_AND_TEST(
   STANDARD_PASS_OUTPUT
   )
 
-TRIBITS_ADD_EXECUTABLE_AND_TEST(
-  CrsMatrix_createDeepCopy
-  SOURCES
+IF (Tpetra_ENABLE_DEPRECATED_CODE)
+  TRIBITS_ADD_EXECUTABLE_AND_TEST(
     CrsMatrix_createDeepCopy
-  COMM serial mpi
-  NUM_MPI_PROCS 1-4
-  STANDARD_PASS_OUTPUT
-  )
+    SOURCES
+      CrsMatrix_createDeepCopy
+    COMM serial mpi
+    NUM_MPI_PROCS 1-4
+    STANDARD_PASS_OUTPUT
+    )
+ENDIF()
 
 TRIBITS_ADD_EXECUTABLE_AND_TEST(
   CrsMatrix_UnpackMerge
