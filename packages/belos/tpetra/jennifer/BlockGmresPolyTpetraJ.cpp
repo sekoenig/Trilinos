@@ -67,6 +67,7 @@
 #include <Teuchos_CommandLineProcessor.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_StandardCatchMacros.hpp>
+#include <Teuchos_StackedTimer.hpp>
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
   Tpetra::ScopeGuard tpetraScope(&argc,&argv);
 
   bool success = false;
-  bool verbose = false;
+  bool verbose = true;
   try {
     const ST one  = SCT::one();
 
@@ -109,6 +110,7 @@ int main(int argc, char *argv[]) {
     int numrhs = 1;                           // number of right-hand sides to solve for
     int maxiters = -1;                        // maximum number of iterations allowed per linear system
     int maxdegree = 25;                       // maximum degree of polynomial
+    bool use_stacked_timer = false;              
     int maxsubspace = 50;                     // maximum number of blocks the solver can use for the subspace
     int maxrestarts = 25;                     // number of restarts allowed
     std::string outersolver("Block Gmres");   // name of outer solver
@@ -121,6 +123,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
     cmdp.setOption("use-random-rhs","use-rhs",&userandomrhs,"Use linear system RHS or random RHS to generate polynomial.");
     cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
+    cmdp.setOption("stacked-timer", "no-stacked-timer", &use_stacked_timer, "Run with or without stacked timer output");
     cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated. Arnoldi, Gmres, or Roots.");
@@ -239,11 +242,30 @@ int main(int argc, char *argv[]) {
       std::cout << std::endl;
     }
 
+    // Set output stream and stacked timer:
+    // (see packages/muelu/example/basic/Stratimikos.cpp)
+    RCP<Teuchos::FancyOStream> fancy = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
+    Teuchos::FancyOStream& out = *fancy;
+    out.setOutputToRootOnly(0);
+    // Set up timers
+    Teuchos::RCP<Teuchos::StackedTimer> stacked_timer;
+    if (use_stacked_timer){
+      stacked_timer = rcp(new Teuchos::StackedTimer("Main"));
+    }
+    TimeMonitor::setStackedTimer(stacked_timer);
+
     //
     // Perform solve
     //
     Belos::ReturnType ret = solver.solve();
 
+    if (use_stacked_timer) {
+      stacked_timer->stop("Main");
+      Teuchos::StackedTimer::OutputOptions options;
+      options.output_fraction = options.output_histogram = options.output_minmax = true;
+      stacked_timer->report(out, comm, options);
+      //stacked_timer->report(out, comm);
+    }
     //
     // Compute actual residuals.
     //
