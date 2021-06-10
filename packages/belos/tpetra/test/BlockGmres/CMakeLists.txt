@@ -35,6 +35,12 @@ TRIBITS_ADD_EXECUTABLE_AND_TEST(
 ENDIF()
 
 
+TRIBITS_ADD_EXECUTABLE(
+  BlockGMRESEx
+  SOURCES BlockGmresTpetraExFile.cpp
+  COMM serial mpi
+  )
+
 TRIBITS_ADD_EXECUTABLE_AND_TEST(
   Tpetra_BlockFGMRES_hb_test
   SOURCES test_bl_fgmres_hb.cpp
