@@ -284,22 +284,28 @@ struct UnpackCrsMatrixAndCombineFunctor {
 
     if (expected_num_bytes > num_bytes)
     {
+// FIXME_SYCL Enable again once a SYCL conforming printf implementation is available.
+#ifndef KOKKOS_ENABLE_SYCL
       printf(
         "*** Error: UnpackCrsMatrixAndCombineFunctor: "
         "At row %d, the expected number of bytes (%d) != number of unpacked bytes (%d)\n",
         (int) lid_no, (int) expected_num_bytes, (int) num_bytes
       );
+#endif
       Kokkos::atomic_compare_exchange_strong(error_code.data(), 0, 21);
       return;
     }
 
     if (offset > buf_size || offset + num_bytes > buf_size)
     {
+// FIXME_SYCL Enable again once a SYCL conforming printf implementation is available.
+#ifndef KOKKOS_ENABLE_SYCL
       printf(
         "*** Error: UnpackCrsMatrixAndCombineFunctor: "
         "At row %d, the offset (%d) > buffer size (%d)\n",
         (int) lid_no, (int) offset, (int) buf_size
       );
+#endif
       Kokkos::atomic_compare_exchange_strong(error_code.data(), 0, 22);
       return;
     }
@@ -332,11 +338,14 @@ struct UnpackCrsMatrixAndCombineFunctor {
     (void)PackTraits<LO>::unpackValue(num_ent_out, num_ent_in);
     if (static_cast<size_t>(num_ent_out) != num_entries_in_row)
     {
+// FIXME_SYCL Enable again once a SYCL conforming printf implementation is available.
+#ifndef KOKKOS_ENABLE_SYCL
       printf(
         "*** Error: UnpackCrsMatrixAndCombineFunctor: "
         "At row %d, number of entries (%d) != number of entries unpacked (%d)\n",
         (int) lid_no, (int) num_entries_in_row, (int) num_ent_out
       );
+#endif
       Kokkos::atomic_compare_exchange_strong(error_code.data(), 0, 23);
     }
 
@@ -389,10 +398,13 @@ struct UnpackCrsMatrixAndCombineFunctor {
           );
         } else {
           // should never get here
+// FIXME_SYCL Enable again once a SYCL conforming printf implementation is available.
+#ifndef KOKKOS_ENABLE_SYCL
           printf(
             "*** Error: UnpackCrsMatrixAndCombineFunctor: "
             "At row %d, an unknown error occurred during unpack\n", (int) lid_no
           );
+#endif
           Kokkos::atomic_compare_exchange_strong(error_code.data(), 0, 31);
         }
       }
@@ -1204,7 +1216,7 @@ unpackCrsMatrixAndCombine(
   typedef typename device_type::execution_space XS;
 
   // Convert all Teuchos::Array to Kokkos::View.
-  typename XS::device_type outputDevice;
+  device_type outputDevice;
 
   // numPacketsPerLID, importLIDs, and imports are input, so we have to copy
   // them to device.  Since unpacking is done directly in to the local matrix
@@ -1486,7 +1498,7 @@ unpackAndCombineIntoCrsArrays (
   auto local_col_map = sourceMatrix.getColMap()->getLocalMap();
 
   // Convert input arrays to Kokkos::View
-  typename XS::device_type outputDevice;
+  DT outputDevice;
   auto import_lids_d =
     create_mirror_view_from_raw_host_array(outputDevice, importLIDs.getRawPtr(),
         importLIDs.size(), true, "import_lids");
