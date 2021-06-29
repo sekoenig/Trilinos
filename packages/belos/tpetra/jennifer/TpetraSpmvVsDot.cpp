@@ -168,6 +168,6 @@ int main(int argc, char *argv[]) {
   //Print final timing details:
   Teuchos::TimeMonitor::summarize( printer_->stream(Belos::TimingDetails) );
 
-  return 0;
   }// End Tpetra Scope Guard
+  return 0;
 }

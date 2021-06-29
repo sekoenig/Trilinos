@@ -107,8 +107,10 @@ int main(int argc, char *argv[]) {
   B2->randomize();
   RCP<Tpetra::Map<>> localMap = rcp( new Tpetra::Map<>(50, map->getIndexBase(), map->getComm(), Tpetra::LocallyReplicated));
   MV bigDotAns(localMap, 50);
+  bigDotAns.randomize();
   RCP<Tpetra::Map<>> localMap2 = rcp( new Tpetra::Map<>(50, map2->getIndexBase(), map2->getComm(), Tpetra::LocallyReplicated));
   MV2 bigDotAns2(localMap2, 50);
+  bigDotAns2.randomize();
 
   // Create the timer if we need to.
   RCP<std::ostream> outputStream = rcp(&std::cout,false);
@@ -127,6 +129,7 @@ int main(int argc, char *argv[]) {
     RCP<Teuchos::Time> timerTransBig2_ = Teuchos::TimeMonitor::getNewCounter(TransLabelBig2);
     RCP<Teuchos::Time> timerMvTimesMatBig2_ = Teuchos::TimeMonitor::getNewCounter(MvTimesMatLabelBig2);
 #endif
+
   //*************************************************************************
   // Init loop: Double
   // ***************************************************************************
@@ -154,12 +157,12 @@ int main(int argc, char *argv[]) {
       #endif
       A->apply(*X1, *B1);
       }
-      { //scope guard for timer
+      /*{ //scope guard for timer
       #ifdef BELOS_TEUCHOS_TIME_MONITOR
       Teuchos::TimeMonitor slvtimer(*timerTransBig_);
       #endif
       bigDotAns.multiply (Teuchos::CONJ_TRANS, Teuchos::NO_TRANS, 1.0, *X1, *B1, 0.0);
-      }
+      }*/
       { //scope guard for timer
       #ifdef BELOS_TEUCHOS_TIME_MONITOR
       Teuchos::TimeMonitor slvtimer(*timerMvTimesMatBig_);
@@ -178,12 +181,12 @@ int main(int argc, char *argv[]) {
       #endif
       A2->apply(*X2, *B2);
       }
-      { //scope guard for timer
+      /*{ //scope guard for timer
       #ifdef BELOS_TEUCHOS_TIME_MONITOR
       Teuchos::TimeMonitor slvtimer(*timerTransBig2_);
       #endif
       bigDotAns2.multiply (Teuchos::CONJ_TRANS, Teuchos::NO_TRANS, 1.0, *X2, *B2, 0.0);
-      }
+      }*/
       { //scope guard for timer
       #ifdef BELOS_TEUCHOS_TIME_MONITOR
       Teuchos::TimeMonitor slvtimer(*timerMvTimesMatBig2_);
