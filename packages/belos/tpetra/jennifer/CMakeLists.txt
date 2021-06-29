@@ -45,8 +45,20 @@ ASSERT_DEFINED(Belos_SOURCE_DIR)
 
 
 TRIBITS_ADD_EXECUTABLE(
+  FlDoubleSpmvDot
+  SOURCES FlDoubleSpmvDot.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   SpmvVsDot
   SOURCES SpmvVsDot.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  TpetraFlDoubleSpmvDot
+  SOURCES TpetraFlDoubleSpmvDot.cpp
   COMM serial mpi
   )
 
