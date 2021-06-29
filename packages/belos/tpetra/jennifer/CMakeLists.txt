@@ -74,11 +74,13 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
-TRIBITS_ADD_EXECUTABLE(
-  GaleriMatrixCreator
-  SOURCES GaleriMatrixCreator.cpp
-  COMM serial mpi
-  )
+IF (Belos_ENABLE_Epetra)
+  TRIBITS_ADD_EXECUTABLE(
+    GaleriMatrixCreator
+    SOURCES GaleriMatrixCreator.cpp
+    COMM serial mpi
+    )
+ENDIF()
 
 TRIBITS_ADD_EXECUTABLE(
   GmresIRStart
@@ -89,6 +91,12 @@ TRIBITS_ADD_EXECUTABLE(
 TRIBITS_ADD_EXECUTABLE(
   GmresPolyTpetra
   SOURCES BlockGmresPolyTpetraJ.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  CG_Test_J_Belos
+  SOURCES test_CG_J.cpp
   COMM serial mpi
   )
 
