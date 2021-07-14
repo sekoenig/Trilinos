@@ -51,6 +51,7 @@
 #include "Teuchos_CommandLineProcessor.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_StandardCatchMacros.hpp"
+#include <Teuchos_StackedTimer.hpp>
 
 #include "BelosTpetraAdapter.hpp"
 #include "BelosTpetraOperator.hpp"
@@ -75,32 +76,17 @@ int main(int argc, char *argv[]) {
   bool proc_verbose = ( verbose && (MyPID==0) ); /* Only print on the zero processor */
   int maxiters = 1000;         // maximum number of iterations of outer solver allowed per linear system
   std::string filename("orsirr_1.mtx"); // example matrix
+  bool use_stacked_timer = false;              
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Matrix market format only.");
   cmdp.setOption("iters",&maxiters,"Maximum number of iterations of outer solver."); 
+    cmdp.setOption("stacked-timer", "no-stacked-timer", &use_stacked_timer, "Run with or without stacked timer output");
 
   if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
     return -1;
   }
-
-
-  //Read CrsMats into Tpetra::Operator
-  RCP<Tpetra::CrsMatrix<ST>> A = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readSparseFile(filename,comm);
-  RCP<const Tpetra::Map<> > map = A->getDomainMap();
-
-  RCP<MV> X1 = rcp( new MV(map, 1) );
-  RCP<MV> X2 = rcp( new MV(map, 50) );
-  RCP<MV> B1 = rcp( new MV(map, 1) );
-  RCP<MV> B2 = rcp( new MV(map, 50) );
-  X1->randomize();
-  X2->randomize();
-  B1->randomize();
-  B2->randomize();
-  ST smDotAns;
-  RCP<Tpetra::Map<>> localMap = rcp( new Tpetra::Map<>(50, map->getIndexBase(), map->getComm(), Tpetra::LocallyReplicated));
-  MV bigDotAns(localMap, 50);
 
   // Create the timer if we need to.
   RCP<std::ostream> outputStream = rcp(&std::cout,false);
@@ -117,6 +103,34 @@ int main(int argc, char *argv[]) {
     RCP<Teuchos::Time> timerMvTimesMat_ = Teuchos::TimeMonitor::getNewCounter(MvTimesMatLabel);
     RCP<Teuchos::Time> timerMvTimesMatBig_ = Teuchos::TimeMonitor::getNewCounter(MvTimesMatLabelBig);
 #endif
+
+    // Set output stream and stacked timer:
+    // (see packages/muelu/example/basic/Stratimikos.cpp)
+    RCP<Teuchos::FancyOStream> fancy = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
+    Teuchos::FancyOStream& out = *fancy;
+    out.setOutputToRootOnly(0);
+    // Set up timers
+    Teuchos::RCP<Teuchos::StackedTimer> stacked_timer;
+    if (use_stacked_timer){
+      stacked_timer = rcp(new Teuchos::StackedTimer("Main"));
+    }
+    Teuchos::TimeMonitor::setStackedTimer(stacked_timer);
+
+  //Read CrsMats into Tpetra::Operator
+  RCP<Tpetra::CrsMatrix<ST>> A = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readSparseFile(filename,comm);
+  RCP<const Tpetra::Map<> > map = A->getDomainMap();
+
+  RCP<MV> X1 = rcp( new MV(map, 1) );
+  RCP<MV> X2 = rcp( new MV(map, 50) );
+  RCP<MV> B1 = rcp( new MV(map, 1) );
+  RCP<MV> B2 = rcp( new MV(map, 50) );
+  X1->randomize();
+  X2->randomize();
+  B1->randomize();
+  B2->randomize();
+  ST smDotAns;
+  RCP<Tpetra::Map<>> localMap = rcp( new Tpetra::Map<>(50, map->getIndexBase(), map->getComm(), Tpetra::LocallyReplicated));
+  MV bigDotAns(localMap, 50);
 
 
   //*************************************************************************
@@ -167,6 +181,13 @@ int main(int argc, char *argv[]) {
 
   //Print final timing details:
   Teuchos::TimeMonitor::summarize( printer_->stream(Belos::TimingDetails) );
+
+    if (use_stacked_timer) {
+      stacked_timer->stop("Main");
+      Teuchos::StackedTimer::OutputOptions options;
+      options.output_fraction = options.output_histogram = options.output_minmax = true;
+      stacked_timer->report(out, comm, options);
+    }
 
   }// End Tpetra Scope Guard
   return 0;
