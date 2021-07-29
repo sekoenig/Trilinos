@@ -80,21 +80,35 @@ int main(int argc, char *argv[]) {
   bool proc_verbose = ( verbose && (MyPID==0) ); /* Only print on the zero processor */
   int maxiters = 1000;         // maximum number of iterations of outer solver allowed per linear system
   std::string filename("orsirr_1.mtx"); // example matrix
+  std::string rowmapname(""); // init to empty string
 
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Matrix market format only.");
+  cmdp.setOption("rowmap",&rowmapname,"Filename for a rowmap for the test matrix.  Matrix market format only.");
   cmdp.setOption("iters",&maxiters,"Maximum number of iterations of outer solver."); 
 
   if (cmdp.parse(argc,argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
     return -1;
   }
 
+  RCP<OP> A;
+  RCP<OP2> A2;
 
   //Read CrsMats into Tpetra::Operator
-  RCP<OP> A = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readSparseFile(filename,comm);
+  if(rowmapname==""){
+    A = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readSparseFile(filename,comm);
+    A2 = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST2>>::readSparseFile(filename,comm);
+  }
+  else{
+    RCP<const Tpetra::Map<> > rowmap = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readMapFile(rowmapname,comm);
+    RCP<const Tpetra::Map<> > rowmap2 = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST2>>::readMapFile(rowmapname,comm);
+    RCP<const Tpetra::Map<> > colmap;
+    RCP<const Tpetra::Map<> > colmap2;
+    A = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST>>::readSparseFile(filename,rowmap, colmap, rowmap, rowmap);
+    A2 = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST2>>::readSparseFile(filename,rowmap2, colmap2,rowmap2,rowmap2);
+  }
   RCP<const Tpetra::Map<> > map = A->getDomainMap();
-  RCP<OP2> A2 = Tpetra::MatrixMarket::Reader<Tpetra::CrsMatrix<ST2>>::readSparseFile(filename,comm);
   RCP<const Tpetra::Map<> > map2 = A2->getDomainMap();
 
   RCP<MV> X1 = rcp( new MV(map, 50) );
