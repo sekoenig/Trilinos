@@ -52,6 +52,7 @@
 #include "Panzer_LocalMeshInfo.hpp"
 #include "Panzer_PointGenerator.hpp"
 #include "Panzer_PointValues2.hpp"
+#include "Panzer_ConvertNormalToRotationMatrix.hpp"
 
 #include "Panzer_SubcellConnectivity.hpp"
 #include "Panzer_OrientationsInterface.hpp"
@@ -147,7 +148,7 @@ correctVirtualNormals(const Teuchos::RCP<panzer::IntegrationValues2<double> > iv
           normal[d] = -n_d;
         }
 
-        panzer::IntegrationValues2<double>::convertNormalToRotationMatrix(normal,transverse,binormal);
+        panzer::convertNormalToRotationMatrix(normal,transverse,binormal);
 
         for(int dim=0; dim<3; ++dim){
           iv->surface_rotation_matrices(virtual_cell,virtual_cell_point,0,dim) = normal[dim];
@@ -226,9 +227,11 @@ setup(const panzer::LocalMeshPartition & partition,
     cell_local_ids_k = cell_ids;
 
     // DEPRECATED - only retain for backward compatability
+    auto local_cells_h = Kokkos::create_mirror_view(partition.local_cells);
+    Kokkos::deep_copy(local_cells_h, partition.local_cells);
     cell_local_ids.resize(num_cells,-1);
     for(int cell=0;cell<num_cells;++cell){
-      const int local_cell = partition.local_cells(cell);
+      const int local_cell = local_cells_h(cell);
       cell_local_ids[cell] = local_cell;
     }
   }
@@ -253,12 +256,14 @@ setup(const panzer::LocalMeshPartition & partition,
     cell_vertex_coordinates = af.buildStaticArray<double, Cell, NODE, Dim>("cell vertices", num_partition_cells, num_vertices_per_cell, num_dims_per_vertex);
 
     // Copy vertices over
-    const auto & partition_vertices = partition.cell_vertices;
-    for(int i=0;i<num_cells;++i)
+    const auto partition_vertices = partition.cell_vertices;
+    auto cvc = cell_vertex_coordinates;
+    Kokkos::parallel_for(num_cells, KOKKOS_LAMBDA (int i) {
       for(int j=0;j<num_vertices_per_cell;++j)
         for(int k=0;k<num_dims_per_vertex;++k)
-          cell_vertex_coordinates(i,j,k) = partition_vertices(i,j,k);
-
+          cvc(i,j,k) = partition_vertices(i,j,k);
+      });
+    Kokkos::fence();
   }
 
   // Add the subcell connectivity
