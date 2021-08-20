@@ -57,6 +57,19 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
+TRIBITS_ADD_EXECUTABLE(
+  KokkosBelosSpmvVsDot
+  SOURCES KokkosBelosSpmvVsDot.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
+  FLOATKokkosBelosSpmvVsDot
+  SOURCES FLOATKokkosBelosSpmvVsDot.cpp
+  COMM serial mpi
+  )
+
+# Commenting this one because it 
 # Commenting this one because it 
 # has problems for CPU builds.
 #TRIBITS_ADD_EXECUTABLE(
