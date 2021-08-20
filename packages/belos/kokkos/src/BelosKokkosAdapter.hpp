@@ -259,17 +259,25 @@
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-      UMHostConstViewMatrixType mat_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
-      ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
-      Kokkos::deep_copy(mat_d, mat_h);
-
-      if( myView.extent(1) == 1 ){ // Only 1 col
-        ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
+      if( myView.extent(1) == 1 && A_vec->myView.extent(1) == 1){
+        // Then B is a scalar...
+        ScalarType Bsub = B(0,0);
         ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
-        KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
+        ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
+        KokkosBlas::axpy(Bsub, Asub, mysub); 
       }
       else{
-        KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
+        UMHostConstViewMatrixType mat_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
+        ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+        Kokkos::deep_copy(mat_d, mat_h);
+        if( myView.extent(1) == 1 ){ // Only 1 col
+            ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
+            ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
+            KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
+        }
+        else{
+          KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
+        }
       }
     }
 
