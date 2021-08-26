@@ -126,8 +126,8 @@ void kk_sparseMatrix_generate_lower_upper_triangle(
     OrdinalType nrows,
     OrdinalType ncols,
     SizeType &nnz,
-    OrdinalType row_size_variance,
-    OrdinalType bandwidth,
+    OrdinalType /*row_size_variance*/,
+    OrdinalType /*bandwidth*/,
     ScalarType* &values,
     SizeType* &rowPtr,
     OrdinalType* &colInd)
@@ -224,6 +224,55 @@ void kk_diagonally_dominant_sparseMatrix_generate(
     colInd[rowPtr[row+1] - 1]= row;
     values[rowPtr[row+1] - 1] = total_values * diagDominance;
   }
+}
+
+
+// This function creates a diagonal sparse matrix for testing matrix operations.
+// The elements on the diagonal are 1, 2, ..., n-1, n.
+// If "invert" is true, it will return the inverse of the above diagonal matrix.
+template <typename crsMat_t>
+crsMat_t kk_generate_diag_matrix(typename crsMat_t::const_ordinal_type n,
+                                 const bool invert = false){
+  typedef typename crsMat_t::ordinal_type ot;
+  typedef typename crsMat_t::StaticCrsGraphType graph_t;
+  typedef typename graph_t::row_map_type::non_const_type row_map_view_t;
+  typedef typename graph_t::entries_type::non_const_type   cols_view_t;
+  typedef typename crsMat_t::values_type::non_const_type values_view_t;
+
+  typedef typename row_map_view_t::non_const_value_type size_type;
+  typedef typename cols_view_t::non_const_value_type lno_t;
+  typedef typename values_view_t::non_const_value_type scalar_t;
+
+  row_map_view_t rowmap_view("rowmap_view", n+1);
+  cols_view_t columns_view("colsmap_view", n);
+  values_view_t values_view("values_view", n);
+
+  {
+    typename row_map_view_t::HostMirror hr = Kokkos::create_mirror_view (rowmap_view);
+    typename cols_view_t::HostMirror hc = Kokkos::create_mirror_view (columns_view);
+    typename values_view_t::HostMirror hv = Kokkos::create_mirror_view (values_view);
+
+    for (lno_t i = 0; i <= n; ++i){
+      hr(i) = size_type(i);
+    }
+
+    for (ot i = 0; i < n; ++i){
+      hc(i) = lno_t(i);
+      if(invert){
+        hv(i) = scalar_t(1.0)/(scalar_t(i + 1));
+      }
+      else{
+        hv(i) = scalar_t(i + 1);
+      }
+    }
+    Kokkos::deep_copy (rowmap_view , hr);
+    Kokkos::deep_copy (columns_view , hc);
+    Kokkos::deep_copy (values_view , hv);
+  }
+
+  graph_t static_graph (columns_view, rowmap_view);
+  crsMat_t crsmat("CrsMatrix", n, values_view, static_graph);
+  return crsmat;
 }
 
 template <typename crsMat_t>
@@ -382,7 +431,6 @@ crsMat_t kk_generate_sparse_matrix(
     Kokkos::deep_copy (rowmap_view , hr);
     Kokkos::deep_copy (columns_view , hc);
     Kokkos::deep_copy (values_view , hv);
-    Kokkos::fence();
   }
 
   graph_t static_graph (columns_view, rowmap_view);
@@ -397,7 +445,7 @@ crsMat_t kk_generate_sparse_matrix(
 //TODO: need to fix the size_type. All over the reading inputs are lno_t.
 
 template <typename stype>
-void md_malloc(stype **arr, size_t n, std::string alloc_str = ""){
+void md_malloc(stype **arr, size_t n, std::string /*alloc_str*/ = ""){
   *arr = new stype[n];
   if (*arr == NULL){
     throw std::runtime_error ("Memory Allocation Problem\n");
@@ -508,6 +556,26 @@ inline void kk_read_1Dview_from_file(idx_array_type &view, const char *filename)
   Kokkos::fence();
 }
 
+
+template <typename idx_array_type>
+inline void kk_read_MM_vector(idx_array_type &view, const char *filename){
+
+  typedef typename idx_array_type::HostMirror host_type;
+  //typedef typename idx_array_type::size_type idx;
+  host_type host_view = Kokkos::create_mirror_view (view);
+  std::ifstream myFile (filename, std::ios::in );
+
+  std::string line;
+  std::getline(myFile, line);  // have line 1
+  std::getline(myFile, line);  
+
+  for (size_t i = 0; i < view.extent(0); ++i){
+	  myFile >> host_view(i);
+  }
+  myFile.close();
+  Kokkos::deep_copy (view, host_view);
+  Kokkos::fence();
+}
 
 
 
@@ -721,7 +789,7 @@ void write_graph_crs(lno_t nv, size_type ne,const size_type *xadj,const  lno_t *
 }
 
 template <typename lno_t, typename size_type, typename scalar_t>
-void write_graph_ligra(lno_t nv, size_type ne,const size_type *xadj,const  lno_t *adj,const  scalar_t *ew,const  char *filename){
+void write_graph_ligra(lno_t nv, size_type ne,const size_type *xadj,const  lno_t *adj,const  scalar_t * /*ew*/,const  char *filename){
 
   std::ofstream ff (filename);
   ff << "AdjacencyGraph" << std::endl;
@@ -1027,7 +1095,7 @@ void write_kokkos_crst_matrix(crs_matrix_t a_crsmat,const  char *filename){
 template <typename lno_t, typename size_type, typename scalar_t>
 int read_mtx (
     const char *fileName,
-    lno_t *nv, size_type *ne,
+    lno_t *nrows, lno_t* ncols, size_type *ne,
     size_type **xadj, lno_t **adj, scalar_t **ew,
     bool symmetrize = false, bool remove_diagonal = true,
     bool transpose = false)
@@ -1070,10 +1138,15 @@ int read_mtx (
   if(fline.find("real") != std::string::npos || 
      fline.find("double") != std::string::npos)
   {
-    if(!std::is_floating_point<scalar_t>::value)
-      throw std::runtime_error("scalar_t in read_mtx() incompatible with float or double typed MatrixMarket file.");
-    else
+    if (std::is_same<scalar_t,Kokkos::Experimental::half_t>::value)
       mtx_field = REAL;
+    else {
+      if (!std::is_floating_point<scalar_t>::value)
+        throw std::runtime_error(
+            "scalar_t in read_mtx() incompatible with float or double typed MatrixMarket file.");
+      else
+        mtx_field = REAL;
+    }
   }
   else if (fline.find("complex") != std::string::npos){
     if(!(std::is_same<scalar_t, Kokkos::complex<float>>::value ||
@@ -1218,7 +1291,8 @@ int read_mtx (
     nc = tmp;
   }
   //idx *nv, idx *ne, idx **xadj, idx **adj, wt **wt
-  *nv = nr;
+  *nrows = nr;
+  *ncols = nc;
   *ne = nE;
   //*xadj = new idx[nr + 1];
   md_malloc<size_type>(xadj, nr+1);
@@ -1244,6 +1318,20 @@ int read_mtx (
   (*xadj)[nr] = actual;
   *ne = actual;
   return 0;
+}
+
+//Version of read_mtx which does not capture the number of columns.
+//This is the old interface; it's kept for backwards compatibility.
+template <typename lno_t, typename size_type, typename scalar_t>
+int read_mtx (
+    const char *fileName,
+    lno_t *nv, size_type *ne,
+    size_type **xadj, lno_t **adj, scalar_t **ew,
+    bool symmetrize = false, bool remove_diagonal = true,
+    bool transpose = false)
+{
+  lno_t ncol; //will discard
+  return read_mtx<lno_t, size_type, scalar_t>(fileName, nv, &ncol, ne, xadj, adj, ew, symmetrize, remove_diagonal, transpose);
 }
 
 template <typename lno_t, typename size_type, typename scalar_t>
@@ -1273,6 +1361,8 @@ void read_matrix(lno_t *nv, size_type *ne,size_type **xadj, lno_t **adj, scalar_
 
 template <typename crsMat_t>
 crsMat_t read_kokkos_crst_matrix(const char * filename_){
+  std::string strfilename(filename_);
+  bool isMatrixMarket = endswith(strfilename, ".mtx") || endswith(strfilename, ".mm");
 
   typedef typename crsMat_t::StaticCrsGraphType graph_t;
   typedef typename graph_t::row_map_type::non_const_type row_map_view_t;
@@ -1283,43 +1373,45 @@ crsMat_t read_kokkos_crst_matrix(const char * filename_){
   typedef typename cols_view_t::value_type   lno_t;
   typedef typename values_view_t::value_type scalar_t;
 
-
-  lno_t nv, *adj;
+  lno_t nr, nc, *adj;
   size_type *xadj, nnzA;
   scalar_t *values;
-  read_matrix<lno_t, size_type, scalar_t>(
-      &nv, &nnzA, &xadj, &adj, &values, filename_);
 
-  row_map_view_t rowmap_view("rowmap_view", nv+1);
+  if(isMatrixMarket)
+  {
+    //MatrixMarket file contains the exact number of columns
+    read_mtx<lno_t, size_type, scalar_t> (
+        filename_, &nr, &nc, &nnzA, &xadj, &adj, &values, false, false, false);
+  }
+  else
+  {
+    //.crs and .bin files don't contain #cols, so will compute it later based on the entries
+    read_matrix<lno_t, size_type, scalar_t>(
+        &nr, &nnzA, &xadj, &adj, &values, filename_);
+  }
+
+  row_map_view_t rowmap_view("rowmap_view", nr + 1);
   cols_view_t columns_view("colsmap_view", nnzA);
   values_view_t values_view("values_view", nnzA);
 
-
   {
-    typename row_map_view_t::HostMirror hr = Kokkos::create_mirror_view (rowmap_view);
-    typename cols_view_t::HostMirror hc = Kokkos::create_mirror_view (columns_view);
-    typename values_view_t::HostMirror hv = Kokkos::create_mirror_view (values_view);
-
-    for (lno_t i = 0; i <= nv; ++i){
-      hr(i) = xadj[i];
-    }
-
-    for (size_type i = 0; i < nnzA; ++i){
-      hc(i) = adj[i];
-      hv(i) = values[i];
-    }
+    Kokkos::View<size_type*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> hr(xadj, nr + 1);
+    Kokkos::View<lno_t*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> hc(adj, nnzA);
+    Kokkos::View<scalar_t*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> hv(values, nnzA);
     Kokkos::deep_copy (rowmap_view , hr);
     Kokkos::deep_copy (columns_view , hc);
     Kokkos::deep_copy (values_view , hv);
   }
 
-  lno_t ncols = 0;
-  KokkosKernels::Impl::kk_view_reduce_max
-      <cols_view_t, typename crsMat_t::execution_space>(nnzA, columns_view, ncols);
-  ncols += 1;
+  if(!isMatrixMarket)
+  {
+    KokkosKernels::Impl::kk_view_reduce_max
+        <cols_view_t, typename crsMat_t::execution_space>(nnzA, columns_view, nc);
+    nc++;
+  }
   
   graph_t static_graph (columns_view, rowmap_view);
-  crsMat_t crsmat("CrsMatrix", ncols, values_view, static_graph);
+  crsMat_t crsmat("CrsMatrix", nc, values_view, static_graph);
   delete [] xadj; delete [] adj; delete [] values;
   return crsmat;
 }
