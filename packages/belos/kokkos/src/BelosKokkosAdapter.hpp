@@ -261,10 +261,10 @@
       KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
       if( myView.extent(1) == 1 && A_vec->myView.extent(1) == 1){
         // Then B is a scalar...
-        ScalarType Bsub = B(0,0);
+        ScalarType scal1 = alpha*B(0,0);
         ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
         ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
-        KokkosBlas::axpy(Bsub, Asub, mysub); 
+        KokkosBlas::axpby(scal1, Asub, beta, mysub); 
       }
       else{
         UMHostConstViewMatrixType mat_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
@@ -281,6 +281,7 @@
       }
     }
 
+    //Version not used by belos that has multivecs everywhere.
     //! *this <- alpha * A * B + beta * (*this)
     void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                            const MultiVec<ScalarType>& B, const ScalarType beta ){
