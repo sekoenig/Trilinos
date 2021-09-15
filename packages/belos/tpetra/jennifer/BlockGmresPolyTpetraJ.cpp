@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
     std::string outersolver("Block Gmres");   // name of outer solver
     std::string polytype("Roots");            // polynomial configuration.  
     std::string filename("bcsstk13.mtx");      // name of matrix file
+    std::string polyPrec = "none";
     MT tol = 1.0e-8;                          // relative residual tolerance
     MT polytol = tol/10;                      // relative residual tolerance for polynomial construction
 
@@ -126,13 +127,14 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("stacked-timer", "no-stacked-timer", &use_stacked_timer, "Run with or without stacked timer output");
     cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
     cmdp.setOption("outersolver",&outersolver,"Name of outer solver to be used with GMRES poly");
+    cmdp.setOption("polyprec",&polyPrec,"Use Poly preconditioning. Options are 'none' or 'poly'.");
     cmdp.setOption("poly-type",&polytype,"Name of the polynomial to be generated. Arnoldi, Gmres, or Roots.");
     cmdp.setOption("tol",&tol,"Relative residual tolerance used by GMRES solver.");
     cmdp.setOption("poly-tol",&polytol,"Relative residual tolerance used to construct the GMRES polynomial.");
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
     cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
     cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
-    cmdp.setOption("max-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
+    cmdp.setOption("poly-deg",&maxdegree,"Maximum degree of the GMRES polynomial.");
     cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
     cmdp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
     if (cmdp.parse(argc,argv) != CommandLineProcessor::PARSE_SUCCESSFUL) {
@@ -144,10 +146,6 @@ int main(int argc, char *argv[]) {
 
     MyPID = rank(*comm);
     proc_verbose = ( verbose && (MyPID==0) );
-
-    if (proc_verbose) {
-      std::cout << Belos::Belos_Version() << std::endl << std::endl;
-    }
 
     //
     // Get the data from the HB file and build the Map,Matrix
@@ -192,6 +190,9 @@ int main(int argc, char *argv[]) {
     // Parameter list used by the GMRES Polynomial (inner) solver
     ParameterList polyList;
     polyList.set( "Polynomial Type", polytype );          // Type of polynomial to be generated
+    if( polyPrec == "none" ){
+      maxdegree=0;
+    }
     polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Verbosity", verbosity );               // Verbosity for polynomial construction

@@ -107,14 +107,14 @@ int main(int argc, char *argv[]) {
 
     bool proc_verbose = false;
     bool userandomrhs = false;                // use linear problem RHS or random RHS to generate poly
-    int frequency = -1;                       // frequency of status test output.
+    int frequency = 50;                       // frequency of status test output.
     int blocksize = 1;                        // blocksize
     int numrhs = 1;                           // number of right-hand sides to solve for
-    int maxiters = -1;                        // maximum number of iterations allowed per linear system
-    int maxdegree = 25;                       // maximum degree of polynomial
+    int maxiters = 1000000;                        // maximum number of iterations allowed per linear system
+    int polydegree = 0;                       // maximum degree of polynomial
     bool use_stacked_timer = false;              
     int maxsubspace = 50;                     // maximum number of blocks the solver can use for the subspace
-    int maxrestarts = 25;                     // number of restarts allowed
+    int maxrestarts = 2500;                     // number of restarts allowed
     std::string outersolver("Block Gmres");   // name of outer solver
     std::string polytype("Roots");            // polynomial configuration.  
     std::string filename("bcsstk13.mtx");      // name of matrix file
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
     cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
     cmdp.setOption("block-size",&blocksize,"Block size used by GMRES.");
     cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
-    cmdp.setOption("max-degree",&maxdegree,"Maximum degree of the GMRES polynomial.");
+    cmdp.setOption("poly-deg",&polydegree,"Maximum degree of the GMRES polynomial.");
     cmdp.setOption("max-subspace",&maxsubspace,"Maximum number of blocks the solver can use for the subspace.");
     cmdp.setOption("max-restarts",&maxrestarts,"Maximum number of restarts allowed for GMRES solver.");
 
@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
     // Parameter list used by the GMRES Polynomial (inner) solver
     ParameterList polyList;
     polyList.set( "Polynomial Type", polytype );          // Type of polynomial to be generated
-    polyList.set( "Maximum Degree", maxdegree );          // Maximum degree of the GMRES polynomial
+    polyList.set( "Maximum Degree", polydegree );          // Maximum degree of the GMRES polynomial
     polyList.set( "Polynomial Tolerance", polytol );      // Polynomial convergence tolerance requested
     polyList.set( "Verbosity", verbosity );               // Verbosity for polynomial construction
     polyList.set( "Random RHS", userandomrhs );           // Use RHS from linear system or random vector
