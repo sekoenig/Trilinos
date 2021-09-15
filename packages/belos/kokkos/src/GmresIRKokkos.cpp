@@ -72,7 +72,7 @@ bool success = true;
   typedef Kokkos::DefaultExecutionSpace     EXSP;
   //typedef Teuchos::ScalarTraits<ST>        SCT;
   //typedef SCT::magnitudeType                MT;
-  //typedef Belos::KokkosMultiVec<ST>         MV;
+  //typedef Belos::KokkosMultiVec<ST2>         MV2;
   //typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
@@ -97,6 +97,7 @@ bool proc_verbose = false;
   int maxsubspace = 50;      // maximum number of blocks the solver can use for the subspace
   //int maxrestarts = 50;      // number of restarts allowed
   std::string filename("orsirr_1.mtx"); // example matrix
+  std::string rhsfile("");
   double tol = 1.0e-8;           // relative residual tolerance
   bool converged = false;  
   bool verboseTimes = false; //Show timing at every low precision Gmres iter?  
@@ -120,6 +121,7 @@ bool proc_verbose = false;
   cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
+  cmdp.setOption("rhsfile",&rhsfile,"Filename for right-hand side. (*.mtx file) ");
   //cmdp.setOption("tol",&tol,"Relative residual tolerance used by Gmres solver.");
   cmdp.setOption("outerTol",&tol,"Relative residual tolerance used by outer iterative refinement solver.");
   cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
@@ -157,17 +159,40 @@ bool proc_verbose = false;
   
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
   X1->MvInit(0.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST>> B1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
-  B1->MvInit(1.0);
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> R1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
   Teuchos::RCP<Belos::KokkosMultiVec<ST2>> X2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
   Teuchos::RCP<Belos::KokkosMultiVec<ST2>> Xfinal = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
   Xfinal->MvInit(0.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST2>> B2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
-  B2->MvInit(1.0);
-  Teuchos::RCP<Belos::KokkosMultiVec<ST2>> R2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
-  R2->MvInit(1.0);// This is used to make R1 in initial loop. So make it equal B1=B2.  
+  Teuchos::RCP<Belos::KokkosMultiVec<ST2>> R2;
 
+  Teuchos::RCP<Belos::KokkosMultiVec<ST>> B1;
+  Teuchos::RCP<Belos::KokkosMultiVec<ST2>> B2;
+  if(rhsfile == ""){
+    B1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );
+    B2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
+    B1->MvInit(1.0);
+    B2->MvInit(1.0);
+    R2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(numRows, numrhs) );
+    R2->MvInit(1.0);// This is used to make R1 in initial loop. So make it equal B1=B2.  
+    std::cout << "Just initialized rhs vecs to 1." << std::endl;
+  }
+  else{
+    Kokkos::View<ST**> b1k("kokkos b1", numRows, 1);
+    Kokkos::View<ST2**> b2k("kokkos b2", numRows, 1);
+    Kokkos::View<ST2**> r2k("kokkos r2", numRows, 1);
+    auto b1ksub = Kokkos::subview(b1k, Kokkos::ALL, 0);
+    auto b2ksub = Kokkos::subview(b2k, Kokkos::ALL, 0);
+    auto r2ksub = Kokkos::subview(r2k, Kokkos::ALL, 0);
+    KokkosKernels::Impl::kk_read_MM_vector(b1ksub,rhsfile.c_str());
+    KokkosKernels::Impl::kk_read_MM_vector(b2ksub,rhsfile.c_str());
+    KokkosKernels::Impl::kk_read_MM_vector(r2ksub,rhsfile.c_str());
+    B1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(b1k) );
+    B2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(b2k) );
+    R2 = Teuchos::rcp( new Belos::KokkosMultiVec<ST2>(r2k) );
+    //R2 = MVT::CloneCopy(dynamic_cast<Belos::KokkosMultiVec<ST2>>(*B2)); //Make R2 = B2. //Can't copy line above because constructor owns the view.
+    //R2 = KMVT::CloneCopy(*B2); //Make R2 = B2. //Can't copy line above because constructor owns the view.
+    std::cout << "Just read in rhs vecs from file." << std::endl;
+  }
   proc_verbose = verbose;  /* Only print on the zero processor */
 
   //

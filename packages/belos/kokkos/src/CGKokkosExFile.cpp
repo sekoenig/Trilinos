@@ -283,8 +283,6 @@ bool proc_verbose = false;
       std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
   }
 
-  std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
-
 #ifdef JENN_DEBUG
   cout << "The JENN_DEBUG variable is working!!!" << endl;
 #endif

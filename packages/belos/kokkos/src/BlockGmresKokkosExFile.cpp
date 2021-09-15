@@ -111,6 +111,7 @@ bool proc_verbose = false;
   bool polyRandomRhs = true; // if True, poly may be different on each run!
   std::string jacobisolve("GEMV"); //Solve type for Jacobi prec- TRSV or GEMV. 
   std::string filename("bcsstk13.mtx"); // example matrix
+  std::string rhsfile("");
   MT tol = 1.0e-6;           // relative residual tolerance
 
   Teuchos::CommandLineProcessor cmdp(false,true);
@@ -125,6 +126,7 @@ bool proc_verbose = false;
   cmdp.setOption("expres","impres",&expresidual,"Use explicit residual throughout.");
   cmdp.setOption("frequency",&frequency,"Solvers frequency for printing residuals (#iters).");
   cmdp.setOption("filename",&filename,"Filename for test matrix.  Acceptable file extensions: *.hb,*.mtx,*.triU,*.triS");
+  cmdp.setOption("rhsfile",&rhsfile,"Filename for right-hand side. (*.mtx file) ");
   cmdp.setOption("tol",&tol,"Relative residual tolerance used by Gmres solver.");
   cmdp.setOption("num-rhs",&numrhs,"Number of right-hand sides to be solved for.");
   cmdp.setOption("max-iters",&maxiters,"Maximum number of iterations per linear system (-1 = adapted to problem/block size).");
@@ -156,8 +158,19 @@ bool proc_verbose = false;
 
   Teuchos::RCP<MV> X = Teuchos::rcp( new MV(numRows, numrhs) );
   X->MvInit(0.0);
-  Teuchos::RCP<MV> B = Teuchos::rcp( new MV(numRows, numrhs) );
-  B->MvInit(1.0);
+  Teuchos::RCP<MV> B;
+  if(rhsfile == ""){
+    B = Teuchos::rcp( new MV(numRows, numrhs) );
+    B->MvInit(1.0);
+    std::cout << "Just initialized rhs vecs to 1." << std::endl;
+  }
+  else{
+    Kokkos::View<ST**> bk("kokkos b", numRows, 1);
+    auto bksub = Kokkos::subview(bk, Kokkos::ALL, 0);
+    KokkosKernels::Impl::kk_read_MM_vector(bksub,rhsfile.c_str());
+    B = Teuchos::rcp( new MV(bk) );
+    std::cout << "Just read in rhs vecs from file." << std::endl;
+  }
 
   proc_verbose = verbose;  /* Only print on the zero processor */
   // Create the timer for outer iteration:
@@ -306,8 +319,6 @@ bool proc_verbose = false;
     if (proc_verbose)
       std::cout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
   }
-
-  std::cout << std::endl << "Final num multivecs is: " << MV::multivecCount << std::endl;
 
 #ifdef JENN_DEBUG
   cout << "The JENN_DEBUG variable is working!!!" << endl;
