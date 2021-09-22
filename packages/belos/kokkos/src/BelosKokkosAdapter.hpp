@@ -77,23 +77,27 @@ class KokkosOperator;
 template<class ScalarType, class Device = Kokkos::DefaultExecutionSpace >
 class KokkosMultiVec : public MultiVec<ScalarType> {
 
-//TODO T- Did we make myView public because of this??
-  //Think it is okay for ScalarType to not match ScalarType2 b/c eventually we might want
-  //MV and OP to have different precisions
-//   template<class ScalarType2, class OrdinalType, class Device>
-//   friend class KokkosOperator; 
-public: //TODO: should these typedefs be public? 
+public: 
+
   using ViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Device>;
   using ConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Device>;
   using ViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Device>;
   using ConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Device>;
   
   //Unmanaged view types: 
-  using UMHostViewVectorType = Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
-  using UMHostConstViewVectorType = Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
-  using UMHostViewMatrixType = Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
-  using UMHostConstViewMatrixType = Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+  using UMHostViewVectorType = 
+        Kokkos::View<ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+  using UMHostConstViewVectorType = 
+        Kokkos::View<const ScalarType*,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+  using UMHostViewMatrixType = 
+        Kokkos::View<ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+  using UMHostConstViewMatrixType = 
+        Kokkos::View<const ScalarType**,Kokkos::LayoutLeft, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
+protected:
+  ViewMatrixType myView;
+
+public:
   // constructors
   // TODO: Heidi: Should the views in these first 3 constructors be initialized?  Or not?
   KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs) :
@@ -109,22 +113,22 @@ public: //TODO: should these typedefs be public?
   template < class ScalarType2 >
     KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType2, Device> &sourceVec) : 
     myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
-  { Kokkos::deep_copy(myView,sourceVec.myView); }
+  { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   //Need this explicitly, else compiler makes its own with shallow copy. 
   KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
     myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
-  { Kokkos::deep_copy(myView,sourceVec.myView); }
+  { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   // Compiler default should give shallow copy.
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType, Device> & sourceVec) {
-    Kokkos::deep_copy(myView,sourceVec.myView);
+    Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
   
   template < class ScalarType2 >
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType2, Device> & sourceVec) {
-    Kokkos::deep_copy(myView,sourceVec.myView);
+    Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
   
@@ -146,6 +150,16 @@ public: //TODO: should these typedefs be public?
   //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
   ~KokkosMultiVec<ScalarType, Device>(){}
 
+
+  //! Reader method for internal view.
+  ConstViewMatrixType GetInternalViewConst() const {
+    return myView;
+  }
+
+  //! Reader/Writer method for internal view.
+  ViewMatrixType GetInternalViewNonConst(){
+    return myView;
+  }
   //! @name Member functions inherited from Belos::MultiVec
   //@{
 
@@ -167,7 +181,7 @@ public: //TODO: should these typedefs be public?
   /// copy).
   MultiVec<ScalarType> * CloneCopy () const{
     KokkosMultiVec<ScalarType, Device> * ptr = new KokkosMultiVec<ScalarType, Device>(myView.extent(0),myView.extent(1));
-    Kokkos::deep_copy(ptr->myView,myView);
+    Kokkos::deep_copy(ptr->GetInternalViewNonConst(),myView);
     return ptr;
   }
 
@@ -187,15 +201,15 @@ public: //TODO: should these typedefs be public?
       }
     }
     if(isAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
-      Kokkos::deep_copy(B->myView,myView);
+      Kokkos::deep_copy(B->GetInternalViewNonConst(),myView);
     }
     else if (isAscending){ //Copy contiguous subset
       ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
-      Kokkos::deep_copy(B->myView,ThisSub);
+      Kokkos::deep_copy(B->GetInternalViewNonConst(),ThisSub);
     } 
     else{ //Copy columns one by one
       for(unsigned int i=0; i<index.size(); i++){
-        auto Bsub = Kokkos::subview(B->myView, Kokkos::ALL, i);
+        auto Bsub = Kokkos::subview(B->GetInternalViewNonConst(), Kokkos::ALL, i);
         auto ThisSub = Kokkos::subview(myView, Kokkos::ALL, index[i]);
         Kokkos::deep_copy(Bsub, ThisSub);
       }
@@ -265,16 +279,16 @@ public: //TODO: should these typedefs be public?
 
     //Perform deep copy of sub block:
     if(isAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
-      Kokkos::deep_copy(myView,A_vec->myView);
+      Kokkos::deep_copy(myView,A_vec->GetInternalViewConst());
     }
     else if (isAscending){ //Copy contiguous subset
-      ViewMatrixType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, std::make_pair(0,(int)index.size()));
+      ConstViewMatrixType Asub = Kokkos::subview(A_vec->GetInternalViewConst(), Kokkos::ALL, std::make_pair(0,(int)index.size()));
       ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
       Kokkos::deep_copy(ThisSub, Asub);
     } 
     else{ //Copy columns one by one
       for(unsigned int i=0; i<index.size(); i++){
-        ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, i);
+        ConstViewVectorType Asub = Kokkos::subview(A_vec->GetInternalViewConst(), Kokkos::ALL, i);
         ViewVectorType ThisSub = Kokkos::subview(myView, Kokkos::ALL, index[i]);
         Kokkos::deep_copy(ThisSub, Asub);
       }
@@ -293,23 +307,23 @@ public: //TODO: should these typedefs be public?
   void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                          const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
-    if( myView.extent(1) == 1 && A_vec->myView.extent(1) == 1){ //B is a scalar.
+    if( myView.extent(1) == 1 && A_vec->GetInternalViewConst().extent(1) == 1){ //B is a scalar.
       ScalarType scal1 = alpha*B(0,0);
       ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
-      ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
+      ConstViewVectorType Asub = Kokkos::subview(A_vec->GetInternalViewConst(), Kokkos::ALL, 0);
       KokkosBlas::axpby(scal1, Asub, beta, mysub); 
     }
     else{
-      UMHostConstViewMatrixType mat_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
-      ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1));
+      UMHostConstViewMatrixType mat_h(B.values(), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
+      ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
       Kokkos::deep_copy(mat_d, mat_h);
       if( myView.extent(1) == 1 ){ // B has only 1 col
           ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
           ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
-          KokkosBlas::gemv("N", alpha, A_vec->myView, Bsub, beta, mysub);
+          KokkosBlas::gemv("N", alpha, A_vec->GetInternalViewConst(), Bsub, beta, mysub);
       }
       else{
-        KokkosBlas::gemm("N", "N", alpha, A_vec->myView, mat_d, beta, myView);
+        KokkosBlas::gemm("N", "N", alpha, A_vec->GetInternalViewConst(), mat_d, beta, myView);
       }
     }
   }
@@ -320,7 +334,7 @@ public: //TODO: should these typedefs be public?
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
     KokkosMultiVec<ScalarType, Device> *B_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(B));
 
-    KokkosBlas::update(alpha, A_vec->myView, beta, B_vec->myView, (ScalarType) 0.0, myView);
+    KokkosBlas::update(alpha, A_vec->GetInternalViewConst(), beta, B_vec->GetInternalViewConst(), (ScalarType) 0.0, myView);
   }
 
   //! Scale (multiply) each element of the vectors in \c *this with \c alpha.
@@ -343,7 +357,7 @@ public: //TODO: should these typedefs be public?
   void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
     if(A_vec->myView.extent(1) == 1 && myView.extent(1) == 1){
-      ViewVectorType Asub = Kokkos::subview(A_vec->myView, Kokkos::ALL, 0);
+      ConstViewVectorType Asub = Kokkos::subview(A_vec->GetInternalViewConst(), Kokkos::ALL, 0);
       ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
       ScalarType soln = KokkosBlas::dot(Asub, mysub);
       soln = alpha*soln;
@@ -354,17 +368,17 @@ public: //TODO: should these typedefs be public?
    // Do not enable for now. 
    // ****
    // else if( myView.extent(1) == 1 ){ // Only 1 col in soln vec
-   //   ViewVectorType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->myView.extent(1));
+   //   ViewVectorType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->GetInternalViewConst().extent(1));
    //   ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
-   //   KokkosBlas::gemv("C", alpha, A_vec->myView, mysub, ScalarType(0.0), soln);
+   //   KokkosBlas::gemv("C", alpha, A_vec->GetInternalViewConst(), mysub, ScalarType(0.0), soln);
    //   for( unsigned int i = 0; i < soln.extent(0); i++){
    //     B(i,0) = soln(i);
    //   }
    // }
     else{
-      UMHostViewMatrixType soln_h(B.values(), A_vec->myView.extent(1), myView.extent(1));
-      ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->myView.extent(1), myView.extent(1)); 
-      KokkosBlas::gemm("C", "N", alpha, A_vec->myView, myView, ScalarType(0.0), soln_d);
+      UMHostViewMatrixType soln_h(B.values(), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
+      ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1)); 
+      KokkosBlas::gemm("C", "N", alpha, A_vec->GetInternalViewConst(), myView, ScalarType(0.0), soln_d);
       Kokkos::deep_copy(soln_h, soln_d);
     }
   }
@@ -381,7 +395,7 @@ public: //TODO: should these typedefs be public?
 
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
 
-    KokkosBlas::dot(dotView_d, A_vec->myView, myView); 
+    KokkosBlas::dot(dotView_d, A_vec->GetInternalViewConst(), myView); 
     Kokkos::deep_copy(dotView_h, dotView_d);
   }
 
@@ -442,10 +456,6 @@ public: //TODO: should these typedefs be public?
     os << std::endl;
   }
 
-//private:  //TODO fix this??
-//This var should be private, but I can't get friend class templaty stuff to work, so...
-  ViewMatrixType myView;
-private:
 
 };
 
@@ -518,7 +528,7 @@ public:
     //KokkosSparse::spmv computes y = beta*y + alpha*Op(A)*x
     ScalarType alpha = 1.0;
     ScalarType beta = 0;
-    KokkosSparse::spmv(mode, alpha, myMatrix, x_vec->myView, beta, y_vec->myView);
+    KokkosSparse::spmv(mode, alpha, myMatrix, x_vec->GetInternalViewConst(), beta, y_vec->GetInternalViewNonConst());
   }
 
   /// \brief Whether this operator implements applying the transpose.

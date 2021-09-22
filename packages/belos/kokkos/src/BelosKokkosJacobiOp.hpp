@@ -174,15 +174,15 @@
       const int i = member.league_rank();
       auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
       Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = 
-         Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = 
-         Kokkos::subview(x_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+         Kokkos::subview(y_vec->GetInternalViewNonConst(), Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+      Kokkos::View<const ScalarType*, Kokkos::LayoutLeft, Device> xsub = 
+         Kokkos::subview(x_vec->GetInternalViewConst(), Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
       KokkosBatched::TeamGemv<member_type, KokkosBatched::Trans::NoTranspose, KokkosBatched::Algo::Level2::Unblocked>
         ::invoke(member, one, Asub, xsub, zero, ysub);
             });}
     else if (solve_ == "TRSV"){
       //Must deep copy here because TRSV uses same input and output vector.
-      Kokkos::deep_copy(y_vec->myView, x_vec->myView);
+      Kokkos::deep_copy(y_vec->GetInternalViewNonConst(), x_vec->GetInternalViewConst());
 
       //Print y before LU inv:
       /*std::cout << "Printing y before apply LU inv: " << std::endl;
@@ -196,7 +196,7 @@
          const int i = member.league_rank();
          auto Asub = Kokkos::subview(Ablocks_, i, Kokkos::ALL(), Kokkos::ALL());
          Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = 
-           Kokkos::subview(y_vec->myView, Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
+           Kokkos::subview(y_vec->GetInternalViewNonConst(), Kokkos::make_pair(i*blockSize_,(i+1)*blockSize_), 0);
          /*if(i == 0){
            printf("Printing A from proc 0: \n");
            for(int k = 0; k < Asub.extent(0); k++){

@@ -224,8 +224,8 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
       KokkosMultiVec<ScalarType, Device> *y_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>(&y);
 
       // Get a rank-1 subview of our rank-2 view, so don't fail asserts on sptrsv. 
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> xsub = Kokkos::subview(x_vec->myView, Kokkos::ALL, 0);
-      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = Kokkos::subview(y_vec->myView, Kokkos::ALL, 0);
+      Kokkos::View<const ScalarType*, Kokkos::LayoutLeft, Device> xsub = Kokkos::subview(x_vec->GetInternalViewConst(), Kokkos::ALL, 0);
+      Kokkos::View<ScalarType*, Kokkos::LayoutLeft, Device> ysub = Kokkos::subview(y_vec->GetInternalViewNonConst(), Kokkos::ALL, 0);
 
       // KokkosSparse::Experimental::sptrsv_solve(handle, rowmap, entries, values, b, x);
       // x = U\b, x = L\b, Ux=b, etc. 

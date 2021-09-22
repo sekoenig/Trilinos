@@ -108,11 +108,11 @@ TRIBITS_ADD_EXECUTABLE(
   COMM serial mpi
   )
 
-TRIBITS_ADD_EXECUTABLE(
-  MVTestInternal
-  SOURCES MVTestInternal.cpp
-  COMM serial mpi
-  )
+#TRIBITS_ADD_EXECUTABLE(
+#  MVTestInternal
+#  SOURCES MVTestInternal.cpp
+#  COMM serial mpi
+#  )
 
 TRIBITS_ADD_EXECUTABLE(
   PseudoBlockCGKokkosEx
