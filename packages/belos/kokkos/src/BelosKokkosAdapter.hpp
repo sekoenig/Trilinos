@@ -99,15 +99,17 @@ protected:
 
 public:
   // constructors
-  // TODO: Heidi: Should the views in these first 3 constructors be initialized?  Or not?
-  KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs) :
-    myView (label,numrows,numvecs) { }
+  KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs, const bool zeroOut = true) :
+    myView (Kokkos::ViewAllocateWithoutInitializing(label),numrows,numvecs) 
+    { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
-  KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs) :
-    myView ("MV",numrows,numvecs) { }
+  KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs, const bool zeroOut = true) :
+    myView (Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,numvecs) 
+    { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
-  KokkosMultiVec<ScalarType, Device> (const int numrows) :
-    myView("MV",numrows,1) { }
+  KokkosMultiVec<ScalarType, Device> (const int numrows, const bool zeroOut = true) :
+    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,1) 
+    { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
   // Make so that copy constructor of MV gives deep copy.  
   template < class ScalarType2 >
@@ -132,11 +134,14 @@ public:
     return *this;
   }
   
-  //TODO: Would it be better if this was deep copy?  So we can't change the user's original data?  
-  // And so the user can't change ours?
-  // But doing so would add a bunch of deep copy's to clone view... Maybe make it an option?  
-  KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView) : 
-    myView(sourceView){ }
+  KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView, bool makeCopy = true) { 
+    if( makeCopy ){
+      Kokkos::deep_copy(myView, sourceView);
+    }
+    else{
+      myView = sourceView;
+    }  
+  }
   
   // This version allows us to make exclusive changes to the view and convert between scalar types:
   template < class ScalarType2 > //TODO: Fix this so that passing in a view without device specified actually compiles...
@@ -167,11 +172,12 @@ public:
   /// object of the pure virtual class.  This vector's entries are
   /// not copied; instead, a new MultiVec is created with the same
   /// data distribution, but with numvecs columns (numvecs > 0).
+  /// Multivector entries are not initialized.
   ///
   /// \param numvecs [in] The number of columns in the output
   ///   multivector.  Must be positive.
   MultiVec<ScalarType> * Clone ( const int numvecs ) const{
-    KokkosMultiVec<ScalarType, Device> * ptr = new KokkosMultiVec<ScalarType, Device>(myView.extent(0),numvecs);
+    KokkosMultiVec<ScalarType, Device> * ptr = new KokkosMultiVec<ScalarType, Device>(myView.extent(0),numvecs, false);
     return ptr;
   }
 
@@ -180,7 +186,7 @@ public:
   /// copied and a new stand-alone multivector is created.  (deep
   /// copy).
   MultiVec<ScalarType> * CloneCopy () const{
-    KokkosMultiVec<ScalarType, Device> * ptr = new KokkosMultiVec<ScalarType, Device>(myView.extent(0),myView.extent(1));
+    KokkosMultiVec<ScalarType, Device> * ptr = new KokkosMultiVec<ScalarType, Device>(myView.extent(0),myView.extent(1), false);
     Kokkos::deep_copy(ptr->GetInternalViewNonConst(),myView);
     return ptr;
   }
@@ -193,7 +199,7 @@ public:
     // Be careful with indexing- need to add 1 to last index value b/c Belos includes value at last index while Kokkos doesn't.
     // TODO might need to check that index bounds are valid. 
     int numvecs = index.size();
-    KokkosMultiVec<ScalarType, Device> * B = new KokkosMultiVec<ScalarType, Device>("B",myView.extent(0),numvecs);
+    KokkosMultiVec<ScalarType, Device> * B = new KokkosMultiVec<ScalarType, Device>("B",myView.extent(0),numvecs, false);
     bool isAscending = true;//Also checks if is contiguous.
     for(unsigned int i=0; i< (index.size()-1); i++){
       if( index[i+1] != index[i]+1 ){
@@ -227,9 +233,9 @@ public:
         isAscending = false;
       }
     }
-    if(isAscending ){ //Copy entire multivec.
+    if(isAscending ){ //View entire multivec.
     KokkosMultiVec<ScalarType, Device> * B = 
-        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
+        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),false);
       return B; 
     }
     else{
@@ -249,7 +255,7 @@ public:
     }
     if(isAscending ){ //Copy entire multivec.
     const KokkosMultiVec<ScalarType, Device> * B = 
-        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)));
+        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),false);
       return B; 
     }
     else{
