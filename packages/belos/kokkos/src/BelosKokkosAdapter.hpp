@@ -98,42 +98,85 @@ protected:
   ViewMatrixType myView;
 
 public:
-  // constructors
+  //! @name Constructors/Destructor
+  //@{ 
+  
+  //! Constructs a multivector with specified number of columns and rows.
+  ///
+  /// Returns a multivector with `numrows` rows and `numvecs` columns.
+  /// The `label` string indicates the label for the internal `Kokkos::view`. 
+  /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs, const bool zeroOut = true) :
     myView (Kokkos::ViewAllocateWithoutInitializing(label),numrows,numvecs) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
+  //! Constructs a multivector with specified number of columns and rows.
+  ///
+  /// Returns a multivector with `numrows` rows and `numvecs` columns.
+  /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs, const bool zeroOut = true) :
     myView (Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,numvecs) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
+  //! Constructs a single column multivector with specified number of rows.
+  ///
+  /// Returns a single column multivector with `numrows` rows.
+  /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const bool zeroOut = true) :
     myView(Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,1) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
-  // Make so that copy constructor of MV gives deep copy.  
+  //! Copy constructor (performs deep copy).
+  ///
+  /// This copy constructor returns a new KokksMultiVec containing a
+  /// deep copy of the multivector given by the user.  
+  KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
+    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
+  { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
+
+  //! Copy constructor for type conversion. (Performs deep copy.)
+  ///
+  /// This copy constructor returns a new KokksMultiVec containing a
+  /// deep copy of the multivector given by the user.  
+  /// The internal data of the multivector is converted from 
+  /// `ScalarType` to `ScalarType2`.
   template < class ScalarType2 >
     KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType2, Device> &sourceVec) : 
     myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
   { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
-  //Need this explicitly, else compiler makes its own with shallow copy. 
-  KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
-    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
-  { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
-
-  // Compiler default should give shallow copy.
+  //! Assignment operator (performs deep copy).
+  ///
+  /// This `=` operator performs a deep copy of
+  /// the right-hand side KokkosMultiVec to the
+  /// left-hand side KokkosMultiVec. 
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType, Device> & sourceVec) {
     Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
   
+  //! Assignment operator for type conversion. (Performs deep copy.)
+  ///
+  /// This `=` operator performs a deep copy of
+  /// the right-hand side KokkosMultiVec to the
+  /// left-hand side KokkosMultiVec. 
+  /// The internal data of the right-hand side multivec
+  /// is converted from `ScalarType` to `ScalarType2`.
   template < class ScalarType2 >
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType2, Device> & sourceVec) {
     Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
   
+  //! Create a KokkosMultiVec from a given `Kokkos::view`.
+  ///
+  /// Returns a KokkosMultiVec that internally stores the 
+  /// data given in `sourceView`. If `makeCopy` has value
+  /// `true`, then this function makes a deep copy of the 
+  /// `Kokkos::view`.  If `false`, then the KokkosMultiVec stores a
+  /// shallow copy of the given `Kokkos::view`.  (This option assumes that
+  /// the user will make no changes to that view outside of
+  /// the KokkosMultiVec interface.)
   KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView, bool makeCopy = true) { 
     if( makeCopy ){
       Kokkos::deep_copy(myView, sourceView);
@@ -149,23 +192,37 @@ public:
     myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1))
   { Kokkos::deep_copy(myView,sourceView); }
 
-  //This function specialization makes things compile...else compiler can't deduce template type?
-  //KokkosMultiVec<ScalarType> (const ViewMatrixType & sourceView) : 
-  //    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1)) {Kokkos::deep_copy(myView,sourceView);}
-  //If we've already made a view and want it to be a multivec... is this the right way to do it?? TODO
+  //! Destructor (default)
   ~KokkosMultiVec<ScalarType, Device>(){}
 
+  //@}
 
-  //! Reader method for internal view.
+  //! @name Data Access Methods
+  //@{
+
+  //! Reader (const) method for internal view.
+  ///
+  /// Returns the (const) view that stores internal data 
+  /// for the KokkosMultiVec. 
   ConstViewMatrixType GetInternalViewConst() const {
     return myView;
   }
 
   //! Reader/Writer method for internal view.
+  ///
+  /// Returns the view that stores internal data 
+  /// for the KokkosMultiVec. 
+  /// ** Be careful!! ** The KokkosMultiVec does
+  /// NOT expect users to use this function to 
+  /// make changes to its internal data. Most 
+  /// necessary changes can be made via other functions.
+  /// Make sure you know what you are doing!  
   ViewMatrixType GetInternalViewNonConst(){
     return myView;
   }
-  //! @name Member functions inherited from Belos::MultiVec
+  //@}
+
+  //! @name Copy/View functions inherited from Belos::MultiVec
   //@{
 
   /// A virtual "copy constructor" that returns a pointer to a new
@@ -300,7 +357,10 @@ public:
       }
     }
   }
+  //@}
 
+  //! @name Attribue functions inherited from Belos::MultiVec
+  //@{
   //! The number of rows in the multivector.
   ptrdiff_t GetGlobalLength () const {
     return static_cast<ptrdiff_t>(myView.extent(0));
@@ -308,7 +368,10 @@ public:
 
   //! The number of columns in the multivector.
   int GetNumberVecs () const { return myView.extent(1); }
+  //@}
 
+  //! @name Mathematical functions inherited from Belos::MultiVec
+  //@{
   //! *this <- alpha * A * B + beta * (*this)
   void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                          const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
@@ -433,7 +496,10 @@ public:
     }   
     Kokkos::deep_copy(normView_h, normView_d);
   }
+  //@}
 
+  //! @name Initialization functions inherited from Belos::MultiVec
+  //@{
   //! Fill all columns of *this with random values.
   void MvRandom() {
     int rand_seed = std::rand();
@@ -445,7 +511,10 @@ public:
   void MvInit ( const ScalarType alpha ) {
      Kokkos::deep_copy(myView,alpha);
   }
+  //@}
 
+  //! @name Print function inherited from Belos::MultiVec
+  //@{
   //! Print (*this) to the given output stream.
   ///
   /// (This function will first copy the multivector to host space 
@@ -461,7 +530,7 @@ public:
     } 
     os << std::endl;
   }
-
+  //@}
 
 };
 
