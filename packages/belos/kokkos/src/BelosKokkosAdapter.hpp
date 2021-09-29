@@ -102,7 +102,7 @@ public:
   //@{ 
   
   //! Constructs a multivector with specified number of columns and rows.
-  ///
+ 
   /// Returns a multivector with `numrows` rows and `numvecs` columns.
   /// The `label` string indicates the label for the internal `Kokkos::view`. 
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
@@ -111,7 +111,7 @@ public:
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
   //! Constructs a multivector with specified number of columns and rows.
-  ///
+  
   /// Returns a multivector with `numrows` rows and `numvecs` columns.
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs, const bool zeroOut = true) :
@@ -119,7 +119,7 @@ public:
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
   //! Constructs a single column multivector with specified number of rows.
-  ///
+  
   /// Returns a single column multivector with `numrows` rows.
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const bool zeroOut = true) :
@@ -127,7 +127,7 @@ public:
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
   //! Copy constructor (performs deep copy).
-  ///
+
   /// This copy constructor returns a new KokksMultiVec containing a
   /// deep copy of the multivector given by the user.  
   KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
@@ -135,7 +135,7 @@ public:
   { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   //! Copy constructor for type conversion. (Performs deep copy.)
-  ///
+
   /// This copy constructor returns a new KokksMultiVec containing a
   /// deep copy of the multivector given by the user.  
   /// The internal data of the multivector is converted from 
@@ -146,7 +146,7 @@ public:
   { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   //! Assignment operator (performs deep copy).
-  ///
+
   /// This `=` operator performs a deep copy of
   /// the right-hand side KokkosMultiVec to the
   /// left-hand side KokkosMultiVec. 
@@ -156,7 +156,7 @@ public:
   }
   
   //! Assignment operator for type conversion. (Performs deep copy.)
-  ///
+
   /// This `=` operator performs a deep copy of
   /// the right-hand side KokkosMultiVec to the
   /// left-hand side KokkosMultiVec. 
@@ -169,7 +169,7 @@ public:
   }
   
   //! Create a KokkosMultiVec from a given `Kokkos::view`.
-  ///
+
   /// Returns a KokkosMultiVec that internally stores the 
   /// data given in `sourceView`. If `makeCopy` has value
   /// `true`, then this function makes a deep copy of the 
@@ -201,18 +201,18 @@ public:
   //@{
 
   //! Reader (const) method for internal view.
-  ///
+
   /// Returns the (const) view that stores internal data 
   /// for the KokkosMultiVec. 
   ConstViewMatrixType GetInternalViewConst() const {
-    return myView;
+    return myView; //TODO But is the view returned really const?? 
   }
 
   //! Reader/Writer method for internal view.
-  ///
+
   /// Returns the view that stores internal data 
   /// for the KokkosMultiVec. 
-  /// ** Be careful!! ** The KokkosMultiVec does
+  /// \warning ** Be careful!! ** The KokkosMultiVec does
   /// NOT expect users to use this function to 
   /// make changes to its internal data. Most 
   /// necessary changes can be made via other functions.
@@ -225,8 +225,12 @@ public:
   //! @name Copy/View functions inherited from Belos::MultiVec
   //@{
 
+  //! Creates a MultiVec with same data distribution as `this`.
+
   /// A virtual "copy constructor" that returns a pointer to a new
-  /// object of the pure virtual class.  This vector's entries are
+  /// Belos::MultiVec.  (Underneath, the vector is a KokkosMultiVec,
+  /// and its properties can be accessed via `dynamic_cast`.)  
+  /// This vector's entries are
   /// not copied; instead, a new MultiVec is created with the same
   /// data distribution, but with numvecs columns (numvecs > 0).
   /// Multivector entries are not initialized.
@@ -238,8 +242,10 @@ public:
     return ptr;
   }
 
+  //! \brief Creates a MultiVec which is a (deep) copy of `this`.
   /// A virtual "copy constructor" returning a pointer to a new
-  /// object of the pure virtual class.  This vector's entries are
+  /// object of Belos::MultiVec. (KokkosMultiVec underneath.)
+  /// All of this vector's entries are
   /// copied and a new stand-alone multivector is created.  (deep
   /// copy).
   MultiVec<ScalarType> * CloneCopy () const{
@@ -248,25 +254,34 @@ public:
     return ptr;
   }
 
-  /// A virtual "copy constructor" returning a pointer to the pure
-  /// virtual class.  This vector's entries are copied and a new
+  //! \brief Creates a MultiVec which is a (deep) copy of selected columns of `this`.
+  /// A virtual "copy constructor" returning a pointer to a new Belos::MultiVec. 
+  /// This vector's entries are copied and a new
   /// stand-alone MultiVector is created where only selected columns
   /// are chosen.  (deep copy).
+  /// Indexing is zero-based, so an `std::vector index` with values 0, 3, 5 would 
+  /// indicate copying the first, 4th, and 6th columns of the original multivector.  
+  /// Indices need not be contiguous or ordered. 
+  /// Result is `output[:,i] = (*this)[:,index[i]]`.
   MultiVec<ScalarType> * CloneCopy ( const std::vector<int>& index ) const{
-    // Be careful with indexing- need to add 1 to last index value b/c Belos includes value at last index while Kokkos doesn't.
-    // TODO might need to check that index bounds are valid. 
+    // JAL- If debug options needed, could add validity checks of index.
+    // See debug code in belos/src/tpetra/BelosMultiVecTraits_Tpetra.hpp.
     int numvecs = index.size();
     KokkosMultiVec<ScalarType, Device> * B = new KokkosMultiVec<ScalarType, Device>("B",myView.extent(0),numvecs, false);
-    bool isAscending = true;//Also checks if is contiguous.
+    bool isContigAscending = true;
+
+    //Check whether the given indices are contiguous and ascending.
     for(unsigned int i=0; i< (index.size()-1); i++){
       if( index[i+1] != index[i]+1 ){
-        isAscending = false;
+        isContigAscending = false;
       }
     }
-    if(isAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
+
+    //Copy the vectors: (Case depends on indices.)
+    if(isContigAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
       Kokkos::deep_copy(B->GetInternalViewNonConst(),myView);
     }
-    else if (isAscending){ //Copy contiguous subset
+    else if (isContigAscending){ //Copy contiguous subset
       ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
       Kokkos::deep_copy(B->GetInternalViewNonConst(),ThisSub);
     } 
@@ -280,51 +295,68 @@ public:
     return B; 
   }
 
-  /// A virtual view "constructor" returning a pointer to the pure
-  /// virtual class.  This vector's entries are shared and hence no
-  /// memory is allocated for the columns.
-  MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){ //TODO this won't work for non-contiguous!
-    bool isAscending = true;//Also checks if is contiguous.
-    for(unsigned int i=0; i< (index.size()-1); i++){
-      if( index[i+1] != index[i]+1 ){
-        isAscending = false;
-      }
-    }
-    if(isAscending ){ //View entire multivec.
-    KokkosMultiVec<ScalarType, Device> * B = 
-        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),false);
-      return B; 
-    }
-    else{
-      throw std::runtime_error("CloneViewNonConst asked for non-contiguous subset. \n This feature is not supported in Belos for Kokkos.");
-    }
-  }
-
-  /// A virtual view constructor returning a pointer to the pure
-  /// virtual class.  This vector's entries are shared and hence no
-  /// memory is allocated for the columns.
+  //! \brief Creates a (read-only) MultiVec which is a shallow copy of selected columns of `this`.
+  /// A virtual view constructor returning a pointer to a new Belos::MultiVec with 
+  /// selected columns. (Column indexing is zero-based.) The view is read-only. 
+  /// This vector's entries are shared and hence no
+  /// memory is allocated for the columns. (Internally, we create
+  /// a `Kokkos::subview`.)
+  /// \warning At this time, the Kokkos-Belos adapter only supports 
+  /// viewing column indices that form a contiguous subset in memory. 
+  /// Thus, the values in `index` must be contiguous and ascending (e.g. 0,1,2,3).
   const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const { //TODO implement this!! This isn't const!!
-    bool isAscending = true;//Also checks if is contiguous.
+    bool isContigAscending = true;
+    //Check whether the given indices are contiguous and ascending.
     for(unsigned int i=0; i< (index.size()-1); i++){
       if( index[i+1] != index[i]+1 ){
-        isAscending = false;
+        isContigAscending = false;
       }
     }
-    if(isAscending ){ //Copy entire multivec.
+    if(isContigAscending ){ 
     const KokkosMultiVec<ScalarType, Device> * B = 
         new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),false);
       return B; 
     }
     else{
-      throw std::runtime_error("CloneView asked for non-contiguous subset. \n This feature is not supported in Belos for Kokkos.");
+      throw std::runtime_error("CloneView asked for non-contiguous subset. \n This feature is not yet supported in Belos for Kokkos.");
     }
   }
 
-  //! Copy the vectors in A to the vectors in (*this) specified by index.
-  ///
-  /// Sets a subblock of vectors of this multivector, 
-  /// which need not be contiguous, and is given by the indices.
+
+  //! \brief Creates a nonconst MultiVec which is a shallow copy of selected columns of `this`.
+  /// A virtual view constructor returning a pointer to a new Belos::MultiVec with 
+  /// selected columns. (Column indexing is zero-based.)
+  /// This vector's entries are shared and hence no
+  /// memory is allocated for the columns. (Internally, we create
+  /// a `Kokkos::subview`.) Writing to this view will change the 
+  /// entries of the original multivector. 
+  /// \warning At this time, the Kokkos-Belos adapter only supports 
+  /// viewing column indices that form a contiguous subset in memory. 
+  /// Thus, the values in `index` must be contiguous and ascending (e.g. 0,1,2,3).
+  MultiVec<ScalarType> * CloneViewNonConst ( const std::vector<int>& index ){ 
+    bool isContigAscending = true;
+    //Check whether the given indices are contiguous and ascending.
+    for(unsigned int i=0; i< (index.size()-1); i++){
+      if( index[i+1] != index[i]+1 ){
+        isContigAscending = false;
+      }
+    }
+    if(isContigAscending ){ 
+    KokkosMultiVec<ScalarType, Device> * B = 
+        new KokkosMultiVec<ScalarType, Device>(Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1)),false);
+      return B; 
+    }
+    else{
+      throw std::runtime_error("CloneViewNonConst asked for non-contiguous subset. \n This feature is not yet supported in Belos for Kokkos.");
+    }
+  }
+
+  //! Copy the vectors in A to the vectors in (*this) specified by index. (Deep copy.)
+
+  /// Copies vectors of A to a sub-block of vectors of this multivector. (Deep copy.)
+  /// The sub-block to be overwritten is given by the indices and need not be contiguous.
   /// Result is (*this)[:,index[i]] = A[:,i].
+  /// Column indexing is zero-based.
   ///
   void SetBlock ( const MultiVec<ScalarType>& A, const std::vector<int>& index ){
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
@@ -332,19 +364,19 @@ public:
     if( index.size() > myView.extent(1) ){
       throw std::runtime_error("Error in KokkosMultiVec::SetBlock. A cannot have more vectors than (*this).");
     }
-    //Check if the indices are contiguous and increasing by 1
-    bool isAscending = true;
+    bool isContigAscending = true;
+    //Check whether the given indices are contiguous and ascending.
     for(unsigned int i=0; i< (index.size()-1); i++){
       if( index[i+1] != index[i]+1 ){
-        isAscending = false;
+        isContigAscending = false;
       }
     }
 
     //Perform deep copy of sub block:
-    if(isAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
+    if(isContigAscending && index.size()==(unsigned)this->GetNumberVecs()){ //Copy entire multivec.
       Kokkos::deep_copy(myView,A_vec->GetInternalViewConst());
     }
-    else if (isAscending){ //Copy contiguous subset
+    else if (isContigAscending){ //Copy contiguous subset
       ConstViewMatrixType Asub = Kokkos::subview(A_vec->GetInternalViewConst(), Kokkos::ALL, std::make_pair(0,(int)index.size()));
       ViewMatrixType ThisSub = Kokkos::subview(myView, Kokkos::ALL, std::make_pair(index.front(), index.back()+1));
       Kokkos::deep_copy(ThisSub, Asub);
@@ -361,18 +393,21 @@ public:
 
   //! @name Attribue functions inherited from Belos::MultiVec
   //@{
-  //! The number of rows in the multivector.
+  //! Returns the number of rows in the multivector.
   ptrdiff_t GetGlobalLength () const {
     return static_cast<ptrdiff_t>(myView.extent(0));
   }
 
-  //! The number of columns in the multivector.
+  //! Returns the number of columns in the multivector.
   int GetNumberVecs () const { return myView.extent(1); }
   //@}
 
   //! @name Mathematical functions inherited from Belos::MultiVec
   //@{
-  //! *this <- alpha * A * B + beta * (*this)
+  //! \brief `*this <- alpha * A * B + beta * (*this)`
+  //! `*this <- alpha * A * B + beta * (*this)`
+  /// where alpha and beta are scalars and the dimensions of A*B match
+  /// the dimensions of `(*this)`. 
   void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                          const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
@@ -454,7 +489,7 @@ public:
 
 
   //! b[i] = A[i]^T * this[i]
-  ///
+  
   /// Performs a dot product between A and (*this).
   /// Uses conjugate transpose when appropriate. 
   void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
@@ -469,7 +504,7 @@ public:
   }
 
   //! alpha[i] = norm of i-th column of (*this)
-  ///
+  
   /// Valid norm types are Belos::TwoNorm, Belos::OneNorm,
   /// and Belos::InfNorm.
   void MvNorm ( std::vector<ScalarType>& normvec, NormType norm_type = TwoNorm ) const{
@@ -516,7 +551,7 @@ public:
   //! @name Print function inherited from Belos::MultiVec
   //@{
   //! Print (*this) to the given output stream.
-  ///
+
   /// (This function will first copy the multivector to host space 
   /// if needed.)
   void MvPrint( std::ostream& os ) const {
@@ -534,7 +569,6 @@ public:
 
 };
 
-///
 /// \class KokkosOperator
 /// \brief Implementation of Belos::Operator using KokkosSparse::CrsMatrix.
 ///
