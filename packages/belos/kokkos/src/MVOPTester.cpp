@@ -129,8 +129,8 @@ int main(int argc, char *argv[])
     // Read in a matrix Market file and use it to test the Kokkos Operator.
     KokkosSparse::CrsMatrix<ScalarType, int, EXSP> crsMat = 
             KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ScalarType, int, EXSP>>("bcsstk13.mtx"); 
-    Teuchos::RCP<Belos::KokkosOperator<ScalarType, int, EXSP>> myOp = 
-            Teuchos::rcp(new Belos::KokkosOperator<ScalarType,int,EXSP>(crsMat));
+    Teuchos::RCP<Belos::KokkosCrsOperator<ScalarType, int, EXSP>> myOp = 
+            Teuchos::rcp(new Belos::KokkosCrsOperator<ScalarType,int,EXSP>(crsMat));
     
     Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec3 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(2003, 2) );
     Teuchos::RCP<Belos::KokkosMultiVec<ScalarType>> ivec4 = Teuchos::rcp( new Belos::KokkosMultiVec<ScalarType>(2003, 1) );

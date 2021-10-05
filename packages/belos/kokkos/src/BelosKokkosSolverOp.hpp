@@ -70,7 +70,7 @@ private:
 
   // Typedefs:
   using Kokkos_MultiVector = KokkosMultiVec<ScalarType, Device>;
-  using Kokkos_Operator = KokkosOperator<ScalarType, OrdinalType, Device>; 
+  using Kokkos_Operator = KokkosCrsOperator<ScalarType, OrdinalType, Device>; 
 
   Teuchos::RCP<SolverManager<ScalarType,Kokkos_MultiVector,Kokkos_Operator> > solver_;
   Teuchos::RCP<LinearProblem<ScalarType,Kokkos_MultiVector,Kokkos_Operator> > lp_;
@@ -79,7 +79,7 @@ private:
   //! Name of solver to be passed into solver factory. 
   std::string solver_name_;
 
-  /// \brief True if KokkosOperator should initialize the solution vector to zero before
+  /// \brief True if KokkosCrsOperator should initialize the solution vector to zero before
   ///   calling 'solve' in the 'apply' function.  
   bool initSolnVec_;
 
@@ -143,7 +143,7 @@ public:
         break;
       default:
         TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
-            "Belos::KokkosOperator::Apply: Invalid ETrans type ");
+            "Belos::KokkosCrsOperator::Apply: Invalid ETrans type ");
     }
     //TODO: Is this really the best way to do this here? Can we do it without the pointers and use rcpFromRef?
     Teuchos::RCP<const Kokkos_MultiVector> vec_X = Teuchos::rcp(dynamic_cast<KokkosMultiVec<ScalarType, Device> *>

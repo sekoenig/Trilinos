@@ -71,7 +71,7 @@ bool success = true;
   //typedef Teuchos::ScalarTraits<ST>        SCT;
   //typedef SCT::magnitudeType                MT;
   //typedef Belos::KokkosMultiVec<ST>         MV;
-  //typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
+  //typedef Belos::KokkosCrsOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVec<ST2> KMV2;
@@ -129,10 +129,10 @@ bool proc_verbose = false;
   //KokkosSparse::CrsMatrix<ST2, OT, EXSP> crsMat2("Mat", crsMat.numCols(), newValues, crsMat.graph); //Convert scalar types. 
   
   //Make CrsMats into Belos::Operator
-  RCP<Belos::KokkosOperator<ST, OT, EXSP>> A1 = 
-            rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
-  RCP<Belos::KokkosOperator<ST2, OT, EXSP>> A2 = 
-            rcp(new Belos::KokkosOperator<ST2,OT,EXSP>(crsMat2));
+  RCP<Belos::KokkosCrsOperator<ST, OT, EXSP>> A1 = 
+            rcp(new Belos::KokkosCrsOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosCrsOperator<ST2, OT, EXSP>> A2 = 
+            rcp(new Belos::KokkosCrsOperator<ST2,OT,EXSP>(crsMat2));
   OT numRows = crsMat.numRows();
   
   Teuchos::RCP<Belos::KokkosMultiVec<ST>> X1 = Teuchos::rcp( new Belos::KokkosMultiVec<ST>(numRows, numrhs) );

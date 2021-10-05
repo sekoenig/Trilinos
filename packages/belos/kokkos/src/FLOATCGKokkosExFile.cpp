@@ -76,7 +76,7 @@ bool success = true;
   typedef Teuchos::ScalarTraits<ST>        SCT;
   typedef SCT::magnitudeType                MT;
   typedef Belos::KokkosMultiVec<ST, EXSP>         MV;
-  typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
+  typedef Belos::KokkosCrsOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
@@ -142,14 +142,14 @@ bool proc_verbose = false;
   // Read in a matrix Market file and use it to test the Kokkos Operator.
   KokkosSparse::CrsMatrix<ST, OT, EXSP> crsMat = 
             KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST, OT, EXSP>>(filename.c_str()); 
-  RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
-            rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosCrsOperator<ST, OT, EXSP>> A = 
+            rcp(new Belos::KokkosCrsOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
   // Also read in double to check ending residuals
   KokkosSparse::CrsMatrix<ST2, OT, EXSP> crsMat2 = 
             KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST2, OT, EXSP>>(filename.c_str()); 
-  RCP<Belos::KokkosOperator<ST2, OT, EXSP>> A2 = 
-            rcp(new Belos::KokkosOperator<ST2,OT,EXSP>(crsMat2));
+  RCP<Belos::KokkosCrsOperator<ST2, OT, EXSP>> A2 = 
+            rcp(new Belos::KokkosCrsOperator<ST2,OT,EXSP>(crsMat2));
 
   //Test code for Jacobi operator: 
   RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> JacobiPrec = 

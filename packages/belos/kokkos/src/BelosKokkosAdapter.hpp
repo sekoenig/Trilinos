@@ -41,6 +41,7 @@
 
 /*! \file BelosKokkosAdapter.hpp
     \brief Implementation of the interface between Belos virtual classes and Kokkos concrete classes.
+    Allows the user to use a Kokkos::view as a Belos::MultiVector in the Belos solvers. 
 */
 
 #include<Kokkos_Core.hpp>
@@ -59,9 +60,9 @@
 #define BELOS_KOKKOS_ADAPTER_HPP
 namespace Belos {
 
-//Forward class declaration of KokkosOperator:
+//Forward class declaration of KokkosCrsOperator:
 template<class ScalarType, class OrdinalType, class Device>
-class KokkosOperator; 
+class KokkosCrsOperator; 
 
 /// \class KokkosMultiVec
 /// \brief Implementation of Belos::MultiVec using Kokkos::View.
@@ -101,29 +102,26 @@ public:
   //! @name Constructors/Destructor
   //@{ 
   
-  //! Constructs a multivector with specified number of columns and rows.
- 
-  /// Returns a multivector with `numrows` rows and `numvecs` columns.
+  /// \brief Returns a multivector with `numrows` rows and `numvecs` columns.
+  /// 
   /// The `label` string indicates the label for the internal `Kokkos::view`. 
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const std::string label, const int numrows, const int numvecs, const bool zeroOut = true) :
-    myView (Kokkos::ViewAllocateWithoutInitializing(label),numrows,numvecs) 
+    myView (Kokkos::view_alloc(Kokkos::WithoutInitializing,label),numrows,numvecs) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
-  //! Constructs a multivector with specified number of columns and rows.
-  
-  /// Returns a multivector with `numrows` rows and `numvecs` columns.
+  /// \brief Returns a multivector with `numrows` rows and `numvecs` columns.
+  ///
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const int numvecs, const bool zeroOut = true) :
-    myView (Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,numvecs) 
+    myView (Kokkos::view_alloc(Kokkos::WithoutInitializing,"MV"),numrows,numvecs) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
-  //! Constructs a single column multivector with specified number of rows.
-  
-  /// Returns a single column multivector with `numrows` rows.
+  /// \brief Returns a single column multivector with `numrows` rows.
+  /// 
   /// If `zeroOut` is set to `true`, the multivector will be initialized to zeros.
   KokkosMultiVec<ScalarType, Device> (const int numrows, const bool zeroOut = true) :
-    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),numrows,1) 
+    myView(Kokkos::view_alloc(Kokkos::WithoutInitializing,"MV"),numrows,1) 
     { if (zeroOut) { Kokkos::deep_copy(myView,0); } }
 
   //! Copy constructor (performs deep copy).
@@ -131,7 +129,7 @@ public:
   /// This copy constructor returns a new KokksMultiVec containing a
   /// deep copy of the multivector given by the user.  
   KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType, Device> &sourceVec) : 
-    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
+    myView(Kokkos::view_alloc(Kokkos::WithoutInitializing,"MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
   { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   //! Copy constructor for type conversion. (Performs deep copy.)
@@ -142,15 +140,21 @@ public:
   /// `ScalarType` to `ScalarType2`.
   template < class ScalarType2 >
     KokkosMultiVec<ScalarType, Device> (const KokkosMultiVec<ScalarType2, Device> &sourceVec) : 
-    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
+    myView(Kokkos::view_alloc(Kokkos::WithoutInitializing, "MV"),(int)sourceVec.GetGlobalLength(),sourceVec.GetNumberVecs())
   { Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst()); }
 
   //! Assignment operator (performs deep copy).
 
   /// This `=` operator performs a deep copy of
   /// the right-hand side KokkosMultiVec to the
-  /// left-hand side KokkosMultiVec. 
+  /// left-hand side KokkosMultiVec. The left-hand
+  /// side MultiVec will be resized if necessary.
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType, Device> & sourceVec) {
+    int len = sourceVec.GetGlobalLength();
+    int cols = sourceVec.GetNumberVecs();
+    if( len !=myView.extent(0) || cols != myView.extent(1) ){
+      Kokkos::resize(myView, len, cols);
+    }
     Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
@@ -159,11 +163,17 @@ public:
 
   /// This `=` operator performs a deep copy of
   /// the right-hand side KokkosMultiVec to the
-  /// left-hand side KokkosMultiVec. 
+  /// left-hand side KokkosMultiVec. The left-hand 
+  /// side MultiVec will be resized if necessary. 
   /// The internal data of the right-hand side multivec
   /// is converted from `ScalarType` to `ScalarType2`.
   template < class ScalarType2 >
   KokkosMultiVec<ScalarType, Device> & operator=(const KokkosMultiVec<ScalarType2, Device> & sourceVec) {
+    int len = sourceVec.GetGlobalLength();
+    int cols = sourceVec.GetNumberVecs();
+    if( len !=myView.extent(0) || cols != myView.extent(1) ){
+      Kokkos::resize(myView, len, cols);
+    }
     Kokkos::deep_copy(myView,sourceVec.GetInternalViewConst());
     return *this;
   }
@@ -186,11 +196,16 @@ public:
     }  
   }
   
-  // This version allows us to make exclusive changes to the view and convert between scalar types:
+  //! Create a KokkosMultiVec with ScalarType2 from a given `Kokkos::view` with ScalarType1.
+
+  /// Returns a KokkosMultiVec that internally stores the 
+  /// data given in `sourceView`. This function always makes
+  /// a deep copy of the sourceView in order to change scalar
+  /// types.
   template < class ScalarType2 > //TODO: Fix this so that passing in a view without device specified actually compiles...
   KokkosMultiVec<ScalarType, Device> (const Kokkos::View<ScalarType2**,Kokkos::LayoutLeft, Device> & sourceView) : 
-    myView(Kokkos::ViewAllocateWithoutInitializing("MV"),sourceView.extent(0),sourceView.extent(1))
-  { Kokkos::deep_copy(myView,sourceView); }
+    myView(Kokkos::view_alloc(Kokkos::WithoutInitializing, "MV"),sourceView.extent(0),sourceView.extent(1))
+  { Kokkos::deep_copy(myView,sourceView); } 
 
   //! Destructor (default)
   ~KokkosMultiVec<ScalarType, Device>(){}
@@ -243,6 +258,7 @@ public:
   }
 
   //! \brief Creates a MultiVec which is a (deep) copy of `this`.
+  ///
   /// A virtual "copy constructor" returning a pointer to a new
   /// object of Belos::MultiVec. (KokkosMultiVec underneath.)
   /// All of this vector's entries are
@@ -253,8 +269,9 @@ public:
     Kokkos::deep_copy(ptr->GetInternalViewNonConst(),myView);
     return ptr;
   }
-
+   
   //! \brief Creates a MultiVec which is a (deep) copy of selected columns of `this`.
+  ///
   /// A virtual "copy constructor" returning a pointer to a new Belos::MultiVec. 
   /// This vector's entries are copied and a new
   /// stand-alone MultiVector is created where only selected columns
@@ -296,6 +313,7 @@ public:
   }
 
   //! \brief Creates a (read-only) MultiVec which is a shallow copy of selected columns of `this`.
+  ///
   /// A virtual view constructor returning a pointer to a new Belos::MultiVec with 
   /// selected columns. (Column indexing is zero-based.) The view is read-only. 
   /// This vector's entries are shared and hence no
@@ -324,6 +342,7 @@ public:
 
 
   //! \brief Creates a nonconst MultiVec which is a shallow copy of selected columns of `this`.
+  ///
   /// A virtual view constructor returning a pointer to a new Belos::MultiVec with 
   /// selected columns. (Column indexing is zero-based.)
   /// This vector's entries are shared and hence no
@@ -405,8 +424,8 @@ public:
   //! @name Mathematical functions inherited from Belos::MultiVec
   //@{
   //! \brief `*this <- alpha * A * B + beta * (*this)`
-  //! `*this <- alpha * A * B + beta * (*this)`
-  /// where alpha and beta are scalars and the dimensions of A*B match
+  ///
+  /// where alpha and beta are scalars and the dimensions of `A*B` match
   /// the dimensions of `(*this)`. 
   void MvTimesMatAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A,
                          const Teuchos::SerialDenseMatrix<int,ScalarType>& B, const ScalarType beta ){
@@ -419,7 +438,7 @@ public:
     }
     else{
       UMHostConstViewMatrixType mat_h(B.values(), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
-      ViewMatrixType mat_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
+      ViewMatrixType mat_d(Kokkos::view_alloc(Kokkos::WithoutInitializing,"mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
       Kokkos::deep_copy(mat_d, mat_h);
       if( myView.extent(1) == 1 ){ // B has only 1 col
           ConstViewVectorType Bsub = Kokkos::subview(mat_d, Kokkos::ALL, 0);
@@ -432,7 +451,9 @@ public:
     }
   }
 
-  //! *this <- alpha * A + beta * B
+  //! `*this <- alpha * A + beta * B`
+  ///
+  /// Scale and add two vectors.  Store the result in `*this`. 
   void MvAddMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, const ScalarType beta,
                  const MultiVec<ScalarType>& B){
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
@@ -441,23 +462,30 @@ public:
     KokkosBlas::update(alpha, A_vec->GetInternalViewConst(), beta, B_vec->GetInternalViewConst(), (ScalarType) 0.0, myView);
   }
 
+  /// `*this <- alpha * this`
+  /// 
   //! Scale (multiply) each element of the vectors in \c *this with \c alpha.
   void MvScale ( const ScalarType alpha ) {
     KokkosBlas::scal(myView, alpha, myView); 
   }
 
+  /// `*this[:,i] <- alpha[i] * this[:,i]`
+  /// 
   //! Scale (multiply) each element of the \c i-th vector in \c *this with \c alpha[i].
   void MvScale ( const std::vector<ScalarType>& alpha ){
 
     //Move scalar values to a Kokkos View:
     UMHostConstViewVectorType scalars_h(alpha.data(), alpha.size());
-    ViewVectorType scalars_d(Kokkos::ViewAllocateWithoutInitializing("scalars_d"), alpha.size());
+    ViewVectorType scalars_d(Kokkos::view_alloc(Kokkos::WithoutInitializing,"scalars_d"), alpha.size());
     Kokkos::deep_copy(scalars_d, scalars_h);
 
     KokkosBlas::scal(myView, scalars_d, myView); 
   }
 
   //! B <- alpha * A^T * (*this)
+  ///
+  /// Computes matrix product with transpose.  Result is a dense matrix. 
+  /// Conjugate transpose is used as appropriate.
   void MvTransMv ( const ScalarType alpha, const MultiVec<ScalarType>& A, Teuchos::SerialDenseMatrix<int,ScalarType>& B ) const{
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
     if(A_vec->myView.extent(1) == 1 && myView.extent(1) == 1){
@@ -472,7 +500,7 @@ public:
    // Do not enable for now. 
    // ****
    // else if( myView.extent(1) == 1 ){ // Only 1 col in soln vec
-   //   ViewVectorType soln(Kokkos::ViewAllocateWithoutInitializing("soln"), A_vec->GetInternalViewConst().extent(1));
+   //   ViewVectorType soln(Kokkos::view_alloc(Kokkos::WithoutInitializing,"soln"), A_vec->GetInternalViewConst().extent(1));
    //   ViewVectorType mysub = Kokkos::subview(myView, Kokkos::ALL, 0);
    //   KokkosBlas::gemv("C", alpha, A_vec->GetInternalViewConst(), mysub, ScalarType(0.0), soln);
    //   for( unsigned int i = 0; i < soln.extent(0); i++){
@@ -481,7 +509,7 @@ public:
    // }
     else{
       UMHostViewMatrixType soln_h(B.values(), A_vec->GetInternalViewConst().extent(1), myView.extent(1));
-      ViewMatrixType soln_d(Kokkos::ViewAllocateWithoutInitializing("mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1)); 
+      ViewMatrixType soln_d(Kokkos::view_alloc(Kokkos::WithoutInitializing,"mat"), A_vec->GetInternalViewConst().extent(1), myView.extent(1)); 
       KokkosBlas::gemm("C", "N", alpha, A_vec->GetInternalViewConst(), myView, ScalarType(0.0), soln_d);
       Kokkos::deep_copy(soln_h, soln_d);
     }
@@ -492,10 +520,11 @@ public:
   
   /// Performs a dot product between A and (*this).
   /// Uses conjugate transpose when appropriate. 
+  /// Output is a vector.
   void MvDot ( const MultiVec<ScalarType>& A, std::vector<ScalarType>& b ) const{
     //Put output vector in unmanaged Kokkos view:
     UMHostViewVectorType dotView_h(b.data(),myView.extent(1)); 
-    ViewVectorType dotView_d(Kokkos::ViewAllocateWithoutInitializing("Dot"),myView.extent(1));
+    ViewVectorType dotView_d(Kokkos::view_alloc(Kokkos::WithoutInitializing,"Dot"),myView.extent(1));
 
     KokkosMultiVec<ScalarType, Device> *A_vec = dynamic_cast<KokkosMultiVec *>(&const_cast<MultiVec<ScalarType> &>(A));
 
@@ -511,7 +540,7 @@ public:
 
     //Put output vector in unmanaged Kokkos view:
     UMHostViewVectorType normView_h(normvec.data() ,myView.extent(1));
-    ViewVectorType normView_d(Kokkos::ViewAllocateWithoutInitializing("Norm"),myView.extent(1));
+    ViewVectorType normView_d(Kokkos::view_alloc(Kokkos::WithoutInitializing,"Norm"),myView.extent(1));
 
     switch( norm_type ) { 
       case ( OneNorm ) : 
@@ -569,12 +598,10 @@ public:
 
 };
 
-/// \class KokkosOperator
+/// \class KokkosCrsOperator
 /// \brief Implementation of Belos::Operator using KokkosSparse::CrsMatrix.
-///
-//TODO: Should this name change to reflect that it isn't generic?  e.g. KokkosCRSOperator??
 template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace>
-class KokkosOperator : public Operator<ScalarType> {
+class KokkosCrsOperator : public Operator<ScalarType> {
 
 private:
   // Shallow copy of the CrsMatrix used for SpMV. 
@@ -584,11 +611,11 @@ public:
   //! @name Constructor/Destructor
   //@{ 
   //! Constructor obtains a shallow copy of the given CrsMatrix.
-  KokkosOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> mat) 
+  KokkosCrsOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> mat) 
    : myMatrix(mat) {}
 
   //! Destructor.
-  ~KokkosOperator<ScalarType, OrdinalType, Device>(){}
+  ~KokkosCrsOperator<ScalarType, OrdinalType, Device>(){}
   //@}
 
   //! @name Methods relating to applying the operator
@@ -626,7 +653,7 @@ public:
         break;
       default:
         TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
-            "Belos::KokkosOperator::Apply: Invalid ETrans type ");
+            "Belos::KokkosCrsOperator::Apply: Invalid ETrans type ");
     }
 
     //Use dynamic_cast to tell the compiler these are Kokkos Multivecs.

@@ -74,7 +74,7 @@ private:
   using Op = Operator<SolveScalarT>; 
   using Kokkos_MultiVector_InOut = KokkosMultiVec<InOutScalarT, Device>;
   using Kokkos_MultiVector_Solve = KokkosMultiVec<SolveScalarT, Device>;
-  using Kokkos_Operator_Solve = KokkosOperator<SolveScalarT, OrdinalType, Device>; 
+  using Kokkos_Operator_Solve = KokkosCrsOperator<SolveScalarT, OrdinalType, Device>; 
 
   //Teuchos::RCP<SolverManager<SolveScalarT,Kokkos_MultiVector_Solve,Kokkos_Operator_Solve> > solver_;
   //Teuchos::RCP<LinearProblem<SolveScalarT,Kokkos_MultiVector_Solve,Kokkos_Operator_Solve> > lp_;
@@ -85,7 +85,7 @@ private:
   //! Name of solver to be passed into solver factory. 
   std::string solver_name_;
 
-  /// \brief True if KokkosOperator should initialize the solution vector to zero before
+  /// \brief True if KokkosCrsOperator should initialize the solution vector to zero before
   ///   calling 'solve' in the 'apply' function.  
   bool initSolnVec_;
 
@@ -147,7 +147,7 @@ public:
             "Belos::KokkosSingleSolverOp::Apply: Transpose not supported. ");
       default:
         TEUCHOS_TEST_FOR_EXCEPTION(true, std::invalid_argument,
-            "Belos::KokkosOperator::Apply: Invalid ETrans type ");
+            "Belos::KokkosCrsOperator::Apply: Invalid ETrans type ");
     }
     //We don't need any input from Y.  Only need to copy X from double -> float.
     //TODO: Is this really the best way to do this here? Can we do it without the pointers and use rcpFromRef?

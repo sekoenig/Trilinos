@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   typedef int                               OT;
   typedef Kokkos::DefaultExecutionSpace     EXSP;
   typedef Belos::KokkosMultiVec<ST, EXSP>         MV;
-  typedef Belos::KokkosOperator<ST, OT, EXSP>       OP;
+  typedef Belos::KokkosCrsOperator<ST, OT, EXSP>       OP;
   typedef Belos::MultiVec<ST> KMV;
   typedef Belos::Operator<ST> KOP; 
   typedef Belos::MultiVecTraits<ST,KMV>     MVT;
@@ -97,8 +97,8 @@ int main(int argc, char *argv[]) {
   //Read CrsMats into Kokkos Operator
   KokkosSparse::CrsMatrix<ST, OT, EXSP> crsMat = 
             KokkosKernels::Impl::read_kokkos_crst_matrix<KokkosSparse::CrsMatrix<ST, OT, EXSP>>(filename.c_str()); 
-  RCP<Belos::KokkosOperator<ST, OT, EXSP>> A = 
-            rcp(new Belos::KokkosOperator<ST,OT,EXSP>(crsMat));
+  RCP<Belos::KokkosCrsOperator<ST, OT, EXSP>> A = 
+            rcp(new Belos::KokkosCrsOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
 
   RCP<MV> X1 = rcp( new MV(numRows, 1) );

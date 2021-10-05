@@ -14,7 +14,7 @@ enum {DEFAULT, LVLSCHED_RP, LVLSCHED_TP1};
 #ifndef BELOS_KOKKOS_ILU_HPP
 #define BELOS_KOKKOS_ILU_HPP
  namespace Belos {
-  /// \class KokkosOperator
+  /// \class KokkosCrsOperator
   /// \brief Implementation of Belos::Operator using Kokkos::Crs matrix.
   ///
   template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace>
