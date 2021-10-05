@@ -189,6 +189,9 @@ public:
   /// the KokkosMultiVec interface.)
   KokkosMultiVec<ScalarType, Device> (const ViewMatrixType & sourceView, bool makeCopy = true) { 
     if( makeCopy ){
+      if( sourceView.extent(0) !=myView.extent(0) || sourceView.extent(1) != myView.extent(1) ){
+        Kokkos::resize(myView, sourceView.extent(0), sourceView.extent(1));
+      }
       Kokkos::deep_copy(myView, sourceView);
     }
     else{

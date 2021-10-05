@@ -269,6 +269,67 @@ bool TestKokkosMultiVecOneScalar(const Teuchos::RCP<OutputManager<ScalarType> > 
     }
   }
   // Test view to multivec:
-  Kokkos::View<ScalarType**> myView;
+  int numCols2 = 4;
+  int numRows2 = 60;
+  Kokkos::View<ScalarType**> myView("View2MV", numRows2, numCols2);
+  typename Kokkos::View<ScalarType**>::HostMirror myView_h("View2MV_host", numRows2, numCols2);
+  Kokkos::deep_copy(myView, 42);
+  Belos::KokkosMultiVec<ScalarType> myVec4( myView );
+  if ( myVec4.GetNumberVecs() != myView.extent(1) ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultiVec view to multivec returned wrong value "
+      << "for GetNumberVecs()." << endl;
+    return false;
+  }
+  if ( myVec4.GetGlobalLength() != myView.extent(0) ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultiVec view to multivec returned wrong value "
+      << "for GetGlobalLength()." << endl;
+    return false;
+  }
+  Kokkos::deep_copy(myView, 55);
+  Kokkos::deep_copy(myView_h, myVec4.GetInternalViewConst());
+  if ( myView_h(5,1) != 42 ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultivec view to multivec did not make a deep copy!" << endl;
+    return false;
+  }
+  // Tesst view to multivec with shallow copy:
+  Kokkos::deep_copy(myView, 100);
+  Belos::KokkosMultiVec<ScalarType> myVec5( myView, false );
+  if ( myVec5.GetNumberVecs() != myView.extent(1) ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultiVec view to multivec shallow returned wrong value "
+      << "for GetNumberVecs()." << endl;
+    return false;
+  }
+  if ( myVec5.GetGlobalLength() != myView.extent(0) ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultiVec view to multivec shallow returned wrong value "
+      << "for GetGlobalLength()." << endl;
+    return false;
+  }
+  Kokkos::deep_copy(myView, 500);
+  Kokkos::deep_copy(myView_h, myVec5.GetInternalViewConst());
+  if ( myView_h(5,1) != 500 ) {
+    outputMgr->stream(Warnings)
+      << "*** ERROR *** KokkosMultivec view to multivec shallow made a deep copy!" << endl;
+    return false;
+  }
+  // Test GetInternalViewNonConst:
+  auto myView2 = myVec5.GetInternalViewNonConst();
+  Kokkos::deep_copy(myView2, 0);
+  std::vector<ScalarType> norms2(4);
+  myVec5.MvNorm(norms2);
+  for(int i = 0; i < myView2.extent(1); i++){
+    if( norms[i] != 0 ){
+      outputMgr->stream(Warnings)
+        << "*** ERROR *** KokkosMultiVec GetInternalViewNonConst returned wrong nrm2 value. "
+        << "Vector was not editable." << endl;
+      return false;
+    }
+  }
+
+
   return true;
 }
