@@ -325,7 +325,7 @@ public:
   /// \warning At this time, the Kokkos-Belos adapter only supports 
   /// viewing column indices that form a contiguous subset in memory. 
   /// Thus, the values in `index` must be contiguous and ascending (e.g. 0,1,2,3).
-  const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const { //TODO implement this!! This isn't const!!
+  const MultiVec<ScalarType> * CloneView ( const std::vector<int>& index ) const { //TODO This isn't const!!
     bool isContigAscending = true;
     //Check whether the given indices are contiguous and ascending.
     for(unsigned int i=0; i< (index.size()-1); i++){
