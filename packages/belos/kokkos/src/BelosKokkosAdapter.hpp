@@ -42,6 +42,8 @@
 /*! \file BelosKokkosAdapter.hpp
     \brief Implementation of the interface between Belos virtual classes and Kokkos concrete classes.
     Allows the user to use a Kokkos::view as a Belos::MultiVector in the Belos solvers. 
+    \warning Note: This class does not currently allow the user to run Belos solvers which 
+    require accessing non-contiguous columns of data in memory.  
 */
 
 #include<Kokkos_Core.hpp>
@@ -223,7 +225,7 @@ public:
   /// Returns the (const) view that stores internal data 
   /// for the KokkosMultiVec. 
   ConstViewMatrixType GetInternalViewConst() const {
-    return myView; //TODO But is the view returned really const?? 
+    return myView; 
   }
 
   //! Reader/Writer method for internal view.
