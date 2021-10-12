@@ -108,6 +108,12 @@ advanceTime(const Scalar timeFinal)
   // Run state integrator and get solution
   bool state_status = state_integrator_->advanceTime(timeFinal);
 
+  // For at least some time-stepping methods, the time of the last time step
+  // may not be timeFinal (e.g., it may be greater by at most delta_t).
+  // But since the adjoint model requires timeFinal in its formulation, reset
+  // it to the achieved final time.
+  adjoint_aux_model_->setFinalTime(state_integrator_->getTime());
+
   // Set solution history in adjoint stepper
   adjoint_aux_model_->setForwardSolutionHistory(state_solution_history);
 
@@ -192,6 +198,9 @@ advanceTime(const Scalar timeFinal)
     TEUCHOS_TEST_FOR_EXCEPTION(
       W == Teuchos::null, std::logic_error,
       "A null W has been encountered in Tempus::IntegratorAdjointSensitivity::advanceTime!\n");
+    // Initialize adjoint_init_mv to zero before solve for linear solvers that
+    // use what is passed in as the initial guess
+    assign(adjoint_init_mv.ptr(), Teuchos::ScalarTraits<Scalar>::zero());
     W->solve(Thyra::NOTRANS, *dgdx, adjoint_init_mv.ptr());
   }
 
