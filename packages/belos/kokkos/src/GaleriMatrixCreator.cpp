@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     RCP<Epetra_Map> Map;
     RCP<Epetra_CrsMatrix> A;
       std::string MapType("Cartesian2D");
-      if( MatrixType == "Laplace3D" || MatrixType == "Cross3D"){
+      if( MatrixType == "Laplace3D" || MatrixType == "Cross3D" || MatrixType == "Brick3D"){
         MapType = "Cartesian3D";
       }
 
