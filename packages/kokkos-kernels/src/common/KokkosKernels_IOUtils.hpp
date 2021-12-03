@@ -56,6 +56,7 @@
 
 #include "Kokkos_ArithTraits.hpp"
 #include <Kokkos_Core.hpp>
+#include "Kokkos_Random.hpp"
 #include "KokkosKernels_SimpleUtils.hpp"
 #include <sys/stat.h>
 
@@ -64,6 +65,27 @@ namespace KokkosKernels{
 
 namespace Impl{
 
+// Get the interval for Kokkos::fill_random
+// For real, interval is (-mag, mag)
+// For complex, both real and imaginary parts will have interval (-mag, mag)
+template <typename Scalar>
+inline void getRandomBounds(double mag, Scalar& start, Scalar& end) {
+  start = -mag * Kokkos::ArithTraits<Scalar>::one();
+  end   = mag * Kokkos::ArithTraits<Scalar>::one();
+}
+
+template <>
+inline void getRandomBounds(double mag, Kokkos::complex<float>& start, Kokkos::complex<float>& end) {
+  start = Kokkos::complex<float>(-mag, -mag);
+  end   = Kokkos::complex<float>(mag, mag);
+}
+
+template<>
+inline void getRandomBounds(double mag, Kokkos::complex<double>& start, Kokkos::complex<double>& end)
+{
+  start = Kokkos::complex<double>(-mag, -mag);
+  end = Kokkos::complex<double>(mag, mag);
+}
 
 //MD: Bases on Christian's sparseMatrix_generate function in test_crsmatrix.cpp file.
 template< typename ScalarType , typename OrdinalType, typename SizeType>
@@ -112,12 +134,17 @@ void kk_sparseMatrix_generate(
         if (!is_already_in_the_row) {
 
           colInd[k]= pos;
-          values[k] = 100.0*rand()/RAND_MAX-50.0;
           break;
         }
       }
     }
   }
+  //Sample each value from uniform (-50, 50) for real types, or (-50 - 50i, 50 + 50i) for complex types.
+  Kokkos::View<ScalarType*, Kokkos::HostSpace> valuesView(values, nnz);
+  ScalarType randStart, randEnd;
+  getRandomBounds(50.0, randStart, randEnd);
+  Kokkos::Random_XorShift64_Pool<Kokkos::DefaultHostExecutionSpace> pool(13718);
+  Kokkos::fill_random(valuesView, pool, randStart, randEnd);
 }
 
 template< typename ScalarType , typename OrdinalType, typename SizeType>
@@ -1156,7 +1183,9 @@ int read_mtx (
       mtx_field = COMPLEX;
   }
   else if (fline.find("integer") != std::string::npos){
-    if(std::is_integral<scalar_t>::value)
+    if(std::is_integral<scalar_t>::value 
+       || std::is_floating_point<scalar_t>::value
+       || std::is_same<scalar_t,Kokkos::Experimental::half_t>::value)
       mtx_field = INTEGER;
     else
       throw std::runtime_error("scalar_t in read_mtx() incompatible with integer-typed MatrixMarket file.");

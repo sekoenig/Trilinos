@@ -12,8 +12,8 @@
 # src
 #
 
-#SET(HEADERS "")
-#SET(SOURCES "")
+SET(HEADERS "")
+SET(SOURCES "")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -23,17 +23,9 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
-#APPEND_SET(HEADERS
-#   BelosKokkosAdapter.hpp
-#  )
-
-#APPEND_SET(SOURCES
-#   ViewPlay.cpp
-#   MVTestInternal.cpp
-#   MVOPTester.cpp
-#   PseudoBlockCGKokkosExFile.cpp
-#   BlockGmresKokkosExFile.cpp
-#  )
+APPEND_SET(HEADERS
+   BelosKokkosAdapter.hpp
+  )
 
 #
 # C) Define the targets for package's library(s)
@@ -45,6 +37,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 #  DEPLIBS belos
 #  )
 
+<<<<<<< HEAD
 TRIBITS_ADD_EXECUTABLE(
   KokkosViewPlay
   SOURCES ViewPlay.cpp
@@ -222,3 +215,5 @@ TRIBITS_COPY_FILES_TO_BINARY_DIR(CopyKokkosMatrixMarketFiles
   SOURCE_FILES bcsstk13.mtx bcsstk12.mtx orsirr_1.mtx
   EXEDEPS KokkosMVOPTester
   ) 
+=======
+>>>>>>> upstream/develop
