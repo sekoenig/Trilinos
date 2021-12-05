@@ -1,4 +1,4 @@
-
+#include <Tpetra_Core.hpp>
 // Xpetra
 #include <Xpetra_Operator.hpp>
 #include <Xpetra_Map.hpp>
@@ -18,14 +18,15 @@ using Teuchos::rcp;
 int main(int argc, char *argv[]) {
   typedef double ST;
   typedef int LO;
-  typedef int GO;
+  typedef long long GO;
   typedef KokkosClassic::DefaultNode::DefaultNodeType Node;
-
-  // MPI initialization using Teuchos
-  Teuchos::GlobalMPISession mpiSession(&argc, &argv, NULL);
-  Kokkos::initialize(argc, argv);
-
   bool success = true;
+  Tpetra::ScopeGuard tpetraScope (&argc, &argv);
+  {
+  // MPI initialization using Teuchos
+  //Teuchos::GlobalMPISession mpiSession(&argc, &argv, NULL);
+  //Kokkos::initialize(argc, argv);
+
   int nx = 10;               // number of discretization points in each direction
   std::string MatrixType("Laplace3D");
   std::string filename("");
@@ -46,16 +47,17 @@ int main(int argc, char *argv[]) {
     }   
     std::cout << "filename is: " << filename << std::endl;
 
-  RCP<const Teuchos::Comm<int>> comm;
+  RCP<const Teuchos::Comm<int>> comm = rcp(new Teuchos::SerialComm<int>);
   RCP<Xpetra::Matrix<ST,LO,GO,Node>> A;
 
   MatrixLoad<ST,LO,GO,Node>( comm, A, galeriParams, xpetraParams);
   std::cout << "Matrix Size is: " << A->getGlobalNumRows() << std::endl;
   std::cout << "NNZ : " << A->getGlobalNumEntries() << std::endl;
 
-  //Xpetra::IO<ST,LO,GO,Node>::Write( filename, *A);
+  Xpetra::IO<ST,LO,GO,Node>::Write( filename, *A);
 
-  Kokkos::finalize();
+  //Kokkos::finalize();
+  } //End Tpetra scope guard. 
 
   return ( success ? EXIT_SUCCESS : EXIT_FAILURE );
 }
