@@ -106,7 +106,7 @@
 	policy_type policy(numBlocks_, Kokkos::AUTO());	
         if (teamSize_ > 0) 
           policy = policy_type(numBlocks_, teamSize_);
-  Kokkos::Impl::Timer timer;
+  Kokkos::Timer timer;
 	timer.reset();
 	    const int  one (1);
     if(solve_ == "GEMV" ){
