@@ -1,11 +1,10 @@
-// Copyright(C) 1999-2020 National Technology & Engineering Solutions
+// Copyright(C) 1999-2021 National Technology & Engineering Solutions
 // of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
 // NTESS, the U.S. Government retains certain rights in this software.
 //
 // See packages/seacas/LICENSE for details
 
-#ifndef IOSS_Ioss_VariableType_h
-#define IOSS_Ioss_VariableType_h
+#pragma once
 
 #include <Ioss_CodeTypes.h>
 #include <Ioss_Utils.h>
@@ -53,11 +52,12 @@ namespace Ioss {
   class VariableType
   {
   public:
-    static void alias(const std::string &base, const std::string &syn);
-    static int  describe(NameList *names);
-    static bool create_named_suffix_field_type(const std::string &             type_name,
-                                               const std::vector<std::string> &suffices);
-    static bool get_field_type_mapping(const std::string &field, std::string *type);
+    static void     alias(const std::string &base, const std::string &syn);
+    static int      describe(NameList *names);
+    static NameList describe();
+    static bool     create_named_suffix_field_type(const std::string              &type_name,
+                                                   const std::vector<std::string> &suffices);
+    static bool     get_field_type_mapping(const std::string &field, std::string *type);
     static bool add_field_type_mapping(const std::string &raw_field, const std::string &raw_type);
 
     VariableType(const VariableType &) = delete;
@@ -96,4 +96,3 @@ inline std::string Ioss::VariableType::name() const { return name_; }
 inline int Ioss::VariableType::component_count() const { return componentCount; }
 
 inline int Ioss::VariableType::suffix_count() const { return componentCount; }
-#endif

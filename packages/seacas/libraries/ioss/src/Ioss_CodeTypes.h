@@ -4,8 +4,7 @@
 //
 // See packages/seacas/LICENSE for details
 
-#ifndef IOSS_code_types_h
-#define IOSS_code_types_h
+#pragma once
 
 #include <array>
 #include <cstddef>
@@ -16,14 +15,6 @@
 #if defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER) ||                \
     defined(__MINGW32__) || defined(_WIN64) || defined(__MINGW64__)
 #define __IOSS_WINDOWS__ 1
-#endif
-
-#if defined(__IOSS_WINDOWS__)
-#ifdef _WIN64
-#define ssize_t __int64
-#else
-#define ssize_t long
-#endif
 #endif
 
 namespace Ioss {
@@ -90,7 +81,6 @@ using Kokkos_Complex = Kokkos::complex<float>;
 using Complex        = std::complex<double>;
 #ifdef SEACAS_HAVE_KOKKOS
 using Kokkos_Complex = Kokkos::complex<double>;
-#endif
 #endif
 #endif
 

@@ -1,12 +1,11 @@
 /*
- * Copyright(C) 1999-2021 National Technology & Engineering Solutions
+ * Copyright(C) 1999-2022 National Technology & Engineering Solutions
  * of Sandia, LLC (NTESS).  Under the terms of Contract DE-NA0003525 with
  * NTESS, the U.S. Government retains certain rights in this software.
  *
  * See packages/seacas/LICENSE for details
  */
-#ifndef IOPX_DECOMPOSITONDATA_H
-#define IOPX_DECOMPOSITONDATA_H
+#pragma once
 
 #include <exodusII.h>
 #if defined PARALLEL_AWARE_EXODUS
@@ -243,7 +242,7 @@ namespace Ioex {
 
     void get_common_set_data(int filePtr, ex_entity_type set_type,
                              std::vector<Ioss::SetDecompositionData> &sets,
-                             const std::string &                      set_type_name);
+                             const std::string                       &set_type_name);
 
     void get_nodeset_data(int filePtr, size_t set_count);
 
@@ -264,5 +263,4 @@ namespace Ioex {
     Ioss::Decomposition<INT> m_decomposition;
   };
 } // namespace Ioex
-#endif
 #endif

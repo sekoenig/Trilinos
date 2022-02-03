@@ -4,8 +4,7 @@
 //
 // See packages/seacas/LICENSE for details
 
-#ifndef IOSS_Ioss_DatabaseIO_h
-#define IOSS_Ioss_DatabaseIO_h
+#pragma once
 
 #include <Ioss_BoundingBox.h>
 #include <Ioss_CodeTypes.h>
@@ -441,7 +440,7 @@ namespace Ioss {
     {
       return get_block_adjacencies__(eb, block_adjacency);
     }
-    void compute_block_membership(Ioss::SideBlock *         efblock,
+    void compute_block_membership(Ioss::SideBlock          *efblock,
                                   std::vector<std::string> &block_membership) const
     {
       return compute_block_membership__(efblock, block_membership);
@@ -512,7 +511,7 @@ namespace Ioss {
 
     void set_time_scale_factor(double factor) { timeScaleFactor = factor; }
 
-    const Ioss::ParallelUtils &  util() const { return util_; }
+    const Ioss::ParallelUtils   &util() const { return util_; }
     const Ioss::PropertyManager &get_property_manager() const { return properties; }
     /** \brief Get the processor that this mesh database is on.
      *
@@ -832,4 +831,3 @@ namespace Ioss {
         m_stateStart; // Used for optional output step timing.
   };
 } // namespace Ioss
-#endif
