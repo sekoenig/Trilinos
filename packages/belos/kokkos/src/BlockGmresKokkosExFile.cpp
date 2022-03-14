@@ -146,12 +146,25 @@ bool proc_verbose = false;
             rcp(new Belos::KokkosCrsOperator<ST,OT,EXSP>(crsMat));
   OT numRows = crsMat.numRows();
 
+  // Set up timers
+  Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
+    Teuchos::RCP<Belos::OutputManager<ST> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST>(Belos::TimingDetails,outputStream) );
+  std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
+  std::string solveJacSetupLabel ="JBelos: Jacobi Prec Setup time";
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+  Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
+  Teuchos::RCP<Teuchos::Time> timerJacobiSetup_ = Teuchos::TimeMonitor::getNewCounter(solveJacSetupLabel);
+#endif
+
   //Test code for Jacobi operator: 
   RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> JacobiPrec = 
             rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize,jacobisolve,teamsize));
 
   if(precOn) { 
   std::cout << "Setting up Jacobi prec: " << std::endl;
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+  Teuchos::TimeMonitor prectimer(*timerJacobiSetup_);
+#endif
   JacobiPrec->SetUpJacobi();
   std::cout << "Exited Jacobi prec setup." << std::endl;
   }
@@ -173,13 +186,6 @@ bool proc_verbose = false;
   }
 
   proc_verbose = verbose;  /* Only print on the zero processor */
-  // Create the timer for outer iteration:
-  Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
-    Teuchos::RCP<Belos::OutputManager<ST> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST>(Belos::TimingDetails,outputStream) );
-    std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
-#ifdef BELOS_TEUCHOS_TIME_MONITOR
-    Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
-#endif
 
   //
   // ********Other information used by block solver***********

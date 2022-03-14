@@ -112,10 +112,10 @@ bool proc_verbose = false;
   Teuchos::CommandLineProcessor cmdp(false,true);
   cmdp.setOption("verbose","quiet",&verbose,"Print messages and results.");
   cmdp.setOption("verboseTimes","quietTimes",&verbose,"Print timings at every Gmres run.");
-  cmdp.setOption("prec","noprec",&precOn,"Use ILU preconditioning.");
-  cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec.");
-  cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations.");
-  cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV.");
+  cmdp.setOption("prec","noprec",&precOn,"Use Jacobi preconditioning.");
+  cmdp.setOption("blksize",&blksize,"Block size for Jacobi prec. Default is 4.");
+  cmdp.setOption("teamsize",&teamsize,"Team size for Jacobi prec operations. Default is -1 for automatic.");
+  cmdp.setOption("jacobisolve",&jacobisolve,"Solve type for Jacobi prec- TRSV or GEMV. Default is GEMV.");
   cmdp.setOption("polyprec",&polyPrec,"Use Poly preconditioning. Options are 'none' or 'poly' ('single'=='poly' for GMRES-IR.)");
   cmdp.setOption("randRHS","probRHS",&polyRandomRhs,"Use a random rhs to generate polynomial.");
   cmdp.setOption("poly-deg",&polyDeg,"Degree of poly preconditioner.");
@@ -151,8 +151,22 @@ bool proc_verbose = false;
   RCP<Belos::KokkosJacobiOperator<ST, OT, EXSP>> JacobiPrec = 
             rcp(new Belos::KokkosJacobiOperator<ST,OT,EXSP>(crsMat,blksize,jacobisolve,teamsize));
 
+  // Create the timer if we need to.
+  Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
+    Teuchos::RCP<Belos::OutputManager<ST2> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST2>(Belos::TimingDetails,outputStream) );
+    std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
+  std::string solveJacSetupLabel ="JBelos: Jacobi Prec Setup time";
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+    Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
+  Teuchos::RCP<Teuchos::Time> timerJacobiSetup_ = Teuchos::TimeMonitor::getNewCounter(solveJacSetupLabel);
+#endif
+
+
   if(precOn) { 
   std::cout << "Setting up Jacobi prec: " << std::endl;
+#ifdef BELOS_TEUCHOS_TIME_MONITOR
+  Teuchos::TimeMonitor prectimer(*timerJacobiSetup_);
+#endif
   JacobiPrec->SetUpJacobi();
   std::cout << "Exited Jacobi prec setup." << std::endl;
   }
@@ -221,14 +235,6 @@ bool proc_verbose = false;
   if(verboseTimes)
     verbosity += Belos::TimingDetails;
   belosList.set( "Verbosity", verbosity);
-
-  // Create the timer if we need to.
-  Teuchos::RCP<std::ostream> outputStream = Teuchos::rcp(&std::cout,false);
-    Teuchos::RCP<Belos::OutputManager<ST2> > printer_ = Teuchos::rcp( new Belos::OutputManager<ST2>(Belos::TimingDetails,outputStream) );
-    std::string solveIRLabel ="JBelos: GmresSolMgr total solve time";
-#ifdef BELOS_TEUCHOS_TIME_MONITOR
-    Teuchos::RCP<Teuchos::Time> timerIRSolve_ = Teuchos::TimeMonitor::getNewCounter(solveIRLabel);
-#endif
 
 
   //*************************************************************************
