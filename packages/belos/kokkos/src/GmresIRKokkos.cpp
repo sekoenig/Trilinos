@@ -209,33 +209,6 @@ bool proc_verbose = false;
   }
   proc_verbose = verbose;  /* Only print on the zero processor */
 
-  //
-  // ********Other information used by block solver***********
-  // *****************(can be user specified)******************
-  //
-  const int NumGlobalElements = B1->GetGlobalLength();
-  if (maxiters == -1)
-    maxiters = NumGlobalElements - 1; // maximum number of iterations to run
-  //
-  ParameterList belosList;
-  belosList.set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
-  belosList.set( "Maximum Iterations", maxsubspace );       // Make inner solver stop at each restart.
-  belosList.set( "Convergence Tolerance", 1e-10 );         // High convergence criteria- we just want 50 iters.
-  //belosList.set("Implicit Residual Scaling", "Norm of RHS"); //Scale residual by b instead of R0 so initial guess works correctly
-  //belosList.set("Explicit Residual Scaling","Norm of RHS");
-
-  int verbosity;
-  if (verbose) {
-    verbosity = Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary;
-    if (frequency > 0)
-      belosList.set( "Output Frequency", frequency );
-  }
-  else
-    verbosity = Belos::Errors + Belos::Warnings;
-  if(verboseTimes)
-    verbosity += Belos::TimingDetails;
-  belosList.set( "Verbosity", verbosity);
-
 
   //*************************************************************************
   // Set up initial values:
@@ -264,15 +237,43 @@ bool proc_verbose = false;
   else if(precOn) {
     problem1.setRightPrec(JacobiPrec);
   }
-  RCP< Belos::SolverManager<ST,KMV,KOP> > Solver1
-    = rcp( new Belos::BlockGmresSolMgr<ST,KMV,KOP>(rcp(&problem1,false), rcp(&belosList,false)) );
-  int iter = 1; //initialize IR loop counter.
 
   //Vectors for computing norms:
   std::vector<ST2> actual_resids( numrhs );
   std::vector<ST2> rhs_norm( numrhs );
   MVT::MvNorm( *B2, rhs_norm );
 
+  //
+  // ********Other information used by block solver***********
+  // *****************(can be user specified)******************
+  //
+  const int NumGlobalElements = B1->GetGlobalLength();
+  if (maxiters == -1)
+    maxiters = NumGlobalElements - 1; // maximum number of iterations to run
+  //
+  ParameterList belosList;
+  belosList.set( "Num Blocks", maxsubspace);             // Maximum number of blocks in Krylov factorization
+  belosList.set( "Maximum Iterations", maxsubspace );       // Make inner solver stop at each restart.
+  belosList.set( "Convergence Tolerance", tol*rhs_norm[0] ); // True convergence criteria.  Times res norm to make it track outer problem. 
+      //TODO: Line above assumes one rhs. 
+  belosList.set("Implicit Residual Scaling", "None"); 
+  belosList.set("Explicit Residual Scaling","None");
+
+  int verbosity;
+  if (verbose) {
+    verbosity = Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::FinalSummary;
+    if (frequency > 0)
+      belosList.set( "Output Frequency", frequency );
+  }
+  else
+    verbosity = Belos::Errors + Belos::Warnings;
+  if(verboseTimes)
+    verbosity += Belos::TimingDetails;
+  belosList.set( "Verbosity", verbosity);
+
+  RCP< Belos::SolverManager<ST,KMV,KOP> > Solver1
+    = rcp( new Belos::BlockGmresSolMgr<ST,KMV,KOP>(rcp(&problem1,false), rcp(&belosList,false)) );
+  int iter = 1; //initialize IR loop counter.
 
   //*************************************************************************
   // Iterative Refinement loop:
