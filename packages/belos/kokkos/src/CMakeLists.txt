@@ -125,6 +125,12 @@ TRIBITS_ADD_EXECUTABLE(
   )
 
 TRIBITS_ADD_EXECUTABLE(
+  BlockGmresSingJacobi
+  SOURCES BlockGmresSingJacobiKokkosEx.cpp
+  COMM serial mpi
+  )
+
+TRIBITS_ADD_EXECUTABLE(
   CGKokkosEx
   SOURCES CGKokkosExFile.cpp
   COMM serial mpi

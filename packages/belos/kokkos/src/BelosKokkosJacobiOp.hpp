@@ -26,9 +26,11 @@
  namespace Belos {
   /// \class KokkosJacobiOperator
   /// \brief Implementation of Kokkos-based block Jacobi preconditioner to be used with Belos.
+  /// InOutScalarT is used when you want the scalar type of vectors given to apply to be different
+  /// than the preconditioner scalar type, e.g. when applying an fp32 precond to fp64 vectors.  
   
-  template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace>
-  class KokkosJacobiOperator : public Operator<ScalarType> {
+  template<class ScalarType, class OrdinalType=int, class Device=Kokkos::DefaultExecutionSpace, class InOutScalarT = ScalarType>
+  class KokkosJacobiOperator : public Operator<InOutScalarT> {
   private:
 
   //TODO: really check if these typedefs match the template. 
@@ -53,7 +55,7 @@
 
   public:
   // Shallow copy for mat of same scalar type:
-    KokkosJacobiOperator<ScalarType, OrdinalType, Device> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> A, int blockSize, std::string solve="TRSV", int teamSize=-1) 
+    KokkosJacobiOperator<ScalarType, OrdinalType, Device, InOutScalarT> (const KokkosSparse::CrsMatrix<ScalarType, OrdinalType, Device> A, int blockSize, std::string solve="TRSV", int teamSize=-1) 
      : A_(A), 
      Ablocks_("Ablocks",0,0,0),
      blockSize_(blockSize),
@@ -157,7 +159,7 @@
 
     //template<typename ScalarType2>  //Tried ST2. Doesn't work b/c apply interface has all same ST. 
     // y = A*x
-    void Apply (const MultiVec<ScalarType>& x,  MultiVec<ScalarType>& y,  ETrans trans=NOTRANS) const{
+    void Apply (const MultiVec<InOutScalarT>& x,  MultiVec<InOutScalarT>& y,  ETrans trans=NOTRANS) const{
     //Note: Do NOT make x and y the same multivector!  You will get NaNs...
       KokkosMultiVec<ScalarType, Device> *x_vec = dynamic_cast<KokkosMultiVec<ScalarType, Device> *>
             (&const_cast<MultiVec<ScalarType> &>(x));
