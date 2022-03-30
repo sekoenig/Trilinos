@@ -235,7 +235,7 @@ namespace { // (anonymous)
            const bool canUseKokkosDeepCopy =
              CanUseKokkosDeepCopy<OutputViewType, InputViewType>::value,
            const bool outputExecSpaceCanAccessInputMemSpace =
-             Kokkos::Impl::SpaceAccessibility<
+             Kokkos::SpaceAccessibility<
                typename OutputViewType::memory_space,
                typename InputViewType::memory_space>::accessible>
   struct CopyConvertImpl {
@@ -356,9 +356,9 @@ void
 copyConvert (const OutputViewType& dst,
              const InputViewType& src)
 {
-  static_assert (Kokkos::Impl::is_view<OutputViewType>::value,
+  static_assert (Kokkos::is_view<OutputViewType>::value,
                  "OutputViewType must be a Kokkos::View.");
-  static_assert (Kokkos::Impl::is_view<InputViewType>::value,
+  static_assert (Kokkos::is_view<InputViewType>::value,
                  "InputViewType must be a Kokkos::View.");
   static_assert (std::is_same<typename OutputViewType::value_type,
                    typename OutputViewType::non_const_value_type>::value,
