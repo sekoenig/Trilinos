@@ -2,6 +2,7 @@ INCLUDE(XpetraAddTest)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../test/unit_tests)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../test/scaling)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../belos/tpetra/adapters/)
 
 #
 # Executables
@@ -60,6 +61,9 @@ IF(${PACKAGE_NAME}_ENABLE_Stratimikos AND ${PACKAGE_NAME}_ENABLE_Thyra)
 
   TRIBITS_COPY_FILES_TO_BINARY_DIR(advanced_stratimikos_cp
     SOURCE_FILES stratimikos_ParameterList.xml stratimikos_ParameterList.yaml stratimikos_ParameterList2.xml
+    stratimikos_HalfBelosPrec_ParameterList.xml 
+    stratimikos_BelosPrec_ParameterList.xml 
+    stratimikos_GMRES_IR_ParameterList.xml 
     set1-gmres.xml set1-cg.xml
     set2-sgs1.xml set2-sgs3.xml
     set3-mg-jacobi.xml set3-mg-sgs.xml set3-mg-gs.xml set3-mg-chebyshev.xml set3-mg-sgs-reuse.xml

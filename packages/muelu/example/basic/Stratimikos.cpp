@@ -72,6 +72,9 @@ The source code is not MueLu specific and can be used with any Stratimikos strat
 #include <Stratimikos_LinearSolverBuilder.hpp>
 #include <Stratimikos_MueLuHelpers.hpp>
 
+// Stratimikos Belos //TODO testing only
+#include <Stratimikos_BelosTpetraPrecHelpers.hpp>
+
 // Xpetra include
 #include <Xpetra_Parameters.hpp>
 
@@ -196,6 +199,8 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib lib, int arg
     Stratimikos::LinearSolverBuilder<Scalar> linearSolverBuilder;
     // Register MueLu as a Stratimikos preconditioner strategy.
     Stratimikos::enableMueLu<Scalar,LocalOrdinal,GlobalOrdinal,Node>(linearSolverBuilder);
+    // Register Belos as a preconditioner:
+    Stratimikos::enableBelosPrecTpetra<Tpetra::CrsMatrix<Scalar,LocalOrdinal,GlobalOrdinal,Node>>(linearSolverBuilder);
 #ifdef HAVE_MUELU_IFPACK2
     // Register Ifpack2 as a Stratimikos preconditioner strategy.
     typedef Thyra::PreconditionerFactoryBase<Scalar> Base;
