@@ -39,74 +39,77 @@
 // ************************************************************************
 //@HEADER
 
-#ifndef _FROSCH_ALGEBRAICOVERLAPPINGOPERATOR_DECL_HPP
-#define _FROSCH_ALGEBRAICOVERLAPPINGOPERATOR_DECL_HPP
+#ifndef _FROSCH_TPETRAPRECONDITIONER_DECL_HPP
+#define _FROSCH_TPETRAPRECONDITIONER_DECL_HPP
 
-#include <FROSch_OverlappingOperator_def.hpp>
+#if defined(HAVE_XPETRA_TPETRA)
+#include <Tpetra_Operator.hpp>
 
+#include <Xpetra_Operator.hpp>
+#include <Xpetra_Matrix_fwd.hpp>
+
+#include <ShyLU_DDFROSch_config.h>
+
+#include <FROSch_Types.h>
+#include <FROSch_SchwarzPreconditioner_decl.hpp>
 
 namespace FROSch {
 
     using namespace std;
     using namespace Teuchos;
-    using namespace Xpetra;
-
-    enum AddingLayersStrategy {LayersFromMatrix=0,LayersFromGraph=1,LayersOld=2};
 
     template <class SC = double,
               class LO = int,
               class GO = DefaultGlobalOrdinal,
               class NO = KokkosClassic::DefaultNode::DefaultNodeType>
-    class AlgebraicOverlappingOperator : public OverlappingOperator<SC,LO,GO,NO> {
+    class TpetraPreconditioner : public Tpetra::Operator<SC,LO,GO,NO> {
 
     protected:
-
-        using CommPtr               = typename SchwarzOperator<SC,LO,GO,NO>::CommPtr;
-
-        using XMapPtr               = typename SchwarzOperator<SC,LO,GO,NO>::XMapPtr;
-        using ConstXMapPtr          = typename SchwarzOperator<SC,LO,GO,NO>::ConstXMapPtr;
-
-        using XMatrixPtr            = typename SchwarzOperator<SC,LO,GO,NO>::XMatrixPtr;
-        using ConstXMatrixPtr       = typename SchwarzOperator<SC,LO,GO,NO>::ConstXMatrixPtr;
-
-        using ConstXCrsGraphPtr     = typename SchwarzOperator<SC,LO,GO,NO>::ConstXCrsGraphPtr;
-
-        using ParameterListPtr      = typename SchwarzOperator<SC,LO,GO,NO>::ParameterListPtr;
-
+        using TMap = Tpetra::Map<LO,GO,NO>;
+        using TMultiVector = Tpetra::MultiVector<SC,LO,GO,NO>;
     public:
 
-        AlgebraicOverlappingOperator(ConstXMatrixPtr k,
-                                     ParameterListPtr parameterList);
+        TpetraPreconditioner();
+        TpetraPreconditioner(Teuchos::RCP<SchwarzPreconditioner<SC,LO,GO,NO> > preconditioner);
 
-        virtual int initialize()
-        {
-            FROSCH_ASSERT(false,"AlgebraicOverlappingOperator cannot be built without input parameters.");
-            return 0;
-        };
+        ~TpetraPreconditioner();
 
-        int initialize(int overlap,
-                       ConstXMapPtr repeatedMap = null);
+        int initialize(bool useDefaultParameters = true);
 
         int compute();
+        
+        // Y = alpha * A^mode * X + beta * Y
+        void apply(const TMultiVector &X,
+                         TMultiVector &Y,
+                   ETransp mode=NO_TRANS,
+                   SC alpha=ScalarTraits<SC>::one(),
+                   SC beta=ScalarTraits<SC>::zero()) const;
+
+        Teuchos::RCP<const TMap> getDomainMap() const;
+
+        Teuchos::RCP<const TMap> getRangeMap() const;
 
         void describe(FancyOStream &out,
                       const EVerbosityLevel verbLevel=Describable::verbLevel_default) const;
 
         string description() const;
 
+        bool isInitialized() const;
+
+        bool isComputed() const;
+
+        void residual(const TMultiVector & X,
+                      const TMultiVector & B,
+                            TMultiVector& R) const;
+
+        Teuchos::RCP<SchwarzPreconditioner<SC,LO,GO,NO> >
+        getSchwarzPreconditioner();
+
     protected:
-
-        int buildOverlappingMatrices(int overlap,
-                                     ConstXMapPtr repeatedMap);
-
-        virtual int updateLocalOverlappingMatrices();
-        virtual int updateLocalOverlappingMatrices_Symbolic();
-
-        virtual void extractLocalSubdomainMatrix_Symbolic();
-
-        AddingLayersStrategy AddingLayersStrategy_ = LayersFromGraph;
+        Teuchos::RCP<SchwarzPreconditioner<SC,LO,GO,NO> > preconditioner_;
     };
 
 }
+#endif
 
 #endif
