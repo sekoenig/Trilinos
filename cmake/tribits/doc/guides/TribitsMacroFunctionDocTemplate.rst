@@ -9,7 +9,7 @@
 @FUNCTION: tribits_add_executable() +
 @FUNCTION: tribits_add_executable_and_test() +
 @FUNCTION: tribits_add_library() +
-@MACRO:    tribits_add_option_and_define() +
+@FUNCTION:    tribits_add_option_and_define() +
 @MACRO:    tribits_add_show_deprecated_warnings_option() +
 @FUNCTION: tribits_add_test() +
 @MACRO:    tribits_add_test_directories() +
@@ -44,6 +44,7 @@
 @MACRO:    tribits_project_enable_all() +
 @MACRO:    tribits_repository_define_packages() +
 @MACRO:    tribits_repository_define_tpls() +
+@MACRO:    tribits_set_and_inc_dirs() +
 @FUNCTION: tribits_set_st_for_dev_mode() +
 @MACRO:    tribits_subpackage() +
 @MACRO:    tribits_subpackage_postprocess() +

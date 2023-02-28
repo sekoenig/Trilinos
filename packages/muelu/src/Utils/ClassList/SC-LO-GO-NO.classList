@@ -68,6 +68,7 @@ NullspaceFactory_kokkos - #if defined(HAVE_MUELU_KOKKOS_REFACTOR)
 NullspacePresmoothFactory
 PatternFactory
 PerfUtils
+PerfModels
 PermutationFactory
 PermutingSmoother
 PgPFactory
@@ -89,6 +90,7 @@ ReorderBlockAFactory
 RepartitionFactory - #ifdef HAVE_MPI
 RepartitionBlockDiagonalFactory - #ifdef HAVE_MPI
 RepartitionHeuristicFactory - #ifdef HAVE_MPI
+ReplicatePFactory
 RigidBodyModeFactory
 SaPFactory
 SaPFactory_kokkos - #if defined(HAVE_MUELU_KOKKOS_REFACTOR)
