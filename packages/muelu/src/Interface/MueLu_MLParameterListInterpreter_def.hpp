@@ -86,7 +86,6 @@
 #include "MueLu_ParameterListUtils.hpp"
 
 #include "MueLu_CoalesceDropFactory_kokkos.hpp"
-// #include "MueLu_CoarseMapFactory_kokkos.hpp"
 // #include "MueLu_CoordinatesTransferFactory_kokkos.hpp"
 // #include "MueLu_NullspaceFactory_kokkos.hpp"
 #include "MueLu_SaPFactory_kokkos.hpp"
@@ -197,21 +196,25 @@ namespace MueLu {
     bool setKokkosRefactor = false;
     bool useKokkosRefactor;
 # ifdef HAVE_MUELU_SERIAL
-    if (typeid(Node).name() == typeid(Kokkos::Compat::KokkosSerialWrapperNode).name())
+    if (typeid(Node).name() == typeid(Tpetra::KokkosCompat::KokkosSerialWrapperNode).name())
       useKokkosRefactor = false;
 # endif
 # ifdef HAVE_MUELU_OPENMP
-    if (typeid(Node).name() == typeid(Kokkos::Compat::KokkosOpenMPWrapperNode).name())
+    if (typeid(Node).name() == typeid(Tpetra::KokkosCompat::KokkosOpenMPWrapperNode).name())
       useKokkosRefactor = true;
 # endif
 # ifdef HAVE_MUELU_CUDA
-    if (typeid(Node).name() == typeid(Kokkos::Compat::KokkosCudaWrapperNode).name())
+    if (typeid(Node).name() == typeid(Tpetra::KokkosCompat::KokkosCudaWrapperNode).name())
       useKokkosRefactor = true;
 # endif
 # ifdef HAVE_MUELU_HIP
-    if (typeid(Node).name() == typeid(Kokkos::Compat::KokkosHIPWrapperNode).name())
+    if (typeid(Node).name() == typeid(Tpetra::KokkosCompat::KokkosHIPWrapperNode).name())
       useKokkosRefactor = true;
 # endif
+# ifdef HAVE_MUELU_SYCL
+    if (typeid(Node).name() == typeid(Tpetra::KokkosCompat::KokkosSYCLWrapperNode).name())
+      useKokkosRefactor = true;
+#endif
     if (paramList.isType<bool>("use kokkos refactor")) {
       useKokkosRefactor = paramList.get<bool>("use kokkos refactor");
       setKokkosRefactor = true;

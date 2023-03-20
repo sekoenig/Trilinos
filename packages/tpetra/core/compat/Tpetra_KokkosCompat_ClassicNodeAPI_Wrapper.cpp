@@ -1,9 +1,8 @@
-#include "KokkosCompat_ClassicNodeAPI_Wrapper.hpp"
+#include <Tpetra_KokkosCompat_ClassicNodeAPI_Wrapper.hpp>
 #include "Teuchos_ParameterList.hpp"
 
-
-namespace Kokkos {
-  namespace Compat {
+namespace Tpetra {
+namespace KokkosCompat {
 
 #ifdef KOKKOS_ENABLE_THREADS
     template<>
@@ -42,14 +41,14 @@ namespace Kokkos {
 
 #ifdef KOKKOS_ENABLE_SYCL
     template<>
-    std::string KokkosDeviceWrapperNode<Kokkos::Experimental::SYCL, Kokkos::Experimental::SYCLSharedUSMSpace>::name() {
+    std::string KokkosDeviceWrapperNode<Kokkos::Experimental::SYCL, Kokkos::Experimental::SYCLDeviceUSMSpace>::name() {
       return std::string("SYCL/Wrapper");
     }
 #endif // KOKKOS_ENABLE_SYCL
 
 
-  } // namespace Compat
-} // namespace Kokkos
+} // namespace KokkosCompat
+} // namespace Tpetra
 
 
 
