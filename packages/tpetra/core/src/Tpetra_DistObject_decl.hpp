@@ -37,6 +37,7 @@
 // ************************************************************************
 // @HEADER
 
+// clang-format off
 #ifndef TPETRA_DISTOBJECT_DECL_HPP
 #define TPETRA_DISTOBJECT_DECL_HPP
 
@@ -797,7 +798,8 @@ namespace Tpetra {
 
     void doPackAndPrepare(const SrcDistObject& src,
                           const Kokkos::DualView<const local_ordinal_type*, buffer_device_type>& exportLIDs,
-                          size_t& constantNumPackets);
+                          size_t& constantNumPackets,
+                          const execution_space &space);
 
     void doUnpackAndCombine(const Kokkos::DualView<const local_ordinal_type*, buffer_device_type>& remoteLIDs,
                             size_t constantNumPackets,
@@ -860,6 +862,18 @@ namespace Tpetra {
                       buffer_device_type>& permuteFromLIDs,
                     const CombineMode CM);
 
+  // clang-format on
+  /*! \brief Same as copyAndPermute, but do operations in \c space
+   */
+  virtual void copyAndPermute(
+      const SrcDistObject &source, const size_t numSameIDs,
+      const Kokkos::DualView<const local_ordinal_type *, buffer_device_type>
+          &permuteToLIDs,
+      const Kokkos::DualView<const local_ordinal_type *, buffer_device_type>
+          &permuteFromLIDs,
+      const CombineMode CM, const execution_space &space);
+  // clang-format off
+
     /// \brief Pack data and metadata for communication (sends).
     ///
     /// Subclasses <i>must</i> reimplement this function.  Its default
@@ -906,6 +920,19 @@ namespace Tpetra {
                     Kokkos::DualView<size_t*,
                       buffer_device_type> numPacketsPerLID,
                     size_t& constantNumPackets);
+
+    /*! \brief Same as packAndPrepare, but in an execution space instance
+    */
+    virtual void
+    packAndPrepare (const SrcDistObject& source,
+                    const Kokkos::DualView<const local_ordinal_type*,
+                      buffer_device_type>& exportLIDs,
+                    Kokkos::DualView<packet_type*,
+                      buffer_device_type>& exports,
+                    Kokkos::DualView<size_t*,
+                      buffer_device_type> numPacketsPerLID,
+                    size_t& constantNumPackets,
+                    const execution_space &space);
 
     /// \brief Perform any unpacking and combining after
     ///   communication.

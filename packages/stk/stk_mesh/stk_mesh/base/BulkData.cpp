@@ -413,7 +413,7 @@ BulkData::BulkData(std::shared_ptr<MetaData> mesh_meta_data,
 
   impl::check_size_of_types();
 
-  register_observer(m_meshDiagnosticObserver, ModificationObserverPriority::STK_INTERNAL);
+  register_observer(m_meshDiagnosticObserver);
 
   init_mesh_consistency_check_mode();
 
@@ -1766,10 +1766,9 @@ void BulkData::reallocate_field_data(stk::mesh::FieldBase & field)
   }
 }
 
-void BulkData::register_observer(std::shared_ptr<ModificationObserver> observer,
-                                 ModificationObserverPriority priority) const
+void BulkData::register_observer(std::shared_ptr<ModificationObserver> observer) const
 {
-    notifier.register_observer(observer, priority);
+    notifier.register_observer(observer);
 }
 
 void BulkData::unregister_observer(std::shared_ptr<ModificationObserver> observer) const
@@ -1822,7 +1821,8 @@ void BulkData::new_bucket_callback(EntityRank rank, const PartVector& superset_p
     m_num_fields = field_set.size();
   }
 
-  m_field_data_manager->allocate_bucket_field_data(rank, field_set, superset_parts, capacity);
+  const unsigned newBucketSize = 0;
+  m_field_data_manager->allocate_bucket_field_data(rank, field_set, superset_parts, newBucketSize, capacity);
 }
 
 //
@@ -1894,7 +1894,7 @@ void BulkData::add_entity_callback(EntityRank rank, unsigned bucketId, unsigned 
   const std::vector<FieldBase *> &fields = mesh_meta_data().get_fields();
 
   if (m_field_data_manager->get_bucket_capacity(rank, bucketId) < bucketCapacity) {
-    m_field_data_manager->grow_bucket_capacity(fields, rank, bucketId, bucketCapacity);
+    m_field_data_manager->grow_bucket_capacity(fields, rank, bucketId, indexInBucket, bucketCapacity);
   }
 
   m_field_data_manager->add_field_data_for_entity(fields, rank, bucketId, indexInBucket);
@@ -1940,6 +1940,12 @@ void BulkData::destroy_bucket_callback(EntityRank rank, Bucket const& dying_buck
 
   const std::vector<FieldBase*>&  fields = mesh_meta_data().get_fields();
   m_field_data_manager->deallocate_bucket_field_data(rank, bucket_id, capacity, fields);
+}
+
+void BulkData::reset_empty_field_data_callback(EntityRank rank, unsigned bucketId, unsigned bucketSize,
+                                               unsigned bucketCapacity, const FieldVector & fields)
+{
+  m_field_data_manager->reset_empty_field_data(rank, bucketId, bucketSize, bucketCapacity, fields);
 }
 
 void BulkData::update_field_data_states(FieldBase* field)
@@ -6002,7 +6008,7 @@ bool BulkData::initialize_face_adjacent_element_graph()
     {
         m_elemElemGraph = new ElemElemGraph(*this);
         m_elemElemGraphUpdater = std::make_shared<ElemElemGraphUpdater>(*this,*m_elemElemGraph);
-        register_observer(m_elemElemGraphUpdater, ModificationObserverPriority::STK_INTERNAL);
+        register_observer(m_elemElemGraphUpdater);
         return true;
     }
     return false;

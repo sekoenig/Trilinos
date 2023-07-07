@@ -128,7 +128,7 @@ void write_mesh_with_specified_splitting(stk::mesh::BulkData &bulk, const std::s
   stkIo.set_bulk_data(bulk);
 
   size_t outputIdx = stkIo.create_output_mesh(filename, stk::io::WRITE_RESULTS);
-  Ioss::Region* ioRegion = stkIo.get_output_io_region(outputIdx).get();
+  Ioss::Region* ioRegion = stkIo.get_output_ioss_region(outputIdx).get();
 
   Ioss::DatabaseIO *db = ioRegion->get_database();
   assert(db != nullptr);
@@ -361,8 +361,7 @@ void create_sideset_observer(stk::mesh::BulkData& bulk, stk::mesh::Selector acti
     if (activeSelector == stk::mesh::Selector()) {
       activeSelector = bulk.mesh_meta_data().universal_part();
     }
-    bulk.register_observer(std::make_shared<stk::mesh::IncrementalSidesetUpdater>(bulk, activeSelector),
-                           stk::mesh::ModificationObserverPriority::STK_INTERNAL);
+    bulk.register_observer(std::make_shared<stk::mesh::IncrementalSidesetUpdater>(bulk, activeSelector));
   }
 }
 }

@@ -391,7 +391,7 @@ public:
   //@{
 
   //! The number of degrees of freedom per mesh point.
-  LO getBlockSize () const { return blockSize_; }
+  virtual LO getBlockSize () const override { return blockSize_; }
 
   //! Get the (mesh) graph.
   virtual Teuchos::RCP<const ::Tpetra::RowGraph<LO,GO,Node> > getGraph () const override;
@@ -744,6 +744,12 @@ protected:
 
   virtual bool checkSizes (const ::Tpetra::SrcDistObject& source) override;
 
+  // clang-format on
+  using dist_object_type::
+      copyAndPermute; ///< DistObject copyAndPermute has multiple overloads --
+                      ///< use copyAndPermutes for anything we don't override
+                      // clang-format off
+
   virtual void
   copyAndPermute
   (const SrcDistObject& sourceObj,
@@ -753,6 +759,13 @@ protected:
    const Kokkos::DualView<const local_ordinal_type*,
      buffer_device_type>& permuteFromLIDs,
    const CombineMode CM) override;
+
+  // clang-format on
+  using dist_object_type::packAndPrepare; ///< DistObject overloads
+                                          ///< packAndPrepare. Explicitly use
+                                          ///< DistObject's packAndPrepare for
+                                          ///< anything we don't override
+                                          // clang-format off
 
   virtual void
   packAndPrepare

@@ -24,7 +24,7 @@ TRIBITS_ADD_OPTION_AND_DEFINE(
 # Supported Kokkos version in Trilinos
 # NOTE: When we snapshot Kokkos into Trilinos, we have to update these numbers to maintain
 # compatibility with external Kokkos
-SET(Tpetra_SUPPORTED_KOKKOS_VERSION "4.0.1")
+SET(Tpetra_SUPPORTED_KOKKOS_VERSION "4.1.00")
 
 
 # Option to allow developers to ignore incompatible Kokkos versions
@@ -71,12 +71,6 @@ ENDIF ()
 
 # Asserts for Accelerator support.
 ASSERT_DEFINED(TPL_ENABLE_CUDA)
-ASSERT_DEFINED(Kokkos_ENABLE_OPENMP)
-ASSERT_DEFINED(Kokkos_ENABLE_THREADS)
-ASSERT_DEFINED(Kokkos_ENABLE_SERIAL)
-ASSERT_DEFINED(Kokkos_ENABLE_CUDA)
-ASSERT_DEFINED(Kokkos_ENABLE_SYCL)
-ASSERT_DEFINED(Kokkos_ENABLE_HIP)
 
 # Support for "ENABLE" Cuda, rather than "INST"
 INCLUDE(CMakeCuda.txt)

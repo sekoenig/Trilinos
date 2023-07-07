@@ -119,13 +119,13 @@ lclNormImpl (const RV& normsOut,
   using Kokkos::subview;
   using mag_type = typename RV::non_const_value_type;
 
-  static_assert (static_cast<int> (RV::Rank) == 1,
+  static_assert (static_cast<int> (RV::rank) == 1,
                  "Tpetra::MultiVector::lclNormImpl: "
                  "The first argument normsOut must have rank 1.");
   static_assert (Kokkos::is_view<XMV>::value,
                  "Tpetra::MultiVector::lclNormImpl: "
                  "The second argument X is not a Kokkos::View.");
-  static_assert (static_cast<int> (XMV::Rank) == 2,
+  static_assert (static_cast<int> (XMV::rank) == 2,
                  "Tpetra::MultiVector::lclNormImpl: "
                  "The second argument X must have rank 2.");
 
@@ -319,6 +319,7 @@ normImpl (MagnitudeType norms[],
           const bool isDistributed,
           const Teuchos::Comm<int>* comm)
 {
+  using execution_space = typename DeviceType::execution_space;
   using RV = Kokkos::View<MagnitudeType*, Kokkos::HostSpace>;
   //using XMV = Kokkos::View<const ValueType**, ArrayLayout, DeviceType>;
   //using pair_type = std::pair<size_t, size_t>;
@@ -333,6 +334,15 @@ normImpl (MagnitudeType norms[],
 
   Impl::lclNormImpl (normsOut, X, numVecs, whichVecs,
                      isConstantStride, whichNorm);
+
+  // lbv 03/15/23: the data from the local norm calculation
+  // better really be available before communication happens
+  // so fencing to make sure the local computations have
+  // completed on device. We might want to make this an
+  // execution space fence down the road?
+  execution_space exec_space_instance = execution_space();
+  exec_space_instance.fence();
+
   Impl::gblNormImpl (normsOut, comm, isDistributed, whichNorm);
 }
 

@@ -831,8 +831,7 @@ public:
 
   const std::string & get_last_modification_description() const { return m_lastModificationDescription; }
 
-  void register_observer(std::shared_ptr<stk::mesh::ModificationObserver> observer,
-                         stk::mesh::ModificationObserverPriority priority) const;
+  void register_observer(std::shared_ptr<stk::mesh::ModificationObserver> observer) const;
   void unregister_observer(std::shared_ptr<ModificationObserver> observer) const;
   template<typename ObserverType>
   bool has_observer_type() const { return notifier.has_observer_type<ObserverType>(); }
@@ -1365,6 +1364,8 @@ private:
 
   void remove_entity_field_data_callback(EntityRank rank, unsigned bucket_id, unsigned bucket_ord);
   void add_entity_callback(EntityRank rank, unsigned bucketId, unsigned bucketCapacity, unsigned indexInBucket);
+  void reset_empty_field_data_callback(EntityRank rank, unsigned bucketId, unsigned bucketSize,
+                                       unsigned bucketCapacity, const FieldVector & fields);
 
   void initialize_arrays();
 

@@ -1156,6 +1156,12 @@ public:
     virtual bool
     checkSizes (const SrcDistObject& source) override;
 
+  // clang-format on
+  using dist_object_type::
+      copyAndPermute; /// DistObject copyAndPermute has multiple overloads --
+                      /// use copyAndPermutes for anything we don't override
+  // clang-format off
+
     virtual void
     copyAndPermute
     (const SrcDistObject& source,
@@ -1225,6 +1231,13 @@ public:
       Kokkos::DualView<packet_type*, buffer_device_type>& exports,
       Kokkos::DualView<size_t*, buffer_device_type> numPacketsPerLID,
       size_t& constantNumPackets) override;
+
+  // clang-format on
+  using dist_object_type::packAndPrepare; ///< DistObject overloads
+                                          ///< packAndPrepare. Explicitly use
+                                          ///< DistObject's packAndPrepare for
+                                          ///< anything we don't override
+  // clang-format off
 
     virtual void
     pack (const Teuchos::ArrayView<const local_ordinal_type>& exportLIDs,
