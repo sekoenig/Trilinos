@@ -151,15 +151,15 @@ Spandan Maiti.  "Recycling Krylov Subspaces for Sequences of Linear
 Systems," SIAM Journal on Scientific Computing, 28(5), pp. 1651-1674,
 2006.*/
 
-  template<class ScalarType, class MV, class OP,
+  template<class ScalarType, class MV, class OP, class DM = Teuchos::SerialDenseMatrix<int,ScalarType>,
            const bool lapackSupportsScalarType =
            Belos::Details::LapackSupportsScalar<ScalarType>::value>
   class GCRODRSolMgr :
-    public Details::SolverManagerRequiresLapack<ScalarType,MV,OP>
+    public Details::SolverManagerRequiresLapack<ScalarType,MV,OP,DM>
   {
     static const bool requiresLapack =
       Belos::Details::LapackSupportsScalar<ScalarType>::value;
-    typedef Details::SolverManagerRequiresLapack<ScalarType, MV, OP,
+    typedef Details::SolverManagerRequiresLapack<ScalarType, MV, OP,DM,
                                                  requiresLapack> base_type;
 
   public:
@@ -176,9 +176,9 @@ Systems," SIAM Journal on Scientific Computing, 28(5), pp. 1651-1674,
   /// \brief Partial specialization for ScalarType types for which
   ///   Teuchos::LAPACK has a valid implementation.  This contains the
   ///   actual working implementation of GCRODR.
-  template<class ScalarType, class MV, class OP>
-  class GCRODRSolMgr<ScalarType, MV, OP, true> :
-    public Details::SolverManagerRequiresLapack<ScalarType, MV, OP, true>
+  template<class ScalarType, class MV, class OP, class DM>
+  class GCRODRSolMgr<ScalarType, MV, OP, DM, true> :
+    public Details::SolverManagerRequiresLapack<ScalarType, MV, OP, DM, true>
   {
 
 #if defined(HAVE_TEUCHOSCORE_CXX11)
@@ -218,12 +218,12 @@ Systems," SIAM Journal on Scientific Computing, 28(5), pp. 1651-1674,
 #endif // defined(HAVE_TEUCHOSCORE_CXX11)
 
   private:
-    typedef MultiVecTraits<ScalarType,MV> MVT;
+    typedef MultiVecTraits<ScalarType,MV,DM> MVT;
     typedef OperatorTraits<ScalarType,MV,OP> OPT;
     typedef Teuchos::ScalarTraits<ScalarType> SCT;
     typedef typename Teuchos::ScalarTraits<ScalarType>::magnitudeType MagnitudeType;
     typedef Teuchos::ScalarTraits<MagnitudeType> MT;
-    typedef OrthoManagerFactory<ScalarType, MV, OP> ortho_factory_type;
+    typedef OrthoManagerFactory<ScalarType, MV, OP, DM> ortho_factory_type;
 
   public:
     //! @name Constructors/Destructor
@@ -295,8 +295,8 @@ Systems," SIAM Journal on Scientific Computing, 28(5), pp. 1651-1674,
     virtual ~GCRODRSolMgr() {};
 
     //! clone for Inverted Injection (DII)
-    Teuchos::RCP<SolverManager<ScalarType, MV, OP> > clone () const override {
-      return Teuchos::rcp(new GCRODRSolMgr<ScalarType,MV,OP,true>);
+    Teuchos::RCP<SolverManager<ScalarType, MV, OP, DM> > clone () const override {
+      return Teuchos::rcp(new GCRODRSolMgr<ScalarType,MV,OP,DM,true>);
     }
     //@}
 
@@ -544,8 +544,8 @@ Systems," SIAM Journal on Scientific Computing, 28(5), pp. 1651-1674,
 
 
 // Empty Constructor
-template<class ScalarType, class MV, class OP>
-GCRODRSolMgr<ScalarType,MV,OP,true>::GCRODRSolMgr():
+template<class ScalarType, class MV, class OP, class DM>
+GCRODRSolMgr<ScalarType,MV,OP,DM,true>::GCRODRSolMgr():
   achievedTol_(0.0),
   numIters_(0)
 {
@@ -554,8 +554,8 @@ GCRODRSolMgr<ScalarType,MV,OP,true>::GCRODRSolMgr():
 
 
 // Basic Constructor
-template<class ScalarType, class MV, class OP>
-GCRODRSolMgr<ScalarType,MV,OP,true>::
+template<class ScalarType, class MV, class OP, class DM>
+GCRODRSolMgr<ScalarType,MV,OP,DM,true>::
 GCRODRSolMgr(const Teuchos::RCP<LinearProblem<ScalarType,MV,OP> >& problem,
              const Teuchos::RCP<Teuchos::ParameterList>& pl):
   achievedTol_(0.0),
@@ -583,8 +583,8 @@ GCRODRSolMgr(const Teuchos::RCP<LinearProblem<ScalarType,MV,OP> >& problem,
 }
 
 // Common instructions executed in all constructors
-template<class ScalarType, class MV, class OP>
-void GCRODRSolMgr<ScalarType,MV,OP,true>::init () {
+template<class ScalarType, class MV, class OP, class DM>
+void GCRODRSolMgr<ScalarType,MV,OP,DM,true>::init () {
   outputStream_ = Teuchos::rcpFromRef(std::cout);
   convTol_ = DefaultSolverParameters::convTol;
   orthoKappa_ = orthoKappa_default_;
@@ -616,9 +616,8 @@ void GCRODRSolMgr<ScalarType,MV,OP,true>::init () {
   B_ = Teuchos::null;
 }
 
-template<class ScalarType, class MV, class OP>
-void
-GCRODRSolMgr<ScalarType,MV,OP,true>::
+template<class ScalarType, class MV, class OP, class DM>
+void GCRODRSolMgr<ScalarType,MV,OP,DM,true>::
 setParameters (const Teuchos::RCP<Teuchos::ParameterList> &params)
 {
   using Teuchos::isParameterType;
@@ -1127,9 +1126,9 @@ setParameters (const Teuchos::RCP<Teuchos::ParameterList> &params)
 }
 
 
-template<class ScalarType, class MV, class OP>
+template<class ScalarType, class MV, class OP, class DM>
 Teuchos::RCP<const Teuchos::ParameterList>
-GCRODRSolMgr<ScalarType,MV,OP,true>::getValidParameters() const
+GCRODRSolMgr<ScalarType,MV,OP,DM,true>::getValidParameters() const
 {
   using Teuchos::ParameterList;
   using Teuchos::parameterList;
@@ -1197,8 +1196,8 @@ GCRODRSolMgr<ScalarType,MV,OP,true>::getValidParameters() const
 }
 
 // initializeStateStorage
-template<class ScalarType, class MV, class OP>
-void GCRODRSolMgr<ScalarType,MV,OP,true>::initializeStateStorage() {
+template<class ScalarType, class MV, class OP, class DM>
+void GCRODRSolMgr<ScalarType,MV,OP,DM,true>::initializeStateStorage() {
 
     ScalarType zero = Teuchos::ScalarTraits<ScalarType>::zero();
 
@@ -1326,8 +1325,8 @@ void GCRODRSolMgr<ScalarType,MV,OP,true>::initializeStateStorage() {
 
 
 // solve()
-template<class ScalarType, class MV, class OP>
-ReturnType GCRODRSolMgr<ScalarType,MV,OP,true>::solve() {
+template<class ScalarType, class MV, class OP, class DM>
+ReturnType GCRODRSolMgr<ScalarType,MV,OP,DM,true>::solve() {
   using Teuchos::RCP;
   using Teuchos::rcp;
 
@@ -1894,8 +1893,8 @@ ReturnType GCRODRSolMgr<ScalarType,MV,OP,true>::solve() {
 }
 
 //  Given existing recycle space and Krylov space, build new recycle space
-template<class ScalarType, class MV, class OP>
-void GCRODRSolMgr<ScalarType,MV,OP,true>::buildRecycleSpace2(Teuchos::RCP<GCRODRIter<ScalarType,MV,OP> > gcrodr_iter) {
+template<class ScalarType, class MV, class OP, class DM>
+void GCRODRSolMgr<ScalarType,MV,OP,DM,true>::buildRecycleSpace2(Teuchos::RCP<GCRODRIter<ScalarType,MV,OP> > gcrodr_iter) {
 
   MagnitudeType one = Teuchos::ScalarTraits<MagnitudeType>::one();
   ScalarType zero = Teuchos::ScalarTraits<ScalarType>::zero();
@@ -2072,8 +2071,8 @@ void GCRODRSolMgr<ScalarType,MV,OP,true>::buildRecycleSpace2(Teuchos::RCP<GCRODR
 
 
 //  Compute the harmonic eigenpairs of the projected, dense system.
-template<class ScalarType, class MV, class OP>
-int GCRODRSolMgr<ScalarType,MV,OP,true>::getHarmonicVecs1(int m,
+template<class ScalarType, class MV, class OP, class DM>
+int GCRODRSolMgr<ScalarType,MV,OP,DM,true>::getHarmonicVecs1(int m,
                                                      const Teuchos::SerialDenseMatrix<int,ScalarType>& HH,
                                                      Teuchos::SerialDenseMatrix<int,ScalarType>& PP) {
   int i, j;
@@ -2188,8 +2187,8 @@ int GCRODRSolMgr<ScalarType,MV,OP,true>::getHarmonicVecs1(int m,
 }
 
 //  Compute the harmonic eigenpairs of the projected, dense system.
-template<class ScalarType, class MV, class OP>
-int GCRODRSolMgr<ScalarType,MV,OP,true>::getHarmonicVecs2(int keffloc, int m,
+template<class ScalarType, class MV, class OP, class DM>
+int GCRODRSolMgr<ScalarType,MV,OP,DM,true>::getHarmonicVecs2(int keffloc, int m,
                                                      const Teuchos::SerialDenseMatrix<int,ScalarType>& HH,
                                                      const Teuchos::RCP<const MV>& VV,
                                                      Teuchos::SerialDenseMatrix<int,ScalarType>& PP) {
@@ -2338,8 +2337,8 @@ int GCRODRSolMgr<ScalarType,MV,OP,true>::getHarmonicVecs2(int keffloc, int m,
 
 
 // This method sorts list of n floating-point numbers and return permutation vector
-template<class ScalarType, class MV, class OP>
-void GCRODRSolMgr<ScalarType,MV,OP,true>::sort(std::vector<MagnitudeType>& dlist, int n, std::vector<int>& iperm) {
+template<class ScalarType, class MV, class OP, class DM>
+void GCRODRSolMgr<ScalarType,MV,OP,DM,true>::sort(std::vector<MagnitudeType>& dlist, int n, std::vector<int>& iperm) {
   int l, r, j, i, flag;
   int    RR2;
   MagnitudeType dRR, dK;
@@ -2403,8 +2402,8 @@ void GCRODRSolMgr<ScalarType,MV,OP,true>::sort(std::vector<MagnitudeType>& dlist
 }
 
 
-template<class ScalarType, class MV, class OP>
-std::string GCRODRSolMgr<ScalarType,MV,OP,true>::description () const {
+template<class ScalarType, class MV, class OP, class DM>
+std::string GCRODRSolMgr<ScalarType,MV,OP,DM,true>::description () const {
   std::ostringstream out;
   out << "Belos::GCRODRSolMgr<...,"<<Teuchos::ScalarTraits<ScalarType>::name()<<">";
   out << "{";
