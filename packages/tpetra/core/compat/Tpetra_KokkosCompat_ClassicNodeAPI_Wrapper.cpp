@@ -1,6 +1,8 @@
 #include <Tpetra_KokkosCompat_ClassicNodeAPI_Wrapper.hpp>
 #include "Teuchos_ParameterList.hpp"
 
+#ifndef HAVE_TPETRA_EXPLICIT_INSTANTIATION
+
 namespace Tpetra {
 namespace KokkosCompat {
 
@@ -54,5 +56,5 @@ namespace KokkosCompat {
 } // namespace KokkosCompat
 } // namespace Tpetra
 
-
+#endif
 

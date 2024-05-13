@@ -47,7 +47,11 @@ public:
   KokkosDeviceWrapperNode () = delete;
 
   //! Human-readable name of this Node.
+#ifndef HAVE_TPETRA_EXPLICIT_INSTANTIATION
+  static std::string name () { return "N/A without ETI"; }
+#else
   static std::string name ();
+#endif
 };
 
 #ifdef KOKKOS_ENABLE_SYCL
